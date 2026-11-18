@@ -34,5 +34,5 @@ document.getElementById("rq").addEventListener("input",rechInput);
 document.getElementById("rq").addEventListener("keydown",function(e){if(e.key==="Escape")rechHide()});
 document.getElementById("rpanel").addEventListener("click",function(e){var b=e.target.closest("[data-cid]");if(b)rechOpen(b.dataset.cid)});
 document.addEventListener("click",function(e){if(!e.target.closest("#rech"))rechHide()});
-document.addEventListener("click",function(e){var b=e.target.closest("[data-act]");if(!b||b.tagName==="INPUT")return;var f=ACTS[b.dataset.act];if(f)f(b)});
+document.addEventListener("click",function(e){var b=e.target.closest("[data-act]");if(!b||b.tagName==="INPUT"||b.tagName==="SELECT")return;var f=ACTS[b.dataset.act];if(f)f(b)});
 `;

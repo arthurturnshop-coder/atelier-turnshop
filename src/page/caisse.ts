@@ -1,31 +1,81 @@
-export const CAISSE = `// ---------- Caisse ----------
+export const CAISSE = `// ---------- Caisse (colonne de droite du Dashboard) ----------
 var PAN=[],CCLI=null,CFID=null,CUSE=false,CPAY={carte:"",especes:"",virement:""},CREP=null,CMSG="";
-function panierTotal(){return PAN.reduce(function(s,l){return s+l.quantite*Math.round(Number(String(l.prix).replace(",","."))*100||0)},0)}
-function remiseCents(){return CUSE&&CFID?Math.min(Math.round(CFID.disponibleEuros*100),panierTotal()):0}
-function vCaisse(){
-  var tot=panierTotal(),rem=remiseCents(),net=tot-rem;
-  var h="<div class='card'><div class='step'>Client (scanne la carte ou tape un email, un téléphone)</div><div class='search'><input id='cq' placeholder='Scan carte, email ou téléphone' autofocus><button data-act='cScan'>Chercher</button></div>";
+var CAV=null,CAVBUSY=false,CAVOFF=[],CREC=null,CHIST=null,CHOPEN=0;
+var MOY={carte:"Carte",especes:"Espèces",virement:"Virement"};
+function pxCents(s){return Math.round(Number(String(s).replace(",","."))*100)||0}
+function panierTotal(){return PAN.reduce(function(s,l){return s+l.quantite*pxCents(l.prix)},0)}
+function avApplicable(a,brut){
+  if(brut<=0)return false;
+  if(a.declencheur==="cumul")return !!(CCLI&&CFID)&&(CFID.recus||[]).indexOf(a.id)<0&&(CFID.depenseCents||0)+brut>=a.seuilCents;
+  return brut>=a.seuilCents}
+function avRemise(a,brut){if(a.effet==="euros")return Math.round(a.valeur*100);if(a.effet==="pourcent")return Math.round(brut*a.valeur/100);return 0}
+function avChoisis(brut){return(CAV||[]).filter(function(a){return avApplicable(a,brut)&&CAVOFF.indexOf(a.id)<0})}
+function avRemTotal(brut){var reste=brut,s=0;avChoisis(brut).forEach(function(a){var c=Math.min(avRemise(a,brut),reste);reste-=c;s+=c});return s}
+function avLabel(a){return a.effet==="euros"?"-"+a.valeur+" €":a.effet==="pourcent"?"-"+a.valeur+" %":"cadeau offert"}
+function avCondition(a){
+  if(a.declencheur==="cumul")return"dès "+(a.seuilCents/100)+" € dépensés au total (une seule fois par client)";
+  if(a.declencheur==="achat")return"dès "+(a.seuilCents/100)+" € d'achat";
+  return"du "+day(a.dateDebut)+" au "+day(a.dateFin)+(a.seuilCents>0?" dès "+(a.seuilCents/100)+" € d'achat":"")}
+function remiseCents(){var brut=panierTotal();return CUSE&&CFID?Math.min(Math.round(CFID.disponibleEuros*100),brut-avRemTotal(brut)):0}
+function lirePay(){CPAY={carte:v("pc"),especes:v("pe"),virement:v("pv")}}
+function dateLongue(d){try{return new Date(d).toLocaleString("fr-FR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit",timeZone:"Europe/Paris"})}catch(e){return d||""}}
+function recuHtml(r){
+  var h="<div class='recu' data-recu='"+r.id+"'><div class='rc'><b>TURN SOCIETY</b><br>"+esc(r.magasin||"")+"</div>"
+    +"<div class='rm'>Ticket n° "+r.id+" · "+esc(dateLongue(r.date))+"</div><div class='rm'>Vendeur : "+esc(r.vendeur||"")+(r.client?" · Client : "+esc(r.client):"")+"</div><hr>";
+  r.lignes.forEach(function(l){h+="<div class='rl'><span>"+l.quantite+" × "+esc(l.libelle)+"</span><span>"+eur(l.quantite*l.prixCents)+"</span></div>"});
+  h+="<hr><div class='rl'><span>Sous-total</span><span>"+eur(r.brutCents)+"</span></div>";
+  r.avantages.forEach(function(a){h+="<div class='rl'><span>"+(a.effet==="cadeau"?"Cadeau : ":"Offre : ")+esc(a.libelle)+"</span><span>"+(a.remiseCents?"-"+eur(a.remiseCents):"offert")+"</span></div>"});
+  if(r.fideliteCents)h+="<div class='rl'><span>Fidélité</span><span>-"+eur(r.fideliteCents)+"</span></div>";
+  h+="<div class='rl rt'><span>TOTAL</span><span>"+eur(r.totalCents)+"</span></div>";
+  r.paiements.forEach(function(p){h+="<div class='rl'><span>Payé en "+esc((MOY[p.moyen]||p.moyen).toLowerCase())+"</span><span>"+eur(p.cents)+"</span></div>"});
+  return h+"<div class='rc rm'>Merci de votre visite !</div></div>"}
+function histoHtml(){
+  if(!CHIST)return"";
+  var h="<div class='card'><div class='step'>"+(CCLI?"Achats de "+esc(CCLI.name):"Ventes du jour")+"</div>";
+  if(!CHIST.length)h+="<div class='muted'>Aucun achat en caisse pour le moment.</div>";
+  CHIST.forEach(function(r){
+    var res=r.lignes.slice(0,2).map(function(l){return esc(l.libelle)}).join(", ")+(r.lignes.length>2?"…":"");
+    h+="<button class='sec hrow' data-act='cRecu' data-id='"+r.id+"'><b>"+esc(dateLongue(r.date))+"</b> · "+eur(r.totalCents)+(CCLI?"":" · "+esc(r.client||"sans client"))+"<br><span class='muted'>"+res+"</span></button>";
+    if(CHOPEN===r.id)h+=recuHtml(r)+"<div class='actions'><button class='sec' data-act='cPrint' data-id='"+r.id+"'>Imprimer le reçu</button></div>"});
+  return h+"</div>"}
+function caisseHtml(){
+  if(CAV===null&&!CAVBUSY){CAVBUSY=true;api("/caisse/avantages").then(function(d){CAV=d;CAVBUSY=false;render()}).catch(function(){CAV=[];CAVBUSY=false})}
+  var brut=panierTotal(),av=avRemTotal(brut),rem=remiseCents(),net=brut-av-rem;
+  var h="<div class='caisse'><h3>Caisse</h3>";
+  if(CREC)h+="<div class='card'><b>Vente enregistrée</b>"+recuHtml(CREC)+"<div class='actions'><button data-act='cPrint' data-id='"+CREC.id+"'>Imprimer le reçu</button><button class='sec' data-act='cFermeRecu'>Fermer</button></div></div>";
+  h+="<div class='card'><div class='step'>Client (scan carte, email ou téléphone)</div><div class='search'><input id='cq' placeholder='Scan carte, email ou téléphone'><button data-act='cScan'>Chercher</button></div>";
   if(CCLI)h+="<div style='margin-top:8px'><b>"+esc(CCLI.name)+"</b> <span class='muted'>"+esc(CCLI.phone||"")+"</span> <button class='link' data-act='cClient0'>Retirer</button></div>";
-  else h+="<div class='muted' style='margin-top:6px'>Vente sans client.</div>";
+  else h+="<div class='muted' style='margin-top:6px'>Vente sans client. <button class='link' data-act='cJour'>Voir les ventes du jour</button></div>";
   if(CCLI&&CFID){
     var gagne=Math.floor(net/100/CFID.regle.eurosPourPalier);
-    h+="<div class='fidbox'><b>Fidélité</b><div>Déjà dépensé en caisse : "+CFID.depenseEuros.toFixed(2).replace(".",",")+" € · prochain palier dans "+CFID.prochainPalierIn.toFixed(2).replace(".",",")+" €</div>"
-      +"<div>Cet achat rapporte "+gagne+" palier(s) ("+CFID.regle.remiseEuros+" € offerts tous les "+CFID.regle.eurosPourPalier+" € dépensés).</div>";
+    h+="<div class='fidbox'><b>Fidélité</b><div>Déjà dépensé en caisse : "+(CFID.depenseEuros).toFixed(2).replace(".",",")+" € · prochain palier dans "+CFID.prochainPalierIn.toFixed(2).replace(".",",")+" €</div>"
+      +"<div>Cet achat rapporte "+gagne+" palier(s) ("+CFID.regle.remiseEuros+" € offerts tous les "+CFID.regle.eurosPourPalier+" €).</div>";
     if(CFID.disponibleEuros>0)h+="<div><b>"+CFID.disponibleEuros.toFixed(2).replace(".",",")+" € de bon d'achat disponible.</b> On l'utilise ?</div><div class='actions'><button class='"+(CUSE?"":"sec")+"' data-act='cUse' data-v='1'>Oui, utiliser</button><button class='"+(CUSE?"sec":"")+"' data-act='cUse' data-v='0'>Non</button></div>";
     else h+="<div class='muted'>Aucun bon d'achat disponible pour l'instant.</div>";
-    h+="</div>";
-  }
+    h+="</div>"}
   h+="</div>";
   h+="<div class='card'><div class='step'>Panier</div>";
   if(!PAN.length)h+="<div class='muted'>Panier vide. Ajoute un article ci-dessous.</div>";
   else h+="<table class='panier' style='width:100%;border-collapse:collapse'><tr><th style='text-align:left'>Article</th><th>Qté</th><th>Prix €</th><th></th></tr>"+PAN.map(function(l,i){return"<tr><td>"+esc(l.libelle)+"</td><td><input type='number' min='1' value='"+l.quantite+"' data-act='cQte' data-i='"+i+"'></td><td><input value='"+esc(l.prix)+"' data-act='cPrix' data-i='"+i+"'></td><td><button class='link' data-act='cDel' data-i='"+i+"'>Retirer</button></td></tr>"}).join("")+"</table>";
-  h+="<div class='dl' style='margin-top:8px'><input id='cl' class='lb' placeholder='Article (libellé) ou cherche dans le bandeau noir'><input id='cq2' class='q' type='number' min='1' value='1'><input id='cp' class='p' placeholder='Prix €'><button data-act='cAdd'>Ajouter</button></div></div>";
-  h+="<div class='card'><div class='step'>Paiement</div><div>Sous-total : "+eur(tot)+(rem?" · remise fidélité : -"+eur(rem):"")+"</div><div class='big'>À payer : "+eur(net)+"</div>"
+  h+="<div class='dl' style='margin-top:8px'><input id='cl' class='lb' placeholder='Article (libellé)'><input id='cq2' class='q' type='number' min='1' value='1'><input id='cp' class='p' placeholder='Prix €'><button data-act='cAdd'>Ajouter</button></div></div>";
+  var dispo=(CAV||[]).filter(function(a){return avApplicable(a,brut)});
+  if(dispo.length){
+    h+="<div class='card avbox'><div class='step'>Offres et cadeaux disponibles</div>";
+    dispo.forEach(function(a){var on=CAVOFF.indexOf(a.id)<0;
+      h+="<label class='avl'><input type='checkbox' data-act='cAv' data-id='"+a.id+"'"+(on?" checked":"")+"> <b>"+esc(a.libelle)+"</b> <span class='tag'>"+esc(avLabel(a))+"</span><div class='muted'>"+esc(avCondition(a))+"</div></label>"});
+    h+="</div>"}
+  h+="<div class='card'><div class='step'>Paiement</div><div>Sous-total : "+eur(brut)+"</div>";
+  avChoisis(brut).forEach(function(a){h+="<div>"+(a.effet==="cadeau"?"Cadeau à remettre : ":"Offre : ")+esc(a.libelle)+(a.effet==="cadeau"?"":" : -"+eur(Math.min(avRemise(a,brut),brut)))+"</div>"});
+  if(rem)h+="<div>Remise fidélité : -"+eur(rem)+"</div>";
+  h+="<div class='big'>À payer : "+eur(net)+"</div>"
     +"<div class='pay'><span>Carte</span><input id='pc' placeholder='0,00' value='"+esc(CPAY.carte)+"'></div><div class='pay'><span>Espèces</span><input id='pe' placeholder='0,00' value='"+esc(CPAY.especes)+"'></div><div class='pay'><span>Virement</span><input id='pv' placeholder='0,00' value='"+esc(CPAY.virement)+"'></div>"
-    +"<div class='muted'>Astuce : un seul moyen de paiement = clique sur « Tout en carte / espèces / virement ».</div>"
     +"<div class='actions'><button class='sec' data-act='cTout' data-m='carte'>Tout en carte</button><button class='sec' data-act='cTout' data-m='especes'>Tout en espèces</button><button class='sec' data-act='cTout' data-m='virement'>Tout en virement</button></div>"
     +"<button data-act='cEncaisser'>Encaisser</button><div class='muted'>"+esc(CMSG)+"</div></div>";
-  app.innerHTML=h;
-  var q=document.getElementById("cq");if(q)q.addEventListener("keydown",function(e){if(e.key==="Enter")ACTS.cScan()})}
-function lirePay(){CPAY={carte:v("pc"),especes:v("pe"),virement:v("pv")}}
+  h+=histoHtml()+"</div>";
+  return h}
+function caisseBind(){var q=document.getElementById("cq");if(q)q.addEventListener("keydown",function(e){if(e.key==="Enter")ACTS.cScan()})}
+function chargeHisto(){
+  var url="/caisse/historique"+(CCLI?"?clientId="+CCLI.id:"");
+  return api(url).then(function(d){CHIST=d.ventes;render()}).catch(function(e){CMSG=e.message;render()})}
+document.addEventListener("change",function(e){var t=e.target;if(!t||!t.dataset||t.dataset.act!=="cAv")return;var id=+t.dataset.id,i=CAVOFF.indexOf(id);if(t.checked&&i>=0)CAVOFF.splice(i,1);if(!t.checked&&i<0)CAVOFF.push(id);lirePay();render()});
 `;

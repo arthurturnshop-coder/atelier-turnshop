@@ -33,15 +33,25 @@ export const ACTIONS = `var ACTS={
   addLigne:async function(b){try{await api("/devis/ligne",{repairId:Number(b.dataset.id),type:v("lt"),libelle:v("ll"),quantite:v("lq"),prix:v("lp")});await recharger(Number(b.dataset.id))}catch(e){alert(e.message)}},
   delLigne:async function(b){try{await api("/devis/ligne/supprimer",{id:Number(b.dataset.id)});await recharger(FICHE.id)}catch(e){alert(e.message)}},
   supprFiche:async function(b){if(!confirm("Supprimer cette fiche de réparation ?"))return;try{var d=await api("/reparations/supprimer",{repairId:Number(b.dataset.id)});alert(d.message);FICHE=null;render()}catch(e){alert(e.message)}},
-  cScan:async function(){var q=v("cq");if(!q)return;try{var s=await api("/caisse/scan?q="+encodeURIComponent(q));if(!s.clientId){CMSG="Aucun client trouvé pour ce scan.";lirePay();render();return}var d=await api("/caisse/client?id="+s.clientId);CCLI=d.client;CFID=d.fidelite;CUSE=false;CMSG="";lirePay();render()}catch(e){alert(e.message)}},
-  cClient0:function(){CCLI=null;CFID=null;CUSE=false;lirePay();render()},
+  cScan:async function(){var q=v("cq");if(!q)return;try{var s=await api("/caisse/scan?q="+encodeURIComponent(q));if(!s.clientId){CMSG="Aucun client trouvé pour ce scan.";lirePay();render();return}var d=await api("/caisse/client?id="+s.clientId);CCLI=d.client;CFID=d.fidelite;CUSE=false;CMSG="";CAVOFF=[];CHOPEN=0;lirePay();await chargeHisto()}catch(e){alert(e.message)}},
+  cClient0:function(){CCLI=null;CFID=null;CUSE=false;CHIST=null;CHOPEN=0;CAVOFF=[];lirePay();render()},
   cUse:function(b){CUSE=b.dataset.v==="1";lirePay();render()},
   cAdd:function(){var l=v("cl");if(!l){alert("Donne un libellé.");return}PAN.push({libelle:l,quantite:Math.max(1,Number(v("cq2"))||1),prix:v("cp")||"0"});lirePay();render()},
   cDel:function(b){PAN.splice(+b.dataset.i,1);lirePay();render()},
-  cTout:function(b){var net=panierTotal()-remiseCents();CPAY={carte:"",especes:"",virement:""};CPAY[b.dataset.m]=(net/100).toFixed(2).replace(".",",");render()},
+  cTout:function(b){var brut=panierTotal(),net=brut-avRemTotal(brut)-remiseCents();CPAY={carte:"",especes:"",virement:""};CPAY[b.dataset.m]=(net/100).toFixed(2).replace(".",",");render()},
+  cJour:function(){lirePay();chargeHisto()},
+  cRecu:function(b){var id=+b.dataset.id;CHOPEN=CHOPEN===id?0:id;lirePay();render()},
+  cFermeRecu:function(){CREC=null;lirePay();render()},
+  cPrint:function(b){var old=document.querySelectorAll(".printme");for(var i=0;i<old.length;i++)old[i].classList.remove("printme");var r=document.querySelector("[data-recu='"+b.dataset.id+"']");if(!r)return;r.classList.add("printme");window.print();setTimeout(function(){r.classList.remove("printme")},500)},
   cEncaisser:async function(){lirePay();var pay=["carte","especes","virement"].map(function(m){return{moyen:m,montant:CPAY[m]}}).filter(function(p){return p.montant});
-    try{var d=await api("/caisse/encaisser",{lignes:PAN,paiements:pay,clientId:CCLI?CCLI.id:null,utiliserFidelite:CUSE});alert(d.message+" Total : "+eur(d.totalCents));PAN=[];CPAY={carte:"",especes:"",virement:""};CUSE=false;CMSG="Dernière vente enregistrée.";if(CCLI){var x=await api("/caisse/client?id="+CCLI.id);CFID=x.fidelite}render()}catch(e){CMSG=e.message;render()}},
+    var brut=panierTotal(),ids=avChoisis(brut).map(function(a){return a.id});
+    try{var d=await api("/caisse/encaisser",{lignes:PAN,paiements:pay,clientId:CCLI?CCLI.id:null,utiliserFidelite:CUSE,avantageIds:ids});PAN=[];CPAY={carte:"",especes:"",virement:""};CUSE=false;CAVOFF=[];CREC=d.vente;CMSG="";CHOPEN=0;if(CCLI){var x=await api("/caisse/client?id="+CCLI.id);CFID=x.fidelite}await chargeHisto()}catch(e){CMSG=e.message;render()}},
+  avSave:async function(){var dec=v("avd");try{var d=await api("/avantages",{libelle:v("avl"),declencheur:dec,seuil:v("avs"),dateDebut:v("avdd"),dateFin:v("avdf"),effet:v("ave"),valeur:v("avv")});AVL=null;AVMSG=d.message||"Avantage ajouté.";CAV=null;render()}catch(e){AVMSG=e.message;render()}},
+  avEtat:async function(b){try{await api("/avantages/etat",{id:+b.dataset.id,actif:b.dataset.v==="1"});AVL=null;CAV=null;render()}catch(e){alert(e.message)}},
+  avSuppr:async function(b){if(!confirm("Supprimer cet avantage ?"))return;try{await api("/avantages/supprimer",{id:+b.dataset.id});AVL=null;CAV=null;render()}catch(e){alert(e.message)}},
+  avType:function(){AVDEC=v("avd");AVF={libelle:v("avl"),seuil:v("avs"),dd:v("avdd"),df:v("avdf"),effet:v("ave"),valeur:v("avv")};render()},
   saveParam:async function(){try{var d=await api("/parametres",{eurosPourPalier:v("pe1"),remiseEuros:v("pr1")});PARAM=null;alert(d.message);render()}catch(e){var m=document.getElementById("parmsg");if(m)m.textContent=e.message}}
 };
+document.addEventListener("change",function(e){var t=e.target;if(t&&t.dataset&&t.dataset.act==="avType")ACTS.avType()});
 document.addEventListener("input",function(e){var t=e.target;if(!t||!t.dataset)return;if(t.dataset.act==="cQte"){PAN[+t.dataset.i].quantite=Math.max(1,Number(t.value)||1)}if(t.dataset.act==="cPrix"){PAN[+t.dataset.i].prix=t.value}});
 `;

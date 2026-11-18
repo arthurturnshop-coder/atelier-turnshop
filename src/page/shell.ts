@@ -96,7 +96,7 @@ button.link{background:none;color:#111;border:0;text-decoration:underline;min-he
 .pwrap{max-height:72vh;overflow:auto;background:#fff;border:1px solid #ddd;border-radius:12px}
 .pgin{display:flex;width:100%;min-width:max-content}
 .ptc{flex:0 0 52px;border-right:1px solid #ddd;background:#fafafa}
-.pcol{flex:1 1 150px;min-width:150px;border-right:1px solid #eee}
+.pcol{flex:1 1 110px;min-width:110px;border-right:1px solid #eee}
 .pth{position:sticky;top:0;z-index:3;background:#111;color:#fff;height:34px;line-height:34px;text-align:center;font-weight:700;font-size:14px;padding:0 4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .ptc .pth{background:#fafafa;color:#555;font-weight:400;font-size:12px}
 .pbody{position:relative;height:968px;background:repeating-linear-gradient(to bottom,#bbb 0,#bbb 1px,transparent 1px,transparent 88px),repeating-linear-gradient(to bottom,#eee 0,#eee 1px,transparent 1px,transparent 22px)}
@@ -105,6 +105,20 @@ button.link{background:none;color:#111;border:0;text-decoration:underline;min-he
 .pcard{position:absolute;left:3px;right:3px;background:#e8f0fe;border:1px solid #7aa3e0;border-left:5px solid #2f6fd0;border-radius:6px;padding:2px 4px;font-size:12px;line-height:1.25;overflow:hidden;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none;z-index:1;color:#111}
 .pcard b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pcard .muted{font-size:11px}
+.pcard.tc0{background:#e8f0fe;border-color:#7aa3e0;border-left-color:#2f6fd0}
+.pcard.tc1{background:#e6f6ea;border-color:#86c696;border-left-color:#1d8a3a}
+.pcard.tc2{background:#fff1e0;border-color:#e8b278;border-left-color:#e07b00}
+.pcard.tc3{background:#f1e8fb;border-color:#bd9be0;border-left-color:#7b3fc4}
+.pcard.tc4{background:#e0f5f5;border-color:#7cc7c8;border-left-color:#0f8b8d}
+.pcard.tc5{background:#fde8f1;border-color:#e59ab9;border-left-color:#c2185b}
+.pcard.sel{box-shadow:0 0 0 3px #111}
+.pth.today{background:#2f6fd0}
+.pnow{position:absolute;left:0;right:0;height:0;border-top:2px solid #d00;z-index:2;pointer-events:none}
+.tchip{display:inline-block;background:#fff;border:1px solid #ddd;border-radius:6px;padding:2px 8px;font-size:13px}
+.pcols{display:flex;flex-direction:column;gap:12px}
+.pside{order:2}.pmain{order:1;min-width:0}
+.pside.card{margin:0}
+@media(min-width:1000px){.pcols{flex-direction:row;align-items:flex-start}.pside{order:0;flex:0 0 250px;position:sticky;top:76px;max-height:calc(100vh - 90px);overflow:auto}.pmain{order:1;flex:1 1 auto}}
 .pcard.ovl{border:2px solid #d00;background:#fdecec}
 .pcard.abs{border-style:dashed;background:#fff8e1;border-color:#d9a400;border-left-color:#d9a400}
 .pcard.drag{z-index:50;box-shadow:0 6px 16px rgba(0,0,0,.3);opacity:.92}
@@ -113,6 +127,18 @@ button.link{background:none;color:#111;border:0;text-decoration:underline;min-he
 .ppanel .head{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .ppanel .head button{width:auto;margin:0}
 .ppanel .step{margin-top:8px}
+.caisse h3{margin:4px 0}
+.hrow{display:block;width:100%;text-align:left;margin:4px 0}
+.recu{background:#fff;border:1px dashed #888;padding:10px;font-family:monospace;font-size:13px;max-width:320px;margin:8px auto}
+.recu .rc{text-align:center}.recu .rm{color:#555;font-size:12px}
+.recu .rl{display:flex;justify-content:space-between;gap:8px}.recu .rt{font-weight:700;font-size:15px;border-top:1px solid #000;margin-top:4px;padding-top:4px}
+.recu hr{border:0;border-top:1px dashed #999;margin:6px 0}
+.avbox{background:#fff8e6;border:1px solid #f0d58a}
+.avl{display:block;margin:6px 0}.avl input{width:auto;margin:0 6px 0 0}
+.avrow{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap;border-top:1px solid #eee;padding:8px 0}
+.avform{border-top:2px solid #ddd;margin-top:10px;padding-top:8px}
+@media print{body *{visibility:hidden}.printme,.printme *{visibility:visible}.printme{position:absolute;left:0;top:0;width:80mm;border:0}}
+@media(min-width:1000px){.dash{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}.dright{position:sticky;top:8px}}
 @media(min-width:800px){.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}.grid .card{margin:10px 0}}
 </style></head><body><header><span>Atelier TURN</span><div id="rech" class="rech" style="display:none"><input id="rq" type="search" placeholder="Chercher un client ou un produit..." autocomplete="off"><div id="rpanel" class="rpanel" style="display:none"></div></div><span id="who"></span></header><nav id="nav"></nav><main id="app">Chargement…</main>
 <script>`;

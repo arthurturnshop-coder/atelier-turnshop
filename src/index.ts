@@ -6,6 +6,7 @@ import "./routes/reparations";
 import "./routes/planning";
 import "./routes/consignes";
 import "./routes/parametres";
+import "./routes/avantages";
 import "./routes/caisse";
 import { HTML } from "./page";
 

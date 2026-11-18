@@ -25,7 +25,7 @@ function newCliForm(){
     +"<button data-act='addC'>Créer le client</button><button class='sec' data-act='cancelNew'>Annuler</button><div class='muted'>La création dans Shopify est éteinte pour l'instant.</div></div>"}
 function vAccueil(){
   if(CUR){vProfil();return}
-  var h="<div class='search'><input id='q' placeholder='Rechercher un client' autofocus><button data-act='search'>Rechercher</button></div>";
+  var h="<div class='dash'><div class='dleft'><div class='search'><input id='q' placeholder='Rechercher un client' autofocus><button data-act='search'>Rechercher</button></div>";
   if(NEWCLI)h+=newCliForm();
   else h+="<div class='newbtn'><button class='sec' data-act='showNew'>+ Nouveau client</button></div>";
   if(SEARCHED&&!RES.length)h+="<div class='card'>Aucun client trouvé. Utilise « + Nouveau client ».</div>";
@@ -34,8 +34,8 @@ function vAccueil(){
     h+="<div class='card'><b>"+esc(c.name||"Sans nom")+"</b>"+(enCours?" <span class='tag'>"+enCours+" en cours</span>":"")
       +"<div class='muted'>"+esc(c.phone||"")+(c.phone&&c.email?" · ":"")+esc(c.email||"")+"</div>"
       +"<div class='actions'><button class='sec' data-act='open' data-i='"+i+"'>Voir le profil</button><button data-act='priseEnCharge' data-i='"+i+"'>Créer une prise en charge</button></div></div>"});
-  h+="<div class='grid'>"+blocConsignes()+blocChiffres()+"</div>";
-  app.innerHTML=h;
+  h+="<div class='grid'>"+blocConsignes()+blocChiffres()+"</div></div><div class='dright'>"+caisseHtml()+"</div></div>";
+  app.innerHTML=h;caisseBind();
   var q=document.getElementById("q");if(q)q.addEventListener("keydown",function(e){if(e.key==="Enter")ACTS.search()});
   if(!CONS||!CHIF)loadAccueil()}
 `;

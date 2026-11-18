@@ -42,6 +42,17 @@ app.get("/api/planning", async (c) => {
   const magasin = await magasinDemande(c, c.req.query("magasin"));
   const magasinUtilisateur = c.get("user").magasin ?? magasin;
 
+  // vue=semaine : du lundi au dimanche de la semaine qui contient "jour". Sinon : le jour seul.
+  const semaine = clean(c.req.query("vue"), 10) === "semaine";
+  const d0 = new Date(jour + "T12:00:00Z");
+  if (semaine) d0.setUTCDate(d0.getUTCDate() - ((d0.getUTCDay() + 6) % 7));
+  const jours: string[] = [];
+  for (let i = 0; i < (semaine ? 7 : 1); i++) {
+    const d = new Date(d0.getTime() + i * 86400000);
+    jours.push(d.toISOString().slice(0, 10));
+  }
+  const premier = jours[0], dernier = jours[jours.length - 1];
+
   const utilisateurs = await sql`SELECT prenom, magasins FROM utilisateurs WHERE actif = true ORDER BY id`;
   const techniciens = (utilisateurs as any[]).filter((u) => magasinsDe(u).includes(magasin)).map((u) => u.prenom);
 
@@ -51,7 +62,8 @@ app.get("/api/planning", async (c) => {
     JOIN clients c ON c.id = r.client_id
     JOIN trottinettes t ON t.id = r.trottinette_id
     WHERE r.debut IS NOT NULL AND r.supprime_le IS NULL
-      AND to_char(r.debut AT TIME ZONE 'Europe/Paris', 'YYYY-MM-DD') = ${jour}
+      AND to_char(r.debut AT TIME ZONE 'Europe/Paris', 'YYYY-MM-DD') >= ${premier}
+      AND to_char(r.debut AT TIME ZONE 'Europe/Paris', 'YYYY-MM-DD') <= ${dernier}
       AND COALESCE(r.magasin, ${magasinUtilisateur}) = ${magasin}
     ORDER BY r.debut, r.id`;
   const nonPlanifiees = await sql`SELECT r.id, r.client_id, r.statut, r.panne, r.technicien, r.debut, r.duree_min, r.en_magasin,
@@ -66,6 +78,7 @@ app.get("/api/planning", async (c) => {
 
   return c.json({
     techniciens,
+    jours,
     planifiees: (planifiees as any[]).map(ligneListePlanning),
     nonPlanifiees: (nonPlanifiees as any[]).map(ligneListePlanning),
   });
