@@ -1,7 +1,7 @@
 import { app } from "../app";
 import { SYNC } from "../config";
 import { sql } from "../db";
-import { PRODUITS_QUERY, shopifyRead } from "../shopify";
+import { PRODUITS_QUERY, PRODUITS_QUERY_LIEUX, shopifyRead } from "../shopify";
 import { AppError, clean } from "../util";
 
 export async function fiche(id: number) {
@@ -37,6 +37,15 @@ app.get("/api/search", async (c) => {
   return c.json(await Promise.all(rows.map((r: any) => fiche(r.id))));
 });
 
+// Nom d'emplacement affiché : Amiens, Rouen, Fournisseur ou le nom Shopify tel quel.
+function nomLieu(n: string) {
+  const m = n.toLowerCase();
+  if (m.includes("amiens")) return "Amiens";
+  if (m.includes("rouen")) return "Rouen";
+  if (m.includes("fourn")) return "Fournisseur";
+  return n || "Stock";
+}
+
 app.get("/api/recherche", async (c) => {
   const q = clean(c.req.query("q"), 100);
   if (q.length < 2) return c.json({ clients: [], produits: [] });
@@ -49,10 +58,15 @@ app.get("/api/recherche", async (c) => {
     const t = q.replace(/["\\]/g, "");
     const ressembleCode = !/\s/.test(q) && q.length >= 6;
     const search = ressembleCode ? `${t} OR sku:${t} OR barcode:${t}` : t;
-    const data = await shopifyRead(PRODUITS_QUERY, { q: search });
+    let data: any;
+    try { data = await shopifyRead(PRODUITS_QUERY_LIEUX, { q: search }); }
+    catch { data = await shopifyRead(PRODUITS_QUERY, { q: search }); }
     produits = (data?.products?.nodes ?? []).map((p: any) => ({
       id: p.id, titre: p.title, marque: p.vendor ?? "",
-      variantes: (p.variants?.nodes ?? []).map((v: any) => ({ id: v.id, titre: v.title ?? "", sku: v.sku ?? "", barcode: v.barcode ?? "", prix: v.price ?? "", stock: v.inventoryQuantity ?? null })),
+      variantes: (p.variants?.nodes ?? []).map((v: any) => ({
+        id: v.id, titre: v.title ?? "", sku: v.sku ?? "", barcode: v.barcode ?? "", prix: v.price ?? "", stock: v.inventoryQuantity ?? null,
+        lieux: (v.inventoryItem?.inventoryLevels?.nodes ?? []).map((n: any) => ({ lieu: nomLieu(n.location?.name ?? ""), qte: n.quantities?.[0]?.quantity ?? 0 })),
+      })),
     }));
   } catch (e: any) {
     produitsIndisponibles = true;

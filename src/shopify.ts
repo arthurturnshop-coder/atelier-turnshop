@@ -47,3 +47,6 @@ export async function shopifyMutate(query: string, variables: Record<string, unk
   if (json.errors) throw new Error("Shopify : " + JSON.stringify(json.errors).slice(0, 300));
   return json.data;
 }
+
+// Même recherche, avec le stock détaillé par emplacement (demande le droit read_locations).
+export const PRODUITS_QUERY_LIEUX = `query($q: String!) { products(first: 8, query: $q) { nodes { id title vendor variants(first: 5) { nodes { id title sku barcode price inventoryQuantity inventoryItem { inventoryLevels(first: 10) { nodes { location { name } quantities(names: ["available"]) { quantity } } } } } } } } }`;

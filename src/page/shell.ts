@@ -140,7 +140,40 @@ button.link{background:none;color:#111;border:0;text-decoration:underline;min-he
 .avrow{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap;border-top:1px solid #eee;padding:8px 0}
 .avform b{display:block;margin-bottom:4px}
 .avform{border-top:2px solid #ddd;margin-top:10px;padding-top:8px}
-@media print{body *{visibility:hidden}.printme,.printme *{visibility:visible}.printme{position:absolute;left:0;top:0;width:80mm;border:0}}
+/* ---- Design : carré, sobre, boutons à leur taille ---- */
+*{border-radius:0!important}
+body{background:#ececec;font-size:16px;letter-spacing:.005em}
+header{padding:10px 18px;border-bottom:3px solid #fff200}
+header #who button{background:transparent;color:#fff;border:1px solid #fff}
+header .gear{font-size:20px;line-height:1;padding:6px 10px;background:transparent;color:#fff;border:1px solid #fff}
+header .gear.on{background:#fff200;color:#111;border-color:#fff200}
+nav{padding:0 12px;gap:0;background:#fff;border-bottom:1px solid #111}
+nav button{flex:0 0 auto;border:0;border-bottom:4px solid transparent;padding:14px 26px;font-size:15px;text-transform:uppercase;letter-spacing:.06em}
+nav button.on{background:#fff;color:#111;border-bottom-color:#111}
+input,select,textarea{border:1px solid #bbb;background:#fff;padding:11px}
+input:focus,select:focus,textarea:focus{outline:2px solid #111;outline-offset:0}
+button{width:auto;min-width:0;min-height:42px;padding:10px 20px;font-size:15px;font-weight:600;letter-spacing:.03em}
+button:hover{background:#333}
+button.sec:hover{background:#111;color:#fff}
+button.link{padding:4px 0}
+.card{border:1px solid #cfcfcf;padding:16px;box-shadow:none}
+.card .step{text-transform:uppercase;letter-spacing:.06em;font-size:13px}
+.actions,.sub,.vues,.stbtns,.prow,.avis .row{gap:8px;flex-wrap:wrap}
+.actions button,.sub button,.vues button,.stbtns button,.avis .row button{flex:0 0 auto}
+.search{max-width:none;margin:0 0 10px}
+.search button,.newbtn button{width:auto}
+.newbtn{max-width:none;margin:8px 0}
+.tag{border-radius:0}
+.chiffre{background:#fff;border:1px solid #cfcfcf}
+.tk{border:1px solid #cfcfcf;border-left:6px solid #111}
+.mags button{width:100%}
+.login button{width:auto;min-width:200px}
+.hrow{width:100%;text-align:left}
+.pay input{max-width:220px}
+.avatar{border-radius:0}
+@page{size:80mm auto;margin:3mm}
+@media print{body *{visibility:hidden}.printme,.printme *{visibility:visible}.printme{position:absolute;left:0;top:0;width:74mm;max-width:none;border:0;margin:0;padding:0;font-size:12px}}
+.qr svg{width:38mm;height:38mm;display:block;margin:6px auto}
 @media(min-width:1000px){.dash{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}.dright{position:sticky;top:8px}}
 @media(min-width:800px){.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}.grid .card{margin:10px 0}}
 </style></head><body><header><span>Atelier TURN</span><div id="rech" class="rech" style="display:none"><input id="rq" type="search" placeholder="Chercher un client ou un produit..." autocomplete="off"><div id="rpanel" class="rpanel" style="display:none"></div></div><span id="who"></span></header><nav id="nav"></nav><main id="app">Chargement…</main>

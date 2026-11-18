@@ -41,6 +41,7 @@ export const ACTIONS = `var ACTS={
       FICHE=null;CUR=null;TAB="accueil";await chargeHisto()}catch(e){alert(e.message)}},
   cAnnuleRep:function(){CREP=null;PAN=[];lirePay();render()},
   cShopRetry:async function(b){try{var d=await api("/caisse/shopify",{venteId:+b.dataset.id});if(!d.ok)alert(d.erreur);await chargeHisto();if(CREC&&CREC.id===+b.dataset.id){var h=await api("/caisse/historique"+(CCLI?"?clientId="+CCLI.id:""));var m=h.ventes.filter(function(x){return x.id===CREC.id})[0];if(m){CREC=m;render()}}}catch(e){alert(e.message)}},
+  tickSave:async function(){try{var d=await api("/reglages/ticket",{entete:v("tk-ent"),avisAmiens:v("tk-am"),avisRouen:v("tk-ro")});TICKMSG=d.message;TICK=null;render()}catch(e){TICKMSG=e.message;render()}},
   shopCmd:async function(b){try{await api("/reglages/commandes",{actif:b.dataset.v==="1"});SHOPCMD=null;render()}catch(e){alert(e.message)}},
   cScan:async function(){var q=v("cq");if(!q)return;try{var s=await api("/caisse/scan?q="+encodeURIComponent(q));if(!s.clientId){CMSG="Aucun client trouvé pour ce scan.";lirePay();render();return}var d=await api("/caisse/client?id="+s.clientId);CCLI=d.client;CFID=d.fidelite;CUSE=false;CMSG="";CAVOFF=[];CHOPEN=0;lirePay();await chargeHisto()}catch(e){alert(e.message)}},
   cClient0:function(){CREP=null;CCLI=null;CFID=null;CUSE=false;CHIST=null;CHOPEN=0;CAVOFF=[];lirePay();render()},

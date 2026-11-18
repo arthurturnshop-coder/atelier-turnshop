@@ -3,7 +3,7 @@ var LG={step:"mag"};
 var CUR=null,RES=[],SEARCHED=false,TAB="accueil",MSG="";
 var CONS=null,CHIF=null,EDITCONS=false,NEWCLI=false,ADDT=false,RECEP=null,EDITCLI=false,FID=null,FIDLOAD=null;
 var ST=["reçu","diagnostic","devis envoyé","en attente de pièce","en réparation","prêt","récupéré"];
-var TABS=[["accueil","Dashboard"],["enc","Atelier"],["param","Paramètres"]];
+var TABS=[["accueil","Dashboard"],["enc","Atelier"]];
 var CLAB={upsell:"Upsell du jour",offre:"Offre du moment",fidelite:"Avantages de la carte fidélité",autre:"Autre consigne"};
 var ATSUB="liste",VUE="tout",LST=null,FICHE=null,PJOUR="",PMAG="",PLAN=null,PMSG="",PSEQ=0,DRAG=null,PSEL=null,PPEND=null;
 var app=document.getElementById("app"),nav=document.getElementById("nav");
@@ -28,7 +28,7 @@ function renderWho(){
   var rc=document.getElementById("rech");if(rc)rc.style.display=on?"":"none";
   if(!on){var rq=document.getElementById("rq");if(rq)rq.value="";rechHide()}
   var el=document.getElementById("who");if(!el)return;
-  el.innerHTML=on?"<span>"+esc(PRENOM)+" · "+esc(MAG||"Secours")+"</span><button class='sec' data-act='logout'>Changer de profil</button>":""}
+  el.innerHTML=on?"<span>"+esc(PRENOM)+" · "+esc(MAG||"Secours")+"</span>"+(ROLE==="admin"?"<button class='gear"+(TAB==="param"?" on":"")+"' data-act='tab' data-tab='param' title='Paramètres'>&#9881;</button>":"")+"<button class='sec' data-act='logout'>Changer de profil</button>":""}
 function render(){
   renderWho();
   if(!TOK&&!PW){vLogin();return}

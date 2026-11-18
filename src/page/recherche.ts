@@ -1,4 +1,10 @@
 export const RECHERCHE = `// ---------- Recherche rapide (bandeau) ----------
+function stockTxt(x){
+  var l=x.lieux||[];
+  if(!l.length)return"stock "+(x.stock==null?"—":x.stock);
+  var ordre={Amiens:0,Rouen:1,Fournisseur:2};
+  l=l.slice().sort(function(a,b){return(ordre[a.lieu]==null?9:ordre[a.lieu])-(ordre[b.lieu]==null?9:ordre[b.lieu])});
+  return l.map(function(e){return esc(e.lieu)+" "+e.qte}).join(" · ")}
 var RT=null,RCTL=null,RSEQ=0,RPROD=[];
 function rechHide(){RSEQ++;if(RCTL){RCTL.abort();RCTL=null}var p=document.getElementById("rpanel");if(p)p.style.display="none"}
 function rechShow(html){var p=document.getElementById("rpanel");p.innerHTML=html;p.style.display="block"}
@@ -25,7 +31,7 @@ function rechHtml(d){
     h+="<div class='rp-static'><b>"+esc(p.titre)+"</b> <span class='rp-muted'>"+esc(p.marque)+"</span>";
     (p.variantes||[]).forEach(function(x,vi){
       var vt=x.titre&&x.titre!=="Default Title"?" · "+esc(x.titre):"";
-      h+="<div class='rp-var'><div class='rp-muted'>"+vt.replace(/^ · /,"")+(vt?" · ":"")+"sku "+esc(x.sku||"—")+" · <b>"+esc(x.prix)+" €</b> · stock "+esc(x.stock==null?"—":x.stock)+"</div>"
+      h+="<div class='rp-var'><div class='rp-muted'>"+vt.replace(/^ · /,"")+(vt?" · ":"")+"sku "+esc(x.sku||"—")+" · <b>"+esc(x.prix)+" €</b> · "+stockTxt(x)+"</div>"
         +"<div class='rp-btns'>"+(FICHE?"<button data-act='rAddDevis' data-pi='"+pi+"' data-vi='"+vi+"'>+ Devis</button>":"")+"<button class='sec' data-act='rAddPanier' data-pi='"+pi+"' data-vi='"+vi+"'>+ Panier caisse</button></div></div>"});
     h+="</div>"})}
   return h}
@@ -50,7 +56,7 @@ function psHtml(ctx,d){
   var h="";
   ps.forEach(function(p,pi){(p.variantes||[]).forEach(function(x,vi){
     var vt=x.titre&&x.titre!=="Default Title"?" - "+esc(x.titre):"";
-    h+="<button class='sec hrow' data-act='psAdd' data-ctx='"+ctx+"' data-pi='"+pi+"' data-vi='"+vi+"'><b>"+esc(p.titre)+vt+"</b><br><span class='muted'>"+esc(x.prix)+" € · stock "+esc(x.stock==null?"—":x.stock)+" · sku "+esc(x.sku||"—")+"</span></button>"})});
+    h+="<button class='sec hrow' data-act='psAdd' data-ctx='"+ctx+"' data-pi='"+pi+"' data-vi='"+vi+"'><b>"+esc(p.titre)+vt+"</b><br><span class='muted'>"+esc(x.prix)+" € · "+stockTxt(x)+" · sku "+esc(x.sku||"—")+"</span></button>"})});
   return h}
 document.addEventListener("input",function(e){
   var t=e.target;if(!t||!t.dataset||!t.dataset.ps)return;

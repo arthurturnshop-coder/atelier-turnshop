@@ -36,5 +36,16 @@ app.get("/api/shopify/diagnostic", async (c) => {
       else add("Lecture des produits", true, `OK (exemple : ${j.data?.products?.nodes?.[0]?.title ?? "aucun produit"})`);
     } catch (e: any) { add("Lecture des produits", false, String(e?.message ?? e).slice(0, 200)); }
   }
+  if (token) {
+    try {
+      const res = await fetch(`https://${SHOP}/admin/api/${SHOP_API}/graphql.json`, {
+        method: "POST", headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": token },
+        body: JSON.stringify({ query: `{ locations(first: 10) { nodes { name } } }` }), signal: AbortSignal.timeout(8000),
+      });
+      const j: any = await res.json();
+      if (j.errors) add("Stock par boutique (emplacements)", false, "Droit read_locations manquant sur l'app : le stock s'affiche en total seulement.");
+      else add("Stock par boutique (emplacements)", true, `Emplacements : ${(j.data?.locations?.nodes ?? []).map((n: any) => n.name).join(", ") || "aucun"}`);
+    } catch (e: any) { add("Stock par boutique (emplacements)", false, String(e?.message ?? e).slice(0, 200)); }
+  }
   return c.json({ etapes });
 });

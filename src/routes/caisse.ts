@@ -2,6 +2,7 @@ import { app } from "../app";
 import { sql } from "../db";
 import { lireParametres } from "./parametres";
 import { shopifyRead } from "../shopify";
+import { infosTicket } from "./ticket";
 import { commandesActives, creerCommandeShopify } from "./commandes";
 import { avantagesActifs, contexteClient, estApplicable, remiseDe } from "./avantages";
 import { AppError, clean, signature } from "../util";
@@ -69,6 +70,7 @@ async function detailVente(v: any) {
     lignes: lignes.map((l) => ({ libelle: l.libelle, quantite: l.quantite, prixCents: l.prix_unitaire_cents })),
     paiements: pays.map((p) => ({ moyen: p.moyen, cents: p.montant_cents })),
     avantages: avs.map((x) => ({ libelle: x.libelle, effet: x.effet, remiseCents: x.remise_cents })),
+    ticket: await infosTicket(v.magasin ?? null),
     reparationId: v.reparation_id ?? null,
     shopify: { nom: v.shopify_order_name ?? null, erreur: v.shopify_erreur ?? null, eligible: !!(v.reparation_id && v.client_id) },
   };

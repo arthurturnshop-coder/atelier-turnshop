@@ -20,14 +20,19 @@ function remiseCents(){var brut=panierTotal();return CUSE&&CFID?Math.min(Math.ro
 function lirePay(){CPAY={carte:v("pc"),especes:v("pe"),virement:v("pv")}}
 function dateLongue(d){try{return new Date(d).toLocaleString("fr-FR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit",timeZone:"Europe/Paris"})}catch(e){return d||""}}
 function recuHtml(r){
-  var h="<div class='recu' data-recu='"+r.id+"'><div class='rc'><b>TURN SOCIETY</b><br>"+esc(r.magasin||"")+"</div>"
-    +"<div class='rm'>Ticket n° "+r.id+" · "+esc(dateLongue(r.date))+"</div><div class='rm'>Vendeur : "+esc(r.vendeur||"")+(r.client?" · Client : "+esc(r.client):"")+"</div><hr>";
+  var ttc=r.totalCents,ht=Math.round(ttc/1.2),tva=ttc-ht,t=r.ticket||{},nl=String.fromCharCode(10);
+  var ent=(t.entete||"TURN SOCIETY").split(nl).map(function(x,i){return i===0?"<b>"+esc(x)+"</b>":esc(x)}).join("<br>");
+  var h="<div class='recu' data-recu='"+r.id+"'><div class='rc'>"+ent+(r.magasin?"<br>Boutique "+esc(r.magasin):"")+"</div><hr>"
+    +"<div class='rl'><span>"+(r.shopify&&r.shopify.nom?"Facture "+esc(r.shopify.nom):"Ticket n° "+r.id)+"</span><span>"+esc(dateLongue(r.date))+"</span></div>"
+    +"<div class='rm'>Vendeur : "+esc(r.vendeur||"")+(r.client?" · Client : "+esc(r.client):"")+"</div><hr>";
   r.lignes.forEach(function(l){h+="<div class='rl'><span>"+l.quantite+" × "+esc(l.libelle)+"</span><span>"+eur(l.quantite*l.prixCents)+"</span></div>"});
   h+="<hr><div class='rl'><span>Sous-total</span><span>"+eur(r.brutCents)+"</span></div>";
   r.avantages.forEach(function(a){h+="<div class='rl'><span>"+(a.effet==="cadeau"?"Cadeau : ":"Offre : ")+esc(a.libelle)+"</span><span>"+(a.remiseCents?"-"+eur(a.remiseCents):"offert")+"</span></div>"});
   if(r.fideliteCents)h+="<div class='rl'><span>Fidélité</span><span>-"+eur(r.fideliteCents)+"</span></div>";
-  h+="<div class='rl rt'><span>TOTAL</span><span>"+eur(r.totalCents)+"</span></div>";
+  h+="<div class='rl rt'><span>TOTAL TTC</span><span>"+eur(ttc)+"</span></div>"
+    +"<div class='rl rm'><span>Total HT</span><span>"+eur(ht)+"</span></div><div class='rl rm'><span>TVA 20 %</span><span>"+eur(tva)+"</span></div><hr>";
   r.paiements.forEach(function(p){h+="<div class='rl'><span>Payé en "+esc((MOY[p.moyen]||p.moyen).toLowerCase())+"</span><span>"+eur(p.cents)+"</span></div>"});
+  if(t.qrSvg)h+="<hr><div class='rc'><b>Laissez-nous un avis</b><br>et recevez une récompense !</div><div class='qr'>"+t.qrSvg+"</div>";
   return h+"<div class='rc rm'>Merci de votre visite !</div></div>"}
 function shopHtml(r){
   var s=r.shopify;if(!s||!s.eligible)return"";

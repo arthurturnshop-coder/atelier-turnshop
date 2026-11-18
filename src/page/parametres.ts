@@ -1,5 +1,5 @@
 export const PARAMETRES = `// ---------- Paramètres (admins) ----------
-var SHOPCMD=null,SHOPRES="",PARAM=null,AVL=null,AVMSG="",AVDEC="achat",AVF={libelle:"",seuil:"",dd:"",df:"",effet:"cadeau",valeur:""};
+var TICK=null,TICKMSG="",SHOPCMD=null,SHOPRES="",PARAM=null,AVL=null,AVMSG="",AVDEC="achat",AVF={libelle:"",seuil:"",dd:"",df:"",effet:"cadeau",valeur:""};
 function avDesc(a){return esc(avLabel(a))+" · "+esc(avCondition(a))}
 function avForm(){
   var f=AVF,d=AVDEC,sel=function(val,cur,txt){return"<option value='"+val+"'"+(val===cur?" selected":"")+">"+txt+"</option>"};
@@ -14,6 +14,7 @@ function avForm(){
 function vParam(){
   if(ROLE!=="admin"){app.innerHTML="<div class='card'>Réservé aux administrateurs.</div>";return}
   if(SHOPCMD===null){SHOPCMD=undefined;api("/reglages/commandes").then(function(d){SHOPCMD=d.actif;render()}).catch(function(){SHOPCMD=false;render()})}
+  if(TICK===null){TICK=undefined;api("/reglages/ticket").then(function(d){TICK=d;render()}).catch(function(){TICK={entete:"",avisAmiens:"",avisRouen:""};render()})}
   if(!PARAM||!AVL){
     app.innerHTML="<div class='card'>Chargement…</div>";
     Promise.all([api("/parametres"),api("/avantages")]).then(function(r){PARAM=r[0];AVL=r[1];render()}).catch(function(e){app.innerHTML="<div class='card'>"+esc(e.message)+"</div>"});return}
@@ -27,5 +28,10 @@ function vParam(){
   h+=avForm()+"</div>";
   h+="<div class='card'><div class='step'>Connexion Shopify</div><div class='muted'>Teste la connexion au catalogue turnshop.fr.</div><button data-act='shopTest'>Tester la connexion</button><div id='shopres'>"+(SHOPRES||"")+"</div></div>";
   h+="<div class='card'><div class='step'>Commandes Shopify à la facturation</div><div class='muted'>Quand on encaisse un devis de réparation, une commande (pièces + main-d'œuvre) est créée dans Shopify et rattachée au compte du client. Elle décompte le stock des pièces.</div><div class='big'>"+(SHOPCMD?"Activé":"Désactivé")+"</div><div class='actions'><button class='"+(SHOPCMD?"sec":"")+"' data-act='shopCmd' data-v='1'>Activer</button><button class='"+(SHOPCMD?"":"sec")+"' data-act='shopCmd' data-v='0'>Désactiver</button></div></div>";
+  if(TICK){var nl=String.fromCharCode(10);h+="<div class='card'><div class='step'>Ticket de caisse</div><div class='muted'>Imprimé en 80 mm (choisis ton imprimante à tickets dans la fenêtre d'impression). Le QR code du bas mène à ta page d'avis Google.</div>"
+    +"<label class='muted'>En-tête (une ligne par ligne : nom, adresse, SIRET...)</label><textarea id='tk-ent' rows='4'>"+esc(TICK.entete)+"</textarea>"
+    +"<label class='muted'>Lien d'avis Google - Amiens</label><input id='tk-am' value='"+esc(TICK.avisAmiens)+"' placeholder='https://g.page/r/...'>"
+    +"<label class='muted'>Lien d'avis Google - Rouen</label><input id='tk-ro' value='"+esc(TICK.avisRouen)+"' placeholder='https://g.page/r/...'>"
+    +"<button data-act='tickSave'>Enregistrer le ticket</button><div class='muted'>"+esc(TICKMSG)+"</div></div>"}
   app.innerHTML=h}
 `;
