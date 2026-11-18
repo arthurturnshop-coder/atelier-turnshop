@@ -137,6 +137,7 @@ button.link{background:none;color:#111;border:0;text-decoration:underline;min-he
 .avbox{background:#fff8e6;border:1px solid #f0d58a}
 .avl{display:block;margin:6px 0}.avl input{width:auto;margin:0 6px 0 0}
 .avrow{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap;border-top:1px solid #eee;padding:8px 0}
+.avform b{display:block;margin-bottom:4px}
 .avform{border-top:2px solid #ddd;margin-top:10px;padding-top:8px}
 @media print{body *{visibility:hidden}.printme,.printme *{visibility:visible}.printme{position:absolute;left:0;top:0;width:80mm;border:0}}
 @media(min-width:1000px){.dash{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}.dright{position:sticky;top:8px}}
