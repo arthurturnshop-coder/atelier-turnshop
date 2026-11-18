@@ -14,8 +14,10 @@ export async function soldeFidelite(clientId: number) {
   const p = await lireParametres();
   const [dep] = (await sql`SELECT COALESCE(sum(total_cents), 0)::int AS n FROM ventes WHERE client_id = ${clientId}`) as any[];
   const [uti] = (await sql`SELECT COALESCE(sum(remise_cents), 0)::int AS n FROM ventes WHERE client_id = ${clientId}`) as any[];
+  // Le bon d'achat ne devient utilisable que le lendemain : seules les ventes d'avant aujourd'hui (heure de Paris) comptent.
+  const [avant] = (await sql`SELECT COALESCE(sum(total_cents), 0)::int AS n FROM ventes WHERE client_id = ${clientId} AND cree_le < date_trunc('day', now() AT TIME ZONE 'Europe/Paris') AT TIME ZONE 'Europe/Paris'`) as any[];
   const depenseEuros = dep.n / 100;
-  const gagneEuros = Math.floor(depenseEuros / p.eurosPourPalier) * p.remiseEuros;
+  const gagneEuros = Math.floor(avant.n / 100 / p.eurosPourPalier) * p.remiseEuros;
   const disponibleEuros = Math.max(0, gagneEuros - uti.n / 100);
   const prochainPalierIn = p.eurosPourPalier - (depenseEuros % p.eurosPourPalier);
   return { depenseEuros, disponibleEuros, prochainPalierIn, regle: p };
