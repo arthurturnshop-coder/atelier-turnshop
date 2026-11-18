@@ -15,6 +15,8 @@ await sql`ALTER TABLE reparations ADD COLUMN IF NOT EXISTS sous_garantie BOOLEAN
 await sql`ALTER TABLE reparations ADD COLUMN IF NOT EXISTS supprime_le TIMESTAMPTZ`;
 // Lignes de devis : type 'main_oeuvre' ou 'piece'.
 await sql`CREATE TABLE IF NOT EXISTS devis_lignes (id SERIAL PRIMARY KEY, reparation_id INT NOT NULL REFERENCES reparations(id), type TEXT NOT NULL CHECK (type IN ('main_oeuvre','piece')), libelle TEXT NOT NULL, quantite INT NOT NULL DEFAULT 1, prix_unitaire_cents INT NOT NULL DEFAULT 0, cree_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
+await sql`ALTER TABLE devis_lignes ADD COLUMN IF NOT EXISTS shopify_variant_id TEXT`;
+await sql`ALTER TABLE devis_lignes ADD COLUMN IF NOT EXISTS sku TEXT`;
 // Caisse : ventes, lignes de vente, paiements, paramètres de fidélité.
 await sql`CREATE TABLE IF NOT EXISTS ventes (id SERIAL PRIMARY KEY, client_id INT REFERENCES clients(id), reparation_id INT REFERENCES reparations(id), magasin TEXT, vendeur TEXT, total_cents INT NOT NULL DEFAULT 0, remise_cents INT NOT NULL DEFAULT 0, points_gagnes INT NOT NULL DEFAULT 0, points_utilises INT NOT NULL DEFAULT 0, cree_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
 await sql`CREATE TABLE IF NOT EXISTS vente_lignes (id SERIAL PRIMARY KEY, vente_id INT NOT NULL REFERENCES ventes(id), libelle TEXT NOT NULL, quantite INT NOT NULL DEFAULT 1, prix_unitaire_cents INT NOT NULL DEFAULT 0)`;

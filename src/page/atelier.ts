@@ -39,7 +39,7 @@ function devisHtml(f){
       +lignes.map(function(l){return"<tr><td>"+esc(l.libelle)+"</td><td class='n'>"+l.quantite+"</td><td class='n'>"+eur(l.prixCents)+"</td><td class='n'>"+eur(l.quantite*l.prixCents)+"</td><td class='n'><button class='link' data-act='delLigne' data-id='"+l.id+"'>Retirer</button></td></tr>"}).join("")+"</table>"}
   return"<div class='devis'>"+table("Forfaits main-d'œuvre",mo)+table("Pièces détachées",pi)
     +"<div class='tot'>Total du devis : "+eur(d.totalCents)+"</div>"
-    +"<div class='step' style='margin-top:10px'>Ajouter une ligne</div><div class='dl'>"
+    +"<div class='step' style='margin-top:10px'>Ajouter une ligne</div><div class='muted'>Une pièce du catalogue turnshop.fr ? Cherche-la dans la barre du haut, puis « + Devis ».</div><div class='dl'>"
     +"<select id='lt' class='t'><option value='main_oeuvre'>Main-d'œuvre</option><option value='piece'>Pièce détachée</option></select>"
     +"<input id='ll' class='lb' placeholder='Ex : changement de pneu / pneu 10x3 CST'>"
     +"<input id='lq' class='q' type='number' min='1' value='1'><input id='lp' class='p' placeholder='Prix €'>"

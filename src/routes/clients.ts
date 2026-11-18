@@ -52,7 +52,7 @@ app.get("/api/recherche", async (c) => {
     const data = await shopifyRead(PRODUITS_QUERY, { q: search });
     produits = (data?.products?.nodes ?? []).map((p: any) => ({
       id: p.id, titre: p.title, marque: p.vendor ?? "",
-      variantes: (p.variants?.nodes ?? []).map((v: any) => ({ sku: v.sku ?? "", barcode: v.barcode ?? "", prix: v.price ?? "", stock: v.inventoryQuantity ?? null })),
+      variantes: (p.variants?.nodes ?? []).map((v: any) => ({ id: v.id, titre: v.title ?? "", sku: v.sku ?? "", barcode: v.barcode ?? "", prix: v.price ?? "", stock: v.inventoryQuantity ?? null })),
     }));
   } catch (e: any) {
     produitsIndisponibles = true;

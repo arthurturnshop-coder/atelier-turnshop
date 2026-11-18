@@ -142,7 +142,7 @@ app.post("/api/devis/ligne", async (c) => {
   if (!libelle) throw new AppError(400, "Le libellé est obligatoire.");
   const quantite = Math.max(1, Math.min(999, Math.round(Number(b.quantite) || 1)));
   const prixCents = Math.max(0, Math.round((Number(String(b.prix ?? "0").replace(",", ".")) || 0) * 100));
-  await sql`INSERT INTO devis_lignes (reparation_id, type, libelle, quantite, prix_unitaire_cents) VALUES (${repId}, ${type}, ${libelle}, ${quantite}, ${prixCents})`;
+  await sql`INSERT INTO devis_lignes (reparation_id, type, libelle, quantite, prix_unitaire_cents, shopify_variant_id, sku) VALUES (${repId}, ${type}, ${libelle}, ${quantite}, ${prixCents}, ${clean(b.variantId, 80) || null}, ${clean(b.sku, 80) || null})`;
   await sql`UPDATE reparations SET maj_le = now() WHERE id = ${repId}`;
   return c.json({ devis: await devisDe(repId) });
 });

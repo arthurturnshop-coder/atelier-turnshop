@@ -32,4 +32,4 @@ export async function shopifyRead(query: string, variables: Record<string, unkno
 }
 
 export const FIDELITE_QUERY = `query($q: String!) { customers(first: 1, query: $q) { nodes { id points: metafield(namespace: "fidelite", key: "points") { value } } } }`;
-export const PRODUITS_QUERY = `query($q: String!) { products(first: 6, query: $q) { nodes { id title vendor variants(first: 3) { nodes { sku barcode price inventoryQuantity } } } } }`;
+export const PRODUITS_QUERY = `query($q: String!) { products(first: 8, query: $q) { nodes { id title vendor variants(first: 5) { nodes { id title sku barcode price inventoryQuantity } } } } }`;
