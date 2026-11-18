@@ -8,6 +8,7 @@ import "./routes/consignes";
 import "./routes/parametres";
 import "./routes/avantages";
 import "./routes/prestations";
+import "./routes/modeles";
 import "./routes/taches";
 import "./routes/brevo";
 import "./routes/diagnostic";

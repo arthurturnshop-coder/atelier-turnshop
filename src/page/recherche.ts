@@ -77,6 +77,7 @@ ACTS.psAdd=async function(b){
   var ctx=b.dataset.ctx,p=(PSRES[ctx]||[])[+b.dataset.pi],x=p&&p.variantes[+b.dataset.vi];if(!x)return;
   var vt=x.titre&&x.titre!=="Default Title"?" - "+x.titre:"";
   var l={libelle:(p.titre+vt).slice(0,200),prix:String(x.prix||"0").replace(".",","),variantId:x.id,sku:x.sku||"",barcode:x.barcode||"",marque:p.marque||""};
+  if(ctx.indexOf("mod")===0){try{await api("/modeles/piece",{modeleId:+ctx.slice(3),libelle:l.libelle,sku:l.sku,variantId:l.variantId,categorie:"pneu"});MODS=null;render()}catch(err){alert(err.message)}return}
   if(ctx==="caisse"){lirePay();PAN.push({libelle:l.libelle,quantite:1,prix:l.prix,type:"piece",variantId:l.variantId,sku:l.sku});CREC=null;render();return}
   if(ctx.indexOf("cmd")===0){try{var d=await api("/achats/ligne",{fournisseurId:+ctx.slice(3),libelle:l.libelle,sku:l.sku,barcode:l.barcode,variantId:l.variantId,quantite:1});CMDMSG=d.message;CMD=null;render()}catch(err){alert(err.message)}return}
   if(!FICHE)return;

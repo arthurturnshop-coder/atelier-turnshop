@@ -26,6 +26,20 @@ function avForm(){
     +"<label class='muted'>Récompense</label><select id='ave' data-act='avType'>"+sel("cadeau",f.effet,"Un cadeau (à remettre au client)")+sel("euros",f.effet,"Une remise en euros")+sel("pourcent",f.effet,"Une remise en pourcentage")+"</select>";
   if(f.effet!=="cadeau")h+="<label class='muted'>"+(f.effet==="euros"?"Montant de la remise (€)":"Pourcentage de remise (%)")+"</label><input id='avv' value='"+esc(f.valeur)+"'>";
   return h+"<button data-act='avSave'>Ajouter</button><div class='muted'>"+esc(AVMSG)+"</div></div>"}
+var MODS=null,MODBUSY=false,MODOPEN=0,MODMSG="";
+function modLoad(){if(MODS===null&&!MODBUSY){MODBUSY=true;api("/modeles").then(function(d){MODS=d.modeles;MODBUSY=false;render()}).catch(function(){MODS=[];MODBUSY=false;render()})}}
+function modCard(){
+  var q=(document.getElementById("mod-q")||{}).value||"";var ql=q.toLowerCase();
+  var h="<div class='card'><div class='step'>Modèles de trottinettes et pièces compatibles</div><div class='muted'>"+MODS.length+" modèles. Ouvre un modèle pour lui rattacher les pneus et pièces compatibles (pris dans le catalogue turnshop.fr). Le client les verra dans son espace.</div>"
+    +"<input id='mod-q' placeholder='Filtrer les modèles...' value='"+esc(q)+"' data-act='modFiltre'>"
+    +"<div class='dl'><input id='mod-ma' class='t' placeholder='Marque'><input id='mod-mo' class='lb' placeholder='Modèle'><button data-act='modAdd'>Ajouter</button></div>";
+  MODS.filter(function(m){return !ql||(m.marque+" "+m.modele).toLowerCase().indexOf(ql)>=0}).slice(0,60).forEach(function(m){
+    var o=MODOPEN===m.id;
+    h+="<div class='avrow'><div><b>"+esc(m.marque)+" "+esc(m.modele)+"</b> <span class='tag"+(m.pieces.length?" ok":"")+"'>"+m.pieces.length+" pièce"+(m.pieces.length>1?"s":"")+"</span></div><div class='actions'><button class='sec' data-act='modOpen' data-id='"+m.id+"'>"+(o?"Fermer":"Pièces")+"</button><button class='danger' data-act='modSuppr' data-id='"+m.id+"'>Supprimer</button></div></div>";
+    if(o){h+="<div class='card'>"+(m.pieces.length?m.pieces.map(function(p){return"<div class='avrow'><div>"+esc(p.libelle)+" <span class='muted'>"+esc(p.sku||"")+"</span></div><button class='link' data-act='modPieceSuppr' data-id='"+p.id+"'>Retirer</button></div>"}).join(""):"<div class='muted'>Aucune pièce rattachée.</div>")+"<div class='step'>Ajouter une pièce compatible</div>"+prodBox("mod"+m.id)+"</div>"}});
+  var nl=String.fromCharCode(10);
+  h+="<div class='step' style='margin-top:10px'>Import CSV (marque;modele;categorie;sku;libelle)</div><textarea id='mod-csv' rows='4' placeholder='Xiaomi;M365;pneu;SKU-123;Pneu 8.5 pouces'></textarea><button class='sec' data-act='modImport'>Importer</button><div class='muted'>"+esc(MODMSG)+"</div></div>";
+  return h}
 function vParam(){
   if(ROLE!=="admin"){app.innerHTML="<div class='card'>Réservé aux administrateurs.</div>";return}
   if(SHOPCMD===null){SHOPCMD=undefined;api("/reglages/commandes").then(function(d){SHOPCMD=d.actif;render()}).catch(function(){SHOPCMD=false;render()})}
@@ -59,6 +73,8 @@ function vParam(){
       +"<div class='muted'>Quand ?</div><select id='rc-f'>"+rcOptions().map(function(o){return"<option value='"+o[0]+"'"+(o[0]===RCF.f?" selected":"")+">"+esc(o[1])+"</option>"}).join("")+"</select>"
       +"<label class='muted' style='display:flex;gap:8px;align-items:center'><input type='checkbox' id='rc-p' style='width:auto;margin:0' "+(RCF.p?"checked":"")+"> Marquer comme priorité</label>"
       +"<button data-act='rcSave'>"+(RCEDIT?"Enregistrer":"Ajouter")+"</button><div class='muted'>"+esc(RCMSG)+"</div></div>"}
+  modLoad();
+  if(MODS)h+=modCard();
   prestaLoad();
   if(PRESTA){h+="<div class='card'><div class='step'>Prestations (main-d'œuvre du devis)</div><div class='muted'>Ces boutons apparaissent dans les devis. Si la prestation demande une pièce (ex : pneu), l'atelier propose de la choisir dans le catalogue.</div>";
     if(!PRESTA.prestations.length)h+="<div class='muted' style='margin:8px 0'>Aucune prestation.</div>";
