@@ -11,7 +11,7 @@ app.get("/api/achats", async (c) => {
   const fournisseurs = (await sql`SELECT id, nom, email FROM fournisseurs WHERE actif = true ORDER BY nom`) as any[];
   const lignes = (await sql`SELECT l.*, trim(cl.prenom || ' ' || cl.nom) AS client FROM commande_lignes l LEFT JOIN reparations r ON r.id = l.reparation_id LEFT JOIN clients cl ON cl.id = r.client_id
     WHERE l.statut <> 'recue' OR l.recue_le > now() - interval '7 days' ORDER BY l.id`) as any[];
-  const vers = (l: any) => ({ id: l.id, libelle: l.libelle, sku: l.sku ?? "", barcode: l.barcode ?? "", variantId: l.variant_id ?? "", quantite: l.quantite, reparationId: l.reparation_id, client: l.client || "", statut: l.statut, commandeLe: l.commandee_le, recueLe: l.recue_le });
+  const vers = (l: any) => ({ commandeId: l.commande_id ?? null, id: l.id, libelle: l.libelle, sku: l.sku ?? "", barcode: l.barcode ?? "", variantId: l.variant_id ?? "", quantite: l.quantite, reparationId: l.reparation_id, client: l.client || "", statut: l.statut, commandeLe: l.commandee_le, recueLe: l.recue_le });
   return c.json({
     fournisseurs: fournisseurs.map((f) => ({
       id: f.id, nom: f.nom, email: f.email,
@@ -25,14 +25,13 @@ app.get("/api/achats", async (c) => {
 // Historique complet d'un fournisseur : chaque commande passée (regroupée par date) avec ses lignes et leur réception.
 app.get("/api/achats/historique", async (c) => {
   const id = Number(c.req.query("fournisseurId"));
-  const rows = (await sql`SELECT l.id, l.libelle, l.sku, l.barcode, l.quantite, l.statut, l.commandee_le, l.recue_le, l.reparation_id, trim(cl.prenom || ' ' || cl.nom) AS client
+  const rows = (await sql`SELECT l.id, l.commande_id, l.libelle, l.sku, l.barcode, l.quantite, l.statut, l.commandee_le, l.recue_le, l.reparation_id, trim(cl.prenom || ' ' || cl.nom) AS client
     FROM commande_lignes l LEFT JOIN reparations r ON r.id = l.reparation_id LEFT JOIN clients cl ON cl.id = r.client_id
     WHERE l.fournisseur_id = ${id} AND l.commandee_le IS NOT NULL ORDER BY l.commandee_le DESC, l.id LIMIT 500`) as any[];
   const groupes: any[] = [];
   for (const r of rows) {
-    const cle = new Date(r.commandee_le).toISOString();
-    let g = groupes[groupes.length - 1];
-    if (!g || g.date !== cle) { g = { date: cle, lignes: [] }; groupes.push(g); }
+    let g = groupes.find((x) => x.id === r.commande_id);
+    if (!g) { g = { id: r.commande_id, date: new Date(r.commandee_le).toISOString(), lignes: [] }; groupes.push(g); }
     g.lignes.push({ id: r.id, libelle: r.libelle, sku: r.sku ?? "", barcode: r.barcode ?? "", quantite: r.quantite, statut: r.statut, recueLe: r.recue_le, reparationId: r.reparation_id, client: r.client || "" });
   }
   return c.json(groupes);
@@ -113,12 +112,14 @@ app.post("/api/achats/commander", async (c) => {
   const id = Number(b.fournisseurId);
   const [f] = await sql`SELECT nom FROM fournisseurs WHERE id = ${id}`;
   if (!f) throw new AppError(404, "Fournisseur introuvable.");
-  const rows = (await sql`UPDATE commande_lignes SET statut = 'commandee', commandee_le = now() WHERE fournisseur_id = ${id} AND statut = 'panier' RETURNING id, reparation_id, libelle`) as any[];
-  if (!rows.length) throw new AppError(400, "Le panier est vide.");
+  const [{ n: nbPanier }] = (await sql`SELECT count(*)::int AS n FROM commande_lignes WHERE fournisseur_id = ${id} AND statut = 'panier'`) as any[];
+  if (!nbPanier) throw new AppError(400, "Le panier est vide.");
+  const [cmd] = (await sql`INSERT INTO commandes (fournisseur_id) VALUES (${id}) RETURNING id`) as any[];
+  const rows = (await sql`UPDATE commande_lignes SET statut = 'commandee', commandee_le = now(), commande_id = ${cmd.id} WHERE fournisseur_id = ${id} AND statut = 'panier' RETURNING id, reparation_id, libelle`) as any[];
   for (const r of rows) {
     if (r.reparation_id) await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${r.reparation_id}, 'note', ${`Pièce commandée chez ${f.nom} : ${r.libelle}${signature(c)}`})`;
   }
-  return c.json({ message: `Commande ${f.nom} enregistrée (${rows.length} ligne(s)).` });
+  return c.json({ message: `Commande n°${String(cmd.id).padStart(4, "0")} ${f.nom} enregistrée (${rows.length} ligne(s)).`, commandeId: cmd.id });
 });
 
 // Réception : quand toutes les pièces d'une prise en charge sont là, elle repasse « en réparation » (À faire)

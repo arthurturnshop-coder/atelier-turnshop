@@ -13,7 +13,7 @@ function refsCmd(l){
   if(!l.sku&&!l.barcode)h+="<div class='muted'>Pas de SKU ni de code-barres <button class='link' data-act='copier' data-t='"+esc(l.libelle)+"' data-l='Copier le nom'>Copier le nom</button></div>";
   return h}
 function ligneCmd(l,mode){
-  var h="<tr><td>"+esc(l.libelle)+refsCmd(l)+(l.client?"<div class='muted'>Pour "+esc(l.client)+(l.reparationId?" (fiche "+l.reparationId+")":"")+"</div>":"")+"</td>";
+  var h="<tr><td>"+(l.commandeId&&mode!=="panier"?"<span class='tag'>"+cmdNum(l.commandeId)+"</span> ":"")+esc(l.libelle)+refsCmd(l)+(l.client?"<div class='muted'>Pour "+esc(l.client)+(l.reparationId?" (fiche "+l.reparationId+")":"")+"</div>":"")+"</td>";
   if(mode==="panier")h+="<td class='n'><input type='number' min='1' value='"+l.quantite+"' data-act='cmdQte' data-id='"+l.id+"'></td><td class='n'><button class='link' data-act='cmdDel' data-id='"+l.id+"'>Retirer</button></td>";
   else if(mode==="commandee")h+="<td class='n'>"+l.quantite+"</td><td class='n'><button data-act='cmdRecevoir' data-id='"+l.id+"'>Réceptionner</button></td>";
   else h+="<td class='n'>"+l.quantite+"</td><td class='n'><span class='tag ok'>Reçu</span></td>";
@@ -63,13 +63,18 @@ var HISTC=null;
 function dateHeure(d){try{var x=new Date(d);return x.toLocaleDateString("fr-FR")+" à "+x.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}catch(e){return d||""}}
 ACTS.histoOpen=async function(b){var id=+b.dataset.id;if(HISTC&&HISTC.fid===id){HISTC=null;render();return}
   try{var g=await api("/achats/historique?fournisseurId="+id);HISTC={fid:id,groupes:g};render()}catch(e){alert(e.message)}};
+function cmdNum(id){return"CMD-"+("0000"+id).slice(-4)}
+var HISTOPEN=0;
+ACTS.histoCmd=function(b){var id=+b.dataset.id;HISTOPEN=HISTOPEN===id?0:id;render()};
 function histoCmdHtml(){
   var g=HISTC.groupes;
   if(!g.length)return"<div class='card'><div class='muted'>Aucune commande passée avec ce fournisseur pour l'instant.</div></div>";
-  return"<div class='card'><div class='step'>Historique des commandes</div>"+g.map(function(c){
-    var tout=c.lignes.every(function(l){return l.statut==="recue"});
-    return"<div style='margin:10px 0'><b>Commande du "+esc(dateHeure(c.date))+"</b> <span class='tag "+(tout?"ok":"warn")+"'>"+(tout?"Reçue en entier":"En attente")+"</span>"
-      +"<table class='devis' style='width:100%'>"+c.lignes.map(function(l){return"<tr><td>"+esc(l.quantite)+" × "+esc(l.libelle)+(l.sku?" <span class='muted'>"+esc(l.sku)+"</span>":"")+(l.client?"<div class='muted'>Pour "+esc(l.client)+(l.reparationId?" ("+pcn(l.reparationId)+")":"")+"</div>":"")+"</td><td class='n'>"+(l.statut==="recue"?"<span class='tag ok'>Reçue le "+esc(day(l.recueLe))+"</span>":"<span class='tag warn'>Commandée</span>")+"</td></tr>"}).join("")+"</table></div>"}).join("")+"</div>"}
+  return"<div class='card'><div class='step'>Historique des commandes</div><div class='muted'>Clique sur une commande pour voir ce qui a été commandé.</div>"+g.map(function(c){
+    var tout=c.lignes.every(function(l){return l.statut==="recue"}),nb=c.lignes.reduce(function(s,l){return s+l.quantite},0),ouvert=HISTOPEN===c.id;
+    var h="<button class='sec hrow' data-act='histoCmd' data-id='"+c.id+"'><b>"+cmdNum(c.id)+"</b> · "+esc(dateHeure(c.date))+" · "+nb+" article"+(nb>1?"s":"")+" <span class='tag "+(tout?"ok":"warn")+"'>"+(tout?"Reçue en entier":"En attente")+"</span></button>";
+    if(ouvert)h+="<div class='card' style='margin:0 0 8px'><b>Commande "+cmdNum(c.id)+"</b> du "+esc(dateHeure(c.date))
+      +"<table class='devis' style='width:100%'><tr><th>Produit</th><th class='n'>Qté</th><th></th></tr>"+c.lignes.map(function(l){return"<tr><td>"+esc(l.libelle)+refsCmd(l)+(l.client?"<div class='muted'>Pour "+esc(l.client)+(l.reparationId?" ("+pcn(l.reparationId)+")":"")+"</div>":"")+"</td><td class='n'>"+esc(l.quantite)+"</td><td class='n'>"+(l.statut==="recue"?"<span class='tag ok'>Reçue le "+esc(day(l.recueLe))+"</span>":"<span class='tag warn'>Commandée</span>")+"</td></tr>"}).join("")+"</table></div>";
+    return h}).join("")+"</div>"}
 // ---------- Réception par scan ----------
 var REC=null;
 function recNorm(c){return String(c||"").trim().toLowerCase()}

@@ -52,3 +52,10 @@ await sql`ALTER TABLE commande_lignes ADD COLUMN IF NOT EXISTS barcode TEXT`;
 await sql`CREATE TABLE IF NOT EXISTS taches (id SERIAL PRIMARY KEY, texte TEXT NOT NULL, echeance DATE, epingle BOOLEAN NOT NULL DEFAULT false, priorite BOOLEAN NOT NULL DEFAULT false, fait BOOLEAN NOT NULL DEFAULT false, fait_le TIMESTAMPTZ, fait_par TEXT, cree_par TEXT, cree_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
 await sql`CREATE TABLE IF NOT EXISTS taches_rec (id SERIAL PRIMARY KEY, texte TEXT NOT NULL, unite TEXT NOT NULL DEFAULT 'jours' CHECK (unite IN ('jours','semaines','mois')), intervalle INT NOT NULL DEFAULT 1, jour_semaine INT NOT NULL DEFAULT 1, jour_mois INT NOT NULL DEFAULT 1, priorite BOOLEAN NOT NULL DEFAULT false, actif BOOLEAN NOT NULL DEFAULT true, prochaine DATE NOT NULL, cree_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
 await sql`ALTER TABLE taches ADD COLUMN IF NOT EXISTS recurrente_id INT`;
+await sql`CREATE TABLE IF NOT EXISTS commandes (id SERIAL PRIMARY KEY, fournisseur_id INT NOT NULL REFERENCES fournisseurs(id), cree_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
+await sql`ALTER TABLE commande_lignes ADD COLUMN IF NOT EXISTS commande_id INT`;
+// Anciennes commandes sans numéro : une commande par fournisseur et par date de commande.
+for (const g of (await sql`SELECT DISTINCT fournisseur_id, commandee_le FROM commande_lignes WHERE commande_id IS NULL AND commandee_le IS NOT NULL ORDER BY commandee_le`) as any[]) {
+  const [n] = (await sql`INSERT INTO commandes (fournisseur_id, cree_le) VALUES (${g.fournisseur_id}, ${g.commandee_le}) RETURNING id`) as any[];
+  await sql`UPDATE commande_lignes SET commande_id = ${n.id} WHERE commande_id IS NULL AND fournisseur_id = ${g.fournisseur_id} AND commandee_le = ${g.commandee_le}`;
+}
