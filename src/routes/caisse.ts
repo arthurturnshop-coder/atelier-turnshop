@@ -97,7 +97,9 @@ async function detailVente(v: any) {
   const pays = (await sql`SELECT moyen, montant_cents FROM vente_paiements WHERE vente_id = ${v.id} ORDER BY id`) as any[];
   const avs = (await sql`SELECT libelle, effet, remise_cents FROM vente_avantages WHERE vente_id = ${v.id} ORDER BY id`) as any[];
   const brut = lignes.reduce((s, l) => s + l.quantite * l.prix_unitaire_cents, 0);
+  const [co] = v.client_id ? ((await sql`SELECT prenom, telephone, email FROM clients WHERE id = ${v.client_id}`) as any[]) : [];
   return {
+    contact: { prenom: co?.prenom ?? "", tel: co?.telephone ?? "", email: co?.email ?? "" },
     id: v.id, date: v.cree_le, magasin: v.magasin, vendeur: v.vendeur, client: v.client_nom || null,
     totalCents: v.total_cents, fideliteCents: v.remise_cents, brutCents: brut,
     lignes: lignes.map((l) => ({ libelle: l.libelle, quantite: l.quantite, prixCents: l.prix_unitaire_cents })),

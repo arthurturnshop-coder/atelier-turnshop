@@ -45,6 +45,14 @@ function recuHtml(r){
   r.paiements.forEach(function(p){h+="<div class='rl'><span>Payé en "+esc((MOY[p.moyen]||p.moyen).toLowerCase())+"</span><span>"+eur(p.cents)+"</span></div>"});
   if(t.qrSvg)h+="<hr><div class='rc'><b>Laissez-nous un avis</b><br>et recevez une récompense !</div><div class='qr'>"+t.qrSvg+"</div>";
   return h+"<div class='rc rm'>Merci de votre visite !</div></div>"}
+function avisBtns(r){
+  var c=r.contact,u=r.ticket&&r.ticket.avisUrl;
+  if(!u||!c||(!c.tel&&!c.email))return"";
+  var nl=String.fromCharCode(10),msg="Bonjour"+(c.prenom?" "+c.prenom:"")+", merci pour votre visite chez TURN Shop ! Votre avis nous aide beaucoup, et une récompense vous attend : "+u;
+  return"<div class='card avbox'><b>Demander un avis au client</b><div class='actions'>"
+    +(c.tel?"<a class='btn' href='sms:"+esc(c.tel.replace(/ /g,""))+"?&body="+encodeURIComponent(msg)+"'>Envoyer par SMS</a>":"")
+    +(c.email?"<a class='btn' href='mailto:"+esc(c.email)+"?subject="+encodeURIComponent("Votre avis sur TURN Shop")+"&body="+encodeURIComponent(msg+nl+nl+"L'équipe TURN Shop")+"'>Envoyer par email</a>":"")
+    +"</div></div>"}
 function shopHtml(r){
   var s=r.shopify;if(!s||!s.eligible)return"";
   if(s.nom)return"<div class='muted'>Commande Shopify "+esc(s.nom)+" créée (visible sur le compte du client).</div>";
@@ -63,7 +71,7 @@ function caisseHtml(){
   prestaLoad();
   var brut=panierTotal(),av=avRemTotal(brut),rem=remiseCents(),net=brut-av-rem;
   var h="<div class='caisse'><h3>Caisse</h3>";
-  if(CREC)h+="<div class='card'><b>Vente enregistrée</b>"+recuHtml(CREC)+shopHtml(CREC)+"<div class='actions'><button data-act='cPrint' data-id='"+CREC.id+"'>Imprimer le reçu</button><button class='sec' data-act='cFermeRecu'>Fermer</button></div></div>";
+  if(CREC)h+="<div class='card'><b>Vente enregistrée</b>"+recuHtml(CREC)+shopHtml(CREC)+avisBtns(CREC)+"<div class='actions'><button data-act='cPrint' data-id='"+CREC.id+"'>Imprimer le reçu</button><button class='sec' data-act='cFermeRecu'>Fermer</button></div></div>";
   if(CREP)h+="<div class='card avbox'><b>Facturation de la réparation n°"+CREP+"</b><div class='muted'>Les lignes du devis sont dans le panier. À l'encaissement, la commande est créée dans Shopify.</div><button class='link' data-act='cAnnuleRep'>Annuler la facturation</button></div>";
   h+="<div class='card'><div class='step'>Client (scan carte, email ou téléphone)</div><div class='search'><input id='cq' placeholder='Scan carte, email ou téléphone'><button data-act='cScan'>Chercher</button></div>";
   if(CCLI)h+="<div style='margin-top:8px'><b>"+esc(CCLI.name)+"</b> <span class='muted'>"+esc(CCLI.phone||"")+"</span> <button class='link' data-act='cClient0'>Retirer</button></div>";
