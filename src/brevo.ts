@@ -31,20 +31,22 @@ export function numeroSms(t: string) {
   return d.length >= 11 ? d : "";
 }
 
-async function appel(chemin: string, corps: any) {
+async function appel(chemin: string, corps: any): Promise<string> {
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), 15000);
   try {
     const r = await fetch(API() + chemin, { method: "POST", headers: { "api-key": Bun.env.BREVO_API_KEY ?? "", "content-type": "application/json", accept: "application/json" }, body: JSON.stringify(corps), signal: ctl.signal });
-    if (!r.ok) throw new Error(`Brevo ${r.status} : ${(await r.text()).slice(0, 200)}`);
+    const txt = await r.text();
+    if (!r.ok) throw new Error(`Brevo ${r.status} : ${txt.slice(0, 200)}`);
+    return txt.slice(0, 200);
   } finally { clearTimeout(t); }
 }
 
-export async function envoiEmail(a: string, sujet: string, texte: string) {
+export async function envoiEmail(a: string, sujet: string, texte: string): Promise<string> {
   const exp = Bun.env.BREVO_EMAIL_EXPEDITEUR;
   if (!exp) throw new Error("BREVO_EMAIL_EXPEDITEUR manquant (adresse expéditeur validée dans Brevo).");
   const html = texte.split("\n").map((l) => l.replace(/&/g, "&amp;").replace(/</g, "&lt;")).join("<br>");
-  await appel("/smtp/email", { sender: { name: "TURN Shop", email: exp }, to: [{ email: a }], subject: sujet, htmlContent: `<div style="font-family:Arial,sans-serif;font-size:15px">${html}</div>`, textContent: texte });
+  return await appel("/smtp/email", { sender: { name: "TURN Shop", email: exp }, to: [{ email: a }], subject: sujet, htmlContent: `<div style="font-family:Arial,sans-serif;font-size:15px">${html}</div>`, textContent: texte });
 }
 
 export async function envoiSms(num: string, texte: string) {
@@ -72,7 +74,7 @@ export async function notifier(quand: MsgType, c: Ctx): Promise<string> {
       const [d] = (await sql`SELECT id FROM messages_envoyes WHERE type = ${quand} AND reparation_id = ${c.reparationId} AND statut = 'envoye' LIMIT 1`) as any[];
       if (d) return "";
     }
-    const envois: [string, string, () => Promise<void>][] = [];
+    const envois: [string, string, () => Promise<unknown>][] = [];
     const mail = String(cl.email ?? "").trim();
     const sms = numeroSms(cl.telephone); // inutilisé tant que les SMS sont désactivés (lireAuto ne renvoie que off ou email)
     if ((canal === "email" || canal === "both") && mail) envois.push(["email", mail, () => envoiEmail(mail, c.sujet, c.texte)]);

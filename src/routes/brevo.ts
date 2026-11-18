@@ -27,11 +27,12 @@ app.post("/api/brevo/test", async (c) => {
   const b = await c.req.json().catch(() => ({}));
   const mail = clean(b.email, 120), tel = numeroSms(clean(b.tel, 40));
   if (!mail && !tel) throw new AppError(400, "Tape ton email pour le test.");
+  let rep = "";
   try {
-    if (mail) await envoiEmail(mail, "Test TURN Shop", "Ceci est un test d'envoi depuis l'Atelier TURN.");
+    if (mail) rep = await envoiEmail(mail, "Test TURN Shop", "Ceci est un test d'envoi depuis l'Atelier TURN.");
     if (tel) await envoiSms(tel, "Test TURN Shop : l'envoi de SMS fonctionne.");
   } catch (e: any) {
     throw new AppError(502, String(e?.message ?? e));
   }
-  return c.json({ message: "Test envoyé : vérifie ta boîte mail ou ton téléphone." });
+  return c.json({ message: "Brevo a accepté l'envoi" + (rep ? " (réponse : " + rep + " depuis " + (Bun.env.BREVO_EMAIL_EXPEDITEUR ?? "?") + ")" : "") + ". Vérifie ta boîte mail (et les spams)." });
 });
