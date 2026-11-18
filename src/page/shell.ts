@@ -180,5 +180,6 @@ a.btn{display:inline-block;background:#111;color:#fff;text-decoration:none;paddi
 @media(min-width:800px){.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}.grid .card{margin:10px 0}}
 .presta{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:6px 0}.presta button{text-align:left}
 .tache{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid #e3e3e3}.tache.top{border-left:4px solid #111;padding-left:8px;background:#fafafa}.tache.fait .tx{text-decoration:line-through;color:#888}.tache .tx{flex:1}.tache .tbtn{white-space:nowrap}.chk{min-height:26px;width:26px;min-width:26px;padding:0;background:#fff;color:#111;border:2px solid #111;font-size:15px}.rec-ok{border-left:4px solid #1a7f37;padding:8px 12px;background:#f0faf2}.rec-ko{border-left:4px solid #b42318;padding:8px 12px;background:#fdf1f0}
+.ttabs{display:flex;gap:0}.ttabs button{min-height:36px}
 </style></head><body><header><span>Atelier TURN</span><div id="rech" class="rech" style="display:none"><input id="rq" type="search" placeholder="Chercher : n° PC, client, modèle, produit..." autocomplete="off"><div id="rpanel" class="rpanel" style="display:none"></div></div><span id="who"></span></header><nav id="nav"></nav><main id="app">Chargement…</main>
 <script>`;

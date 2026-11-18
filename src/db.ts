@@ -50,3 +50,5 @@ for (const [prenom, role, magasins] of PROFILS_INITIAUX) {
 await sql`ALTER TABLE devis_lignes ADD COLUMN IF NOT EXISTS barcode TEXT, ADD COLUMN IF NOT EXISTS marque TEXT`;
 await sql`ALTER TABLE commande_lignes ADD COLUMN IF NOT EXISTS barcode TEXT`;
 await sql`CREATE TABLE IF NOT EXISTS taches (id SERIAL PRIMARY KEY, texte TEXT NOT NULL, echeance DATE, epingle BOOLEAN NOT NULL DEFAULT false, priorite BOOLEAN NOT NULL DEFAULT false, fait BOOLEAN NOT NULL DEFAULT false, fait_le TIMESTAMPTZ, fait_par TEXT, cree_par TEXT, cree_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
+await sql`CREATE TABLE IF NOT EXISTS taches_rec (id SERIAL PRIMARY KEY, texte TEXT NOT NULL, unite TEXT NOT NULL DEFAULT 'jours' CHECK (unite IN ('jours','semaines','mois')), intervalle INT NOT NULL DEFAULT 1, jour_semaine INT NOT NULL DEFAULT 1, jour_mois INT NOT NULL DEFAULT 1, priorite BOOLEAN NOT NULL DEFAULT false, actif BOOLEAN NOT NULL DEFAULT true, prochaine DATE NOT NULL, cree_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
+await sql`ALTER TABLE taches ADD COLUMN IF NOT EXISTS recurrente_id INT`;

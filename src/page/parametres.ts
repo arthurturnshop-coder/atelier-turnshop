@@ -1,4 +1,5 @@
 export const PARAMETRES = `// ---------- Paramètres (admins) ----------
+var RCEDIT=0,RCMSG="",RCF={txt:"",u:"jours",n:"1",js:"1",jm:"1",p:false};
 var PSEDIT=0,PSMSG="",PSF={nom:"",prix:"",avecPiece:false,aide:"",qs:"",qr:""};
 var TICK=null,TICKMSG="",SHOPCMD=null,SHOPRES="",PARAM=null,AVL=null,AVMSG="",AVDEC="achat",AVF={libelle:"",seuil:"",dd:"",df:"",effet:"cadeau",valeur:""};
 function avDesc(a){return esc(avLabel(a))+" · "+esc(avCondition(a))}
@@ -27,6 +28,16 @@ function vParam(){
   if(!AVL.length)h+="<div class='muted' style='margin:8px 0'>Aucun cadeau ni offre pour l'instant.</div>";
   AVL.forEach(function(a){h+="<div class='avrow'><div><b>"+esc(a.libelle)+"</b>"+(a.actif?"":" <span class='tag'>désactivé</span>")+"<div class='muted'>"+avDesc(a)+"</div></div><div class='actions'><button class='sec' data-act='avEtat' data-id='"+a.id+"' data-v='"+(a.actif?0:1)+"'>"+(a.actif?"Désactiver":"Réactiver")+"</button><button class='sec' data-act='avSuppr' data-id='"+a.id+"'>Supprimer</button></div></div>"});
   h+=avForm()+"</div>";
+  trecLoad();
+  if(TREC){var JS=["","lundi","mardi","mercredi","jeudi","vendredi","samedi","dimanche"];
+    h+="<div class='card'><div class='step'>To-do list récurrente</div><div class='muted'>Ces tâches reviennent toutes seules dans l'onglet « Récurrentes » du Dashboard, à la fréquence choisie. Elles ne se modifient qu'ici.</div>";
+    if(!TREC.length)h+="<div class='muted' style='margin:8px 0'>Aucune tâche récurrente.</div>";
+    TREC.forEach(function(r){h+="<div class='avrow'><div><b>"+esc(r.texte)+"</b>"+(r.priorite?" <span class='tag warn'>priorité</span>":"")+(r.actif?"":" <span class='tag'>désactivée</span>")+"<div class='muted'>"+esc(r.libelle)+" · prochaine fois : "+jourCourt(r.prochaine)+"</div></div><div class='actions'><button class='sec' data-act='rcEdit' data-id='"+r.id+"'>Modifier</button><button class='sec' data-act='rcEtat' data-id='"+r.id+"' data-v='"+(r.actif?"0":"1")+"'>"+(r.actif?"Désactiver":"Activer")+"</button><button class='danger' data-act='rcSuppr' data-id='"+r.id+"'>Supprimer</button></div></div>"});
+    h+="<div class='step' style='margin-top:10px'>"+(RCEDIT?"Modifier la tâche":"Nouvelle tâche récurrente")+"</div><input id='rc-txt' placeholder='Ex : Vider les poubelles, faire la caisse, commander les consommables' value='"+esc(RCF.txt)+"'>"
+      +"<div class='dl'><span class='muted'>Tous les</span><input id='rc-n' class='q' type='number' min='1' value='"+esc(RCF.n)+"'><select id='rc-u'><option value='jours'"+(RCF.u==="jours"?" selected":"")+">jour(s)</option><option value='semaines'"+(RCF.u==="semaines"?" selected":"")+">semaine(s)</option><option value='mois'"+(RCF.u==="mois"?" selected":"")+">mois</option></select></div>"
+      +"<div class='dl'><span class='muted'>Si semaines : le</span><select id='rc-js'>"+JS.map(function(j,i){return i?"<option value='"+i+"'"+(String(i)===RCF.js?" selected":"")+">"+j+"</option>":""}).join("")+"</select><span class='muted'>Si mois : le</span><input id='rc-jm' class='q' type='number' min='1' max='31' value='"+esc(RCF.jm)+"'></div>"
+      +"<label class='muted' style='display:flex;gap:8px;align-items:center'><input type='checkbox' id='rc-p' style='width:auto;margin:0' "+(RCF.p?"checked":"")+"> Marquer comme priorité</label>"
+      +"<button data-act='rcSave'>"+(RCEDIT?"Enregistrer":"Ajouter")+"</button><div class='muted'>"+esc(RCMSG)+"</div></div>"}
   prestaLoad();
   if(PRESTA){h+="<div class='card'><div class='step'>Prestations (main-d'œuvre du devis)</div><div class='muted'>Ces boutons apparaissent dans les devis. Si la prestation demande une pièce (ex : pneu), l'atelier propose de la choisir dans le catalogue.</div>";
     if(!PRESTA.prestations.length)h+="<div class='muted' style='margin:8px 0'>Aucune prestation.</div>";
