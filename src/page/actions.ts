@@ -14,6 +14,15 @@ export const ACTIONS = `var ACTS={
   editCons:function(){EDITCONS=true;render()},cancelCons:function(){EDITCONS=false;render()},
   saveCons:async function(){var body={};Object.keys(CLAB).forEach(function(k){body[k]=v("c-"+k)});try{var d=await api("/consignes",body);CONS=null;EDITCONS=false;alert(d.message);render()}catch(e){alert(e.message)}},
   addC:async function(){try{var d=await api("/clients",{prenom:v("pn"),nom:v("nm"),telephone:v("tel"),email:v("em")});alert(d.message);NEWCLI=false;CUR=await api("/customer?id="+d.id);EDITCLI=false;FID=null;ADDT=true;TAB="accueil";render()}catch(e){alert(e.message)}},
+  cliSuppr:async function(){if(!CUR||!confirm("Supprimer la fiche de "+CUR.name+" ? (possible seulement si elle n'a ni réparation ni vente)"))return;
+    try{var d=await api("/clients/supprimer",{id:CUR.id});alert(d.message);CUR=null;RES=[];SEARCHED=false;TAB="accueil";render()}catch(e){alert(e.message)}},
+  cliFusion:async function(){if(!CUR)return;var q=prompt("Fusionner "+CUR.name+" dans quelle fiche ? Tape le nom, l'email ou le téléphone de la fiche à GARDER :");if(!q)return;
+    try{var l=(await api("/search?q="+encodeURIComponent(q))).filter(function(x){return x.id!==CUR.id});
+      if(!l.length){alert("Aucune autre fiche trouvée.");return}
+      var n=prompt("Garder quelle fiche ? Tape le numéro :"+nlc()+l.map(function(x,i){return(i+1)+" = "+x.name+" · "+(x.phone||"")+" · "+(x.email||"")}).join(nlc()),"1");if(!n)return;
+      var k=l[(+n)-1];if(!k){alert("Numéro inconnu.");return}
+      if(!confirm("Tout déplacer de "+CUR.name+" vers "+k.name+" puis supprimer "+CUR.name+" ?"))return;
+      var d=await api("/clients/fusionner",{id:CUR.id,versId:k.id});alert(d.message);CUR=await api("/customer?id="+d.id);RES=[];render()}catch(e){alert(e.message)}},
   editCli:function(){EDITCLI=true;render()},cancelCli:function(){EDITCLI=false;render()},
   saveCli:async function(){try{var d=await api("/clients/modifier",{id:CUR.id,prenom:v("ep"),nom:v("en"),telephone:v("et"),email:v("ee")});alert(d.message);EDITCLI=false;await refresh()}catch(e){alert(e.message)}},
   showAddT:function(){ADDT=true;render()},cancelAddT:function(){ADDT=false;render()},

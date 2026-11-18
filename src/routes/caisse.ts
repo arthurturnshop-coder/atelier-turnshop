@@ -51,6 +51,11 @@ app.get("/api/caisse/scan", async (c) => {
     if (!s) return c.json({ clientId: null });
     const [deja] = (await sql`SELECT id FROM clients WHERE shopify_id = ${s.id}`) as any[];
     if (deja) return c.json({ clientId: deja.id });
+    const mail = clean(s.email, 120).toLowerCase();
+    if (mail) {
+      const [pareil] = (await sql`SELECT id FROM clients WHERE lower(trim(email)) = ${mail} LIMIT 1`) as any[];
+      if (pareil) { await sql`UPDATE clients SET shopify_id = COALESCE(shopify_id, ${s.id}) WHERE id = ${pareil.id}`; return c.json({ clientId: pareil.id }); }
+    }
     const [neuf] = (await sql`INSERT INTO clients (prenom, nom, telephone, email, shopify_id) VALUES (${clean(s.firstName, 80)}, ${clean(s.lastName, 80) || clean(s.email, 80) || "Client"}, ${clean(s.phone, 40)}, ${clean(s.email, 120)}, ${s.id}) RETURNING id`) as any[];
     return c.json({ clientId: neuf.id, cree: true });
   } catch (e: any) {

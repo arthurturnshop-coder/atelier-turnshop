@@ -2,7 +2,7 @@ import { app } from "../app";
 import { SYNC } from "../config";
 import { sql } from "../db";
 import { PRODUITS_QUERY, PRODUITS_QUERY_LIEUX, shopifyRead } from "../shopify";
-import { AppError, clean } from "../util";
+import { AppError, clean, exigeResponsable } from "../util";
 
 export async function fiche(id: number) {
   const [client] = await sql`SELECT * FROM clients WHERE id = ${id}`;
@@ -82,12 +82,28 @@ app.get("/api/recherche", async (c) => {
   return c.json({ clients, reparations, produits, produitsIndisponibles });
 });
 
+// Doublons : même email (sans tenir compte des majuscules) ou même numéro (9 derniers chiffres) sur une autre fiche.
+const fin9 = (t: string) => { const d = String(t ?? "").replace(/\D/g, ""); return d.length >= 9 ? d.slice(-9) : ""; };
+export async function verifieDoublon(email: string, tel: string, sauf: number, ancien?: { email: string; telephone: string }) {
+  const e = email.trim().toLowerCase();
+  if (e && e !== (ancien?.email ?? "").trim().toLowerCase()) {
+    const [x] = (await sql`SELECT id, prenom, nom FROM clients WHERE lower(trim(email)) = ${e} AND id <> ${sauf} LIMIT 1`) as any[];
+    if (x) throw new AppError(409, `Cet email est déjà sur la fiche de ${`${x.prenom} ${x.nom}`.trim()}. Ouvre cette fiche (ou fusionne les deux).`);
+  }
+  const t = fin9(tel);
+  if (t && t !== fin9(ancien?.telephone ?? "")) {
+    const [x] = (await sql`SELECT id, prenom, nom FROM clients WHERE right(regexp_replace(telephone, '\\D', '', 'g'), 9) = ${t} AND length(regexp_replace(telephone, '\\D', '', 'g')) >= 9 AND id <> ${sauf} LIMIT 1`) as any[];
+    if (x) throw new AppError(409, `Ce numéro est déjà sur la fiche de ${`${x.prenom} ${x.nom}`.trim()}. Ouvre cette fiche (ou fusionne les deux).`);
+  }
+}
+
 app.get("/api/customer", async (c) => c.json(await fiche(Number(c.req.query("id")))));
 
 app.post("/api/clients", async (c) => {
   const b = await c.req.json().catch(() => ({}));
   const nom = clean(b.nom, 80);
   if (!nom) throw new AppError(400, "Le nom est obligatoire.");
+  await verifieDoublon(clean(b.email, 120), clean(b.telephone, 40), 0);
   const [row] = await sql`INSERT INTO clients (prenom, nom, telephone, email) VALUES (${clean(b.prenom, 80)}, ${nom}, ${clean(b.telephone, 40)}, ${clean(b.email, 120)}) RETURNING id`;
   return c.json({ id: row.id, message: SYNC ? "Client créé." : "Client créé (synchro Shopify éteinte)." });
 });
@@ -98,10 +114,47 @@ app.post("/api/clients/modifier", async (c) => {
   if (!(id > 0)) throw new AppError(404, "Client introuvable.");
   const nom = clean(b.nom, 80);
   if (!nom) throw new AppError(400, "Le nom est obligatoire.");
-  const [client] = await sql`SELECT id FROM clients WHERE id = ${id}`;
+  const [client] = (await sql`SELECT id, email, telephone FROM clients WHERE id = ${id}`) as any[];
   if (!client) throw new AppError(404, "Client introuvable.");
+  await verifieDoublon(clean(b.email, 120), clean(b.telephone, 40), id, client);
   await sql`UPDATE clients SET prenom = ${clean(b.prenom, 80)}, nom = ${nom}, telephone = ${clean(b.telephone, 40)}, email = ${clean(b.email, 120)} WHERE id = ${id}`;
   return c.json({ message: "Client modifié." });
+});
+
+// Supprimer une fiche vide (doublon). S'il y a des réparations ou des ventes, il faut fusionner.
+app.post("/api/clients/supprimer", async (c) => {
+  exigeResponsable(c);
+  const b = await c.req.json().catch(() => ({}));
+  const id = Number(b.id);
+  const [x] = await sql`SELECT id FROM clients WHERE id = ${id}`;
+  if (!x) throw new AppError(404, "Client introuvable.");
+  const [n] = (await sql`SELECT (SELECT count(*) FROM reparations WHERE client_id = ${id})::int AS r, (SELECT count(*) FROM ventes WHERE client_id = ${id})::int AS v`) as any[];
+  if (n.r > 0 || n.v > 0) throw new AppError(409, `Cette fiche a ${n.r} réparation(s) et ${n.v} vente(s) : utilise « Fusionner dans une autre fiche » pour ne rien perdre.`);
+  await sql`DELETE FROM trottinettes WHERE client_id = ${id}`;
+  await sql`DELETE FROM clients WHERE id = ${id}`;
+  return c.json({ message: "Fiche supprimée." });
+});
+
+// Fusionner un doublon dans une autre fiche : réparations, ventes et trottinettes sont déplacées, puis le doublon est supprimé.
+app.post("/api/clients/fusionner", async (c) => {
+  exigeResponsable(c);
+  const b = await c.req.json().catch(() => ({}));
+  const id = Number(b.id), vers = Number(b.versId);
+  if (!(id > 0) || !(vers > 0) || id === vers) throw new AppError(400, "Choisis une autre fiche.");
+  const [a] = (await sql`SELECT id, email, telephone FROM clients WHERE id = ${id}`) as any[];
+  const [d] = (await sql`SELECT id, email, telephone, shopify_id FROM clients WHERE id = ${vers}`) as any[];
+  if (!a || !d) throw new AppError(404, "Client introuvable.");
+  const ts = (await sql`SELECT id, serie FROM trottinettes WHERE client_id = ${id}`) as any[];
+  for (const t of ts) {
+    const [meme] = (await sql`SELECT id FROM trottinettes WHERE client_id = ${vers} AND serie = ${t.serie}`) as any[];
+    if (meme) { await sql`UPDATE reparations SET trottinette_id = ${meme.id} WHERE trottinette_id = ${t.id}`; await sql`DELETE FROM trottinettes WHERE id = ${t.id}`; }
+    else await sql`UPDATE trottinettes SET client_id = ${vers} WHERE id = ${t.id}`;
+  }
+  await sql`UPDATE reparations SET client_id = ${vers} WHERE client_id = ${id}`;
+  await sql`UPDATE ventes SET client_id = ${vers} WHERE client_id = ${id}`;
+  await sql`UPDATE clients SET email = CASE WHEN email = '' THEN ${a.email} ELSE email END, telephone = CASE WHEN telephone = '' THEN ${a.telephone} ELSE telephone END, shopify_id = COALESCE(shopify_id, ${a.shopify_id ?? null}) WHERE id = ${vers}`;
+  await sql`DELETE FROM clients WHERE id = ${id}`;
+  return c.json({ message: "Fiches fusionnées.", id: vers });
 });
 
 app.post("/api/trottinettes", async (c) => {

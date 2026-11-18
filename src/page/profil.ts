@@ -30,7 +30,7 @@ function vProfil(){
   }else{
     h+="<div class='big'>"+esc(c.name||"Client")+"</div>"
       +"<div class='muted'>"+esc(c.phone||"Pas de téléphone")+" · "+esc(c.email||"Pas d'email")+"</div><div class='muted'>Client depuis le "+esc(day(c.creeLe))+"</div>"
-      +"<button class='sec' data-act='editCli'>Modifier</button>";
+      +"<button class='sec' data-act='editCli'>Modifier</button>"+(estResp()?" <button class='sec' data-act='cliFusion'>Fusionner dans une autre fiche</button> <button class='danger' data-act='cliSuppr'>Supprimer la fiche</button>":"");
   }
   h+="<div class='muted' id='fid'>"+fidHtml()+"</div></div></div></div>";
   if(ADDT)h+="<div class='card'><b>Ajouter une trottinette</b><input id='m' placeholder='Marque'><input id='mo' placeholder='Modèle'><input id='s' placeholder='Numéro de série'><button data-act='addT'>Associer</button><button class='sec' data-act='cancelAddT'>Annuler</button></div>";
