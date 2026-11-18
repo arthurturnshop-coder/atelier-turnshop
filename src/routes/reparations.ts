@@ -1,12 +1,14 @@
 import { app } from "../app";
 import { AVIS_DELAI_HEURES, STATUTS } from "../config";
 import { sql } from "../db";
+import { remiseMulti } from "./prestations";
 import { AppError, clean, exigeResponsable, signature } from "../util";
 
 export async function devisDe(repId: number) {
   const lignes = (await sql`SELECT d.id, d.type, d.libelle, d.quantite, d.prix_unitaire_cents, d.shopify_variant_id, d.sku, (SELECT statut FROM commande_lignes cl WHERE cl.devis_ligne_id = d.id ORDER BY cl.id DESC LIMIT 1) AS cmd FROM devis_lignes d WHERE d.reparation_id = ${repId} ORDER BY d.type DESC, d.id`) as any[];
   const total = lignes.reduce((s, l) => s + l.quantite * l.prix_unitaire_cents, 0);
-  return { lignes: lignes.map((l) => ({ id: l.id, type: l.type, libelle: l.libelle, quantite: l.quantite, prixCents: l.prix_unitaire_cents, variantId: l.shopify_variant_id ?? "", sku: l.sku ?? "", commande: l.cmd ?? "" })), totalCents: total };
+  const remiseMultiCents = await remiseMulti(lignes.map((l) => ({ type: l.type, quantite: l.quantite })), total);
+  return { remiseMultiCents, netCents: total - remiseMultiCents, lignes: lignes.map((l) => ({ id: l.id, type: l.type, libelle: l.libelle, quantite: l.quantite, prixCents: l.prix_unitaire_cents, variantId: l.shopify_variant_id ?? "", sku: l.sku ?? "", commande: l.cmd ?? "" })), totalCents: total };
 }
 
 export function ligneListe(r: any, journal: any[]) {

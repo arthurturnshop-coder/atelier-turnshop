@@ -178,5 +178,6 @@ a.btn{display:inline-block;background:#111;color:#fff;text-decoration:none;paddi
 .qr svg{width:38mm;height:38mm;display:block;margin:6px auto}
 @media(min-width:1000px){.dash{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}.dright{position:sticky;top:8px}}
 @media(min-width:800px){.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}.grid .card{margin:10px 0}}
+.presta{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:6px 0}.presta button{text-align:left}
 </style></head><body><header><span>Atelier TURN</span><div id="rech" class="rech" style="display:none"><input id="rq" type="search" placeholder="Chercher : n° PC, client, modèle, produit..." autocomplete="off"><div id="rpanel" class="rpanel" style="display:none"></div></div><span id="who"></span></header><nav id="nav"></nav><main id="app">Chargement…</main>
 <script>`;

@@ -59,6 +59,16 @@ export const ACTIONS = `var ACTS={
     var brut=panierTotal(),ids=avChoisis(brut).map(function(a){return a.id});
     try{var d=await api("/caisse/encaisser",{lignes:PAN,paiements:pay,clientId:CCLI?CCLI.id:null,utiliserFidelite:CUSE,avantageIds:ids,repairId:CREP});CREP=null;PAN=[];CPAY={carte:"",especes:"",virement:""};CUSE=false;CAVOFF=[];CREC=d.vente;CMSG="";CHOPEN=0;if(CCLI){var x=await api("/caisse/client?id="+CCLI.id);CFID=x.fidelite}await chargeHisto()}catch(e){CMSG=e.message;render()}},
   shopTest:async function(){SHOPRES="<div class='muted'>Test en cours…</div>";render();try{var d=await api("/shopify/diagnostic");SHOPRES=d.etapes.map(function(e){return"<div>"+(e.ok?"✅ ":"❌ ")+"<b>"+esc(e.nom)+"</b><div class='muted'>"+esc(e.detail)+"</div></div>"}).join("")}catch(e){SHOPRES=esc(e.message)}render()},
+  addPresta:async function(b){var x=(PRESTA?PRESTA.prestations:[]).filter(function(p){return p.id===+b.dataset.id})[0];if(!x||!FICHE)return;
+    try{await api("/devis/ligne",{repairId:FICHE.id,type:"main_oeuvre",libelle:x.nom,quantite:1,prix:String(x.prixCents/100).replace(".",",")});
+      DEVHINT=x.avecPiece?"Choisis maintenant : "+(x.pieceAide||"la pièce")+" (cherche-la dans le catalogue ci-dessous).":"";
+      await recharger(FICHE.id);
+      if(x.avecPiece){setTimeout(function(){var i=document.querySelector("input[data-ps=devis]");if(i){i.focus();i.scrollIntoView({block:"center"})}},50)}}catch(e){alert(e.message)}},
+  psSave:async function(){try{var d=await api("/prestations",{id:PSEDIT,nom:v("ps-nom"),prix:v("ps-prix"),avecPiece:!!document.getElementById("ps-piece").checked,pieceAide:v("ps-aide")});PSMSG=d.message;PSEDIT=0;PSF={nom:"",prix:"",avecPiece:false,aide:""};PRESTA=null;render()}catch(e){PSMSG=e.message;render()}},
+  psEdit:function(b){var x=(PRESTA?PRESTA.prestations:[]).filter(function(p){return p.id===+b.dataset.id})[0];if(!x)return;PSEDIT=x.id;PSF={nom:x.nom,prix:String(x.prixCents/100).replace(".",","),avecPiece:x.avecPiece,aide:x.pieceAide};PSMSG="";render()},
+  psEtat:async function(b){try{await api("/prestations/etat",{id:+b.dataset.id,actif:b.dataset.v==="1"});PRESTA=null;render()}catch(e){alert(e.message)}},
+  psSuppr:async function(b){if(!confirm("Supprimer cette prestation ?"))return;try{await api("/prestations/supprimer",{id:+b.dataset.id});PRESTA=null;render()}catch(e){alert(e.message)}},
+  multiSave:async function(){try{var d=await api("/reglages/multi",{seuil:v("mu-n"),remise:v("mu-e")});PSMSG=d.message;PRESTA=null;render()}catch(e){PSMSG=e.message;render()}},
   avSave:async function(){var dec=v("avd");try{var d=await api("/avantages",{libelle:v("avl"),declencheur:dec,seuil:v("avs"),dateDebut:v("avdd"),dateFin:v("avdf"),effet:v("ave"),valeur:v("avv")});AVL=null;AVMSG=d.message||"Avantage ajouté.";CAV=null;render()}catch(e){AVMSG=e.message;render()}},
   avEtat:async function(b){try{await api("/avantages/etat",{id:+b.dataset.id,actif:b.dataset.v==="1"});AVL=null;CAV=null;render()}catch(e){alert(e.message)}},
   avSuppr:async function(b){if(!confirm("Supprimer cet avantage ?"))return;try{await api("/avantages/supprimer",{id:+b.dataset.id});AVL=null;CAV=null;render()}catch(e){alert(e.message)}},

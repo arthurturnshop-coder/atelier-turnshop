@@ -38,13 +38,23 @@ function devisHtml(f){
     return"<div class='step'>"+titre+"</div><table><tr><th>Libellé</th><th class='n'>Qté</th><th class='n'>Prix</th><th class='n'>Total</th><th></th></tr>"
       +lignes.map(function(l){return"<tr><td>"+esc(l.libelle)+"</td><td class='n'>"+l.quantite+"</td><td class='n'>"+eur(l.prixCents)+"</td><td class='n'>"+eur(l.quantite*l.prixCents)+"</td><td class='n'>"+(l.type==="piece"?(l.commande?"<span class='tag "+(l.commande==="recue"?"ok":"warn")+"'>"+({panier:"À commander",commandee:"Commandée",recue:"Reçue"}[l.commande]||"")+"</span> ":"<button class='sec' data-act='aCommander' data-id='"+l.id+"'>À commander</button> "):"")+"<button class='link' data-act='delLigne' data-id='"+l.id+"'>Retirer</button></td></tr>"}).join("")+"</table>"}
   return"<div class='devis'>"+table("Forfaits main-d'œuvre",mo)+table("Pièces détachées",pi)
-    +"<div class='tot'>Total du devis : "+eur(d.totalCents)+"</div>"
+    +(d.remiseMultiCents?"<div class='muted'>Remise plusieurs prestations : -"+eur(d.remiseMultiCents)+" (non cumulable avec une offre)</div>":"")
+    +"<div class='tot'>Total du devis : "+eur(d.netCents==null?d.totalCents:d.netCents)+"</div>"
     +(d.lignes.length?"<button data-act='facturer' data-id='"+f.id+"'>Facturer ce devis (passer en caisse)</button>":"")
-    +"<div class='step' style='margin-top:10px'>Ajouter une ligne</div><div class='muted'>Une pièce du catalogue turnshop.fr ? Cherche-la ici :</div>"+prodBox("devis")+"<div class='dl'>"
+    +prestaBox(f)+"<div class='step' style='margin-top:10px'>Ajouter une ligne</div><div class='muted'>Une pièce du catalogue turnshop.fr ? Cherche-la ici :</div>"+prodBox("devis")+"<div class='dl'>"
     +"<select id='lt' class='t'><option value='main_oeuvre'>Main-d'œuvre</option><option value='piece'>Pièce détachée</option></select>"
     +"<input id='ll' class='lb' placeholder='Ex : changement de pneu / pneu 10x3 CST'>"
     +"<input id='lq' class='q' type='number' min='1' value='1'><input id='lp' class='p' placeholder='Prix €'>"
     +"<button data-act='addLigne' data-id='"+f.id+"'>Ajouter</button></div></div>"}
+function prestaBox(f){
+  prestaLoad();
+  var l=(PRESTA?PRESTA.prestations:[]).filter(function(x){return x.actif});
+  var h="<div class='step' style='margin-top:10px'>Prestations</div>";
+  if(!l.length)h+="<div class='muted'>Aucune prestation. Un admin peut en créer dans ⚙ Paramètres.</div>";
+  else h+="<div class='presta'>"+l.map(function(x){return"<button class='sec' data-act='addPresta' data-id='"+x.id+"'><b>"+esc(x.nom)+"</b><br><span class='muted'>"+eur(x.prixCents)+(x.avecPiece?" + "+esc(x.pieceAide||"pièce"):"")+"</span></button>"}).join("")+"</div>";
+  if(PRESTA&&PRESTA.multi&&PRESTA.multi.remiseCents)h+="<div class='muted'>"+PRESTA.multi.seuil+" prestations ou plus : -"+eur(PRESTA.multi.remiseCents)+" (sans offre cumulée)</div>";
+  if(DEVHINT)h+="<div class='card avbox'><b>"+esc(DEVHINT)+"</b></div>";
+  return h}
 function vFiche(){
   var f=FICHE;
   var h=subHtml()+"<button class='sec' data-act='fermerFiche' style='max-width:260px'>← Retour à la liste</button>"

@@ -1,6 +1,13 @@
 export const CAISSE = `// ---------- Caisse (colonne de droite du Dashboard) ----------
 var PAN=[],CCLI=null,CFID=null,CUSE=false,CPAY={carte:"",especes:"",virement:""},CREP=null,CMSG="";
 var CAV=null,CAVBUSY=false,CAVOFF=[],CREC=null,CHIST=null,CHOPEN=0;
+var PRESTA=null,PRESBUSY=false,DEVHINT="";
+function prestaLoad(){if(PRESTA===null&&!PRESBUSY){PRESBUSY=true;api("/prestations").then(function(d){PRESTA=d;PRESBUSY=false;render()}).catch(function(){PRESTA={prestations:[],multi:{seuil:2,remiseCents:0}};PRESBUSY=false;render()})}}
+function multiRem(brut){
+  var m=PRESTA&&PRESTA.multi;if(!m||!m.remiseCents||brut<=0)return 0;
+  var nb=PAN.filter(function(l){return l.type==="main_oeuvre"}).reduce(function(s,l){return s+l.quantite},0);
+  if(nb<m.seuil||avChoisis(brut).length)return 0;
+  return Math.min(m.remiseCents,brut)}
 var MOY={carte:"Carte",especes:"Espèces",virement:"Virement"};
 function pxCents(s){return Math.round(Number(String(s).replace(",","."))*100)||0}
 function panierTotal(){return PAN.reduce(function(s,l){return s+l.quantite*pxCents(l.prix)},0)}
@@ -10,7 +17,7 @@ function avApplicable(a,brut){
   return brut>=a.seuilCents}
 function avRemise(a,brut){if(a.effet==="euros")return Math.round(a.valeur*100);if(a.effet==="pourcent")return Math.round(brut*a.valeur/100);return 0}
 function avChoisis(brut){return(CAV||[]).filter(function(a){return avApplicable(a,brut)&&CAVOFF.indexOf(a.id)<0})}
-function avRemTotal(brut){var reste=brut,s=0;avChoisis(brut).forEach(function(a){var c=Math.min(avRemise(a,brut),reste);reste-=c;s+=c});return s}
+function avRemTotal(brut){var reste=brut,s=0;avChoisis(brut).forEach(function(a){var c=Math.min(avRemise(a,brut),reste);reste-=c;s+=c});return s+multiRem(brut)}
 function avLabel(a){return a.effet==="euros"?"-"+a.valeur+" €":a.effet==="pourcent"?"-"+a.valeur+" %":"cadeau offert"}
 function avCondition(a){
   if(a.declencheur==="cumul")return"dès "+(a.seuilCents/100)+" € dépensés au total (une seule fois par client)";
@@ -49,6 +56,7 @@ function histoHtml(){
   return h+"</div>"}
 function caisseHtml(){
   if(CAV===null&&!CAVBUSY){CAVBUSY=true;api("/caisse/avantages").then(function(d){CAV=d;CAVBUSY=false;render()}).catch(function(){CAV=[];CAVBUSY=false})}
+  prestaLoad();
   var brut=panierTotal(),av=avRemTotal(brut),rem=remiseCents(),net=brut-av-rem;
   var h="<div class='caisse'><h3>Caisse</h3>";
   if(CREC)h+="<div class='card'><b>Vente enregistrée</b>"+recuHtml(CREC)+shopHtml(CREC)+"<div class='actions'><button data-act='cPrint' data-id='"+CREC.id+"'>Imprimer le reçu</button><button class='sec' data-act='cFermeRecu'>Fermer</button></div></div>";
@@ -77,6 +85,7 @@ function caisseHtml(){
     h+="</div>"}
   h+="<div class='card'><div class='step'>Paiement</div><div>Sous-total : "+eur(brut)+"</div>";
   avChoisis(brut).forEach(function(a){h+="<div>"+(a.effet==="cadeau"?"Cadeau à remettre : ":"Offre : ")+esc(a.libelle)+(a.effet==="cadeau"?"":" : -"+eur(Math.min(avRemise(a,brut),brut)))+"</div>"});
+  if(multiRem(brut))h+="<div>Remise plusieurs prestations : -"+eur(multiRem(brut))+"</div>";
   if(rem)h+="<div>Remise fidélité : -"+eur(rem)+"</div>";
   h+="<div class='big'>À payer : "+eur(net)+"</div>"
     +"<div class='pay'><span>Carte</span><input id='pc' placeholder='0,00' value='"+esc(CPAY.carte)+"'></div><div class='pay'><span>Espèces</span><input id='pe' placeholder='0,00' value='"+esc(CPAY.especes)+"'></div><div class='pay'><span>Virement</span><input id='pv' placeholder='0,00' value='"+esc(CPAY.virement)+"'></div>"
@@ -85,7 +94,7 @@ function caisseHtml(){
   h+=histoHtml()+"</div>";
   return h}
 async function ajouterProduit(p,ctx){
-  if(ctx==="devis"){if(!FICHE)return;await api("/devis/ligne",{repairId:FICHE.id,type:"piece",libelle:p.libelle,quantite:1,prix:String(p.prix).replace(".",","),variantId:p.variantId,sku:p.sku});await recharger(FICHE.id);return}
+  if(ctx==="devis"){if(!FICHE)return;DEVHINT="";await api("/devis/ligne",{repairId:FICHE.id,type:"piece",libelle:p.libelle,quantite:1,prix:String(p.prix).replace(".",","),variantId:p.variantId,sku:p.sku});await recharger(FICHE.id);return}
   if(ctx.indexOf("cmd")===0){var d=await api("/achats/ligne",{fournisseurId:+ctx.slice(3),libelle:p.libelle,sku:p.sku,variantId:p.variantId,quantite:1});CMDMSG=d.message;CMD=null;render();return}
   lirePay();CUR=null;FICHE=null;TAB="accueil";CREC=null;
   var ex=PAN.filter(function(l){return l.variantId&&l.variantId===p.variantId})[0];

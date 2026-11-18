@@ -4,6 +4,7 @@ import { lireParametres } from "./parametres";
 import { shopifyRead } from "../shopify";
 import { infosTicket } from "./ticket";
 import { commandesActives, creerCommandeShopify } from "./commandes";
+import { remiseMulti } from "./prestations";
 import { avantagesActifs, contexteClient, estApplicable, remiseDe } from "./avantages";
 import { AppError, clean, signature } from "../util";
 
@@ -146,6 +147,11 @@ app.post("/api/caisse/encaisser", async (c) => {
       reste -= cents;
       appliques.push({ id: a.id, libelle: a.libelle, effet: a.effet, cents });
     }
+  }
+  // Remise multi-prestations : seulement si aucune offre n'est appliquée.
+  if (!appliques.length) {
+    const rm = await remiseMulti(nettoyees, brut);
+    if (rm > 0) appliques.push({ id: null as any, libelle: "Remise plusieurs prestations", effet: "euros", cents: rm });
   }
   const remAvantages = appliques.reduce((s, a) => s + a.cents, 0);
   let remiseCents = 0;
