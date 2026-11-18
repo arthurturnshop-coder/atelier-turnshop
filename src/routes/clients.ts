@@ -48,10 +48,17 @@ function nomLieu(n: string) {
 
 app.get("/api/recherche", async (c) => {
   const q = clean(c.req.query("q"), 100);
-  if (q.length < 2) return c.json({ clients: [], produits: [] });
+  const numPC = q.match(/^(?:pc|n°|n|#)?[\s-]*0*(\d{1,9})$/i);
+  if (q.length < 2 && !numPC) return c.json({ clients: [], produits: [], reparations: [] });
   const like = `%${q.replace(/[\\%_]/g, "\\$&")}%`;
-  const rows = await sql`SELECT id, prenom, nom, email, telephone FROM clients WHERE prenom ILIKE ${like} OR nom ILIKE ${like} OR email ILIKE ${like} OR telephone ILIKE ${like} ORDER BY nom LIMIT 5`;
+  const chiffres = q.replace(/\D/g, "");
+  const likeTel = chiffres.length >= 4 ? `%${chiffres}%` : "@@aucun@@";
+  const mailCarte = q.match(/[^\s:<>"'?&=\/]+@[^\s<>"'?&]+\.[a-z]{2,}/i);
+  const likeMail = mailCarte ? mailCarte[0] : "@@aucun@@";
+  const rows = await sql`SELECT id, prenom, nom, email, telephone FROM clients WHERE prenom ILIKE ${like} OR nom ILIKE ${like} OR email ILIKE ${like} OR telephone ILIKE ${like} OR regexp_replace(coalesce(telephone,''), '\\D', '', 'g') LIKE ${likeTel} OR lower(email) = lower(${likeMail}) ORDER BY nom LIMIT 5`;
   const clients = (rows as any[]).map((r) => ({ id: r.id, name: `${r.prenom} ${r.nom}`.trim(), phone: r.telephone, email: r.email }));
+  const repRows = (await sql`SELECT r.id, r.statut, r.panne, c.prenom, c.nom, t.marque, t.modele FROM reparations r JOIN clients c ON c.id = r.client_id JOIN trottinettes t ON t.id = r.trottinette_id WHERE r.supprime_le IS NULL AND (${numPC ? Number(numPC[1]) : 0} = r.id OR c.prenom ILIKE ${like} OR c.nom ILIKE ${like} OR t.marque ILIKE ${like} OR t.modele ILIKE ${like} OR t.serie ILIKE ${like} OR r.panne ILIKE ${like}) ORDER BY (r.id = ${numPC ? Number(numPC[1]) : 0}) DESC, r.id DESC LIMIT 6`) as any[];
+  const reparations = repRows.map((r) => ({ id: r.id, client: `${r.prenom} ${r.nom}`.trim(), trottinette: `${r.marque} ${r.modele}`.trim(), statut: r.statut, panne: r.panne }));
   let produits: any[] = [];
   let produitsIndisponibles = false;
   try {
@@ -72,7 +79,7 @@ app.get("/api/recherche", async (c) => {
     produitsIndisponibles = true;
     console.log(JSON.stringify({ event: "recherche-produits", message: String(e?.message ?? e).slice(0, 300) }));
   }
-  return c.json({ clients, produits, produitsIndisponibles });
+  return c.json({ clients, reparations, produits, produitsIndisponibles });
 });
 
 app.get("/api/customer", async (c) => c.json(await fiche(Number(c.req.query("id")))));

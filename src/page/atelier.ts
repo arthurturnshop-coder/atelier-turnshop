@@ -23,7 +23,7 @@ async function loadEnc(){
   if(!l.length){el.innerHTML="<div class='card'>Aucune réparation dans cette vue.</div>";return}
   el.innerHTML="<div class='grid'>"+l.map(function(r){
     var cls="tk"+(r.enMagasin===false?" abs":(r.statut==="prêt"?" pret":(r.statut==="en attente de pièce"?" cmd":"")));
-    return"<button class='"+cls+"' data-act='ouvrirFiche' data-id='"+r.id+"'><div class='l1'><span>"+esc(r.client)+"</span><span class='tag'>"+esc(r.statut)+"</span></div>"
+    return"<button class='"+cls+"' data-act='ouvrirFiche' data-id='"+r.id+"'><div class='l1'><span><b>"+pcn(r.id)+"</b> · "+esc(r.client)+"</span><span class='tag'>"+esc(r.statut)+"</span></div>"
       +"<div>"+esc(r.trottinette)+"</div><div class='muted'>"+esc(r.panne)+"</div>"
       +"<div class='muted'>"+(r.pieceArrivee?"<span class='tag warn'>Pièce arrivée : prévenir</span> ":"")+(r.enMagasin===false?"<span class='tag warn'>Pas en magasin</span> ":"")+(r.sousGarantie?"<span class='tag ok'>Sous garantie</span> ":"")+"Dépôt "+esc(day(r.dateDepot))+"</div></button>"}).join("")+"</div>"}
 
@@ -48,7 +48,7 @@ function devisHtml(f){
 function vFiche(){
   var f=FICHE;
   var h=subHtml()+"<button class='sec' data-act='fermerFiche' style='max-width:260px'>← Retour à la liste</button>"
-    +"<div class='card fiche'><div class='head'><div><div class='big'>"+esc(f.client)+"</div><div>"+esc(f.trottinette)+"</div></div>"
+    +"<div class='card fiche'><div class='head'><div><div class='big'>"+pcn(f.id)+" · "+esc(f.client)+"</div><div>"+esc(f.trottinette)+"</div></div>"
     +"<div class='actions' style='margin:0'><button class='sec' data-act='pOpenCli' data-cid='"+f.customerId+"'>Voir le profil du client</button>"
     +(estResp()?"<button class='danger' data-act='supprFiche' data-id='"+f.id+"'>Supprimer</button>":"")+"</div></div>"
     +(f.pieceArrivee?"<div class='card avbox'><b>Pièce arrivée : prévenir le client</b><div class='muted'>"+esc(f.phone||"")+" "+esc(f.email||"")+"</div><div class='actions'>"+(f.email?"<a class='btn' href='mailto:"+esc(f.email)+"?subject="+encodeURIComponent("Votre pièce est arrivée - TURN Shop")+"&body="+encodeURIComponent("Bonjour, la pièce pour votre "+f.trottinette+" est arrivée. Nous pouvons poursuivre la réparation. L'équipe TURN Shop")+"'>Envoyer un email</a>":"")+"<button data-act='clientPrevenu' data-id='"+f.id+"'>Client prévenu</button></div></div>":"")

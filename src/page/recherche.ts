@@ -12,7 +12,7 @@ function rechInput(){clearTimeout(RT);RT=setTimeout(function(){rechRun(v("rq"))}
 function rechRun(q){
   var seq=++RSEQ;
   if(RCTL){RCTL.abort();RCTL=null}
-  if(q.length<2){rechHide();return}
+  if(q.length<2&&!/^[0-9]+$/.test(q)){rechHide();return}
   var ctl=new AbortController();RCTL=ctl;
   rechShow("<div class='rp-muted'>Recherche…</div>");
   var h={};if(TOK)h["x-atelier-token"]=TOK;else h["x-atelier-password"]=PW;
@@ -20,8 +20,11 @@ function rechRun(q){
     .then(function(r){if(!r.ok)throw new Error("http "+r.status);return r.json()})
     .then(function(d){if(seq!==RSEQ)return;RCTL=null;rechShow(rechHtml(d))})
     .catch(function(){if(seq!==RSEQ)return;RCTL=null;rechShow("<div class='rp-muted'>Recherche indisponible, réessayer.</div>")})}
+function pcn(id){return"PC-"+("0000"+id).slice(-4)}
 function rechHtml(d){
-  var h="<div class='rp-sec'>Clients</div>",cl=d.clients||[];
+  var h="",rp=d.reparations||[];
+  if(rp.length){h+="<div class='rp-sec'>Prises en charge</div>";rp.forEach(function(r){h+="<button class='rp-item' data-rid='"+esc(r.id)+"'><b>"+pcn(r.id)+" · "+esc(r.client||"Sans nom")+"</b> <span class='tag'>"+esc(r.statut)+"</span><div class='rp-muted'>"+esc(r.trottinette)+" · "+esc(r.panne)+"</div></button>"})}
+  h+="<div class='rp-sec'>Clients</div>";var cl=d.clients||[];
   if(!cl.length)h+="<div class='rp-muted'>Aucun client.</div>";
   else cl.forEach(function(c){h+="<button class='rp-item' data-cid='"+esc(c.id)+"'><b>"+esc(c.name||"Sans nom")+"</b><div class='rp-muted'>"+esc([c.phone,c.email].filter(Boolean).join(" · "))+"</div></button>"});
   h+="<div class='rp-sec'>Produits</div>";
@@ -79,8 +82,8 @@ ACTS.psAdd=async function(b){
   if(!FICHE)return;
   try{await api("/devis/ligne",{repairId:FICHE.id,type:"piece",libelle:l.libelle,quantite:1,prix:l.prix,variantId:l.variantId,sku:l.sku});await recharger(FICHE.id)}catch(err){alert(err.message)}};
 document.getElementById("rq").addEventListener("input",rechInput);
-document.getElementById("rq").addEventListener("keydown",function(e){if(e.key==="Escape")rechHide();if(e.key==="Enter"){var q=v("rq");if(q.length>=4&&!q.indexOf(" ")>=0){scanCode(q,"caisse",true).then(function(){})}}});
-document.getElementById("rpanel").addEventListener("click",function(e){var b=e.target.closest("[data-cid]");if(b)rechOpen(b.dataset.cid)});
+document.getElementById("rq").addEventListener("keydown",function(e){if(e.key==="Escape")rechHide();if(e.key==="Enter"){var q=v("rq");var mpc=q.match(/^(?:pc|#)[ -]*0*([0-9]+)$/i);if(mpc){rechHide();document.getElementById("rq").value="";ouvrirFiche(Number(mpc[1]));return}if(q.length>=4&&q.indexOf(" ")<0){scanCode(q,"caisse",true).then(function(){})}}});
+document.getElementById("rpanel").addEventListener("click",function(e){var r=e.target.closest("[data-rid]");if(r){rechHide();var q=document.getElementById("rq");if(q)q.value="";ouvrirFiche(Number(r.dataset.rid));return}var b=e.target.closest("[data-cid]");if(b)rechOpen(b.dataset.cid)});
 document.addEventListener("click",function(e){if(!e.target.closest("#rech"))rechHide()});
 document.addEventListener("click",function(e){var b=e.target.closest("[data-act]");if(!b||b.tagName==="INPUT"||b.tagName==="SELECT")return;var f=ACTS[b.dataset.act];if(f)f(b)});
 `;
