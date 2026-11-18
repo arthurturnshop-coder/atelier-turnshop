@@ -1,10 +1,11 @@
 import { app } from "../app";
 import { AVIS_DELAI_HEURES, STATUTS } from "../config";
+import { lireTicket } from "./ticket";
 import { sql } from "../db";
 import { envoyerPret } from "../automatisations";
 import { remiseMulti } from "./prestations";
 import { acomptesDe } from "./acomptes";
-import { infosGarde } from "../garde";
+import { GARDE, infosGarde } from "../garde";
 import { AppError, clean, exigeResponsable, signature } from "../util";
 
 export async function devisDe(repId: number) {
@@ -75,7 +76,7 @@ app.get("/api/reparation", async (c) => {
   const [r] = (await sql`SELECT r.*, c.prenom, c.nom, c.telephone, c.email, t.marque, t.modele, t.serie FROM reparations r JOIN clients c ON c.id = r.client_id JOIN trottinettes t ON t.id = r.trottinette_id WHERE r.id = ${id} AND r.supprime_le IS NULL`) as any[];
   if (!r) throw new AppError(404, "Réparation introuvable.");
   const journal = (await sql`SELECT reparation_id, date, type, texte FROM journal WHERE reparation_id = ${id} ORDER BY id`) as any[];
-  return c.json({ ...ligneListe(r, journal), devis: await devisDe(id), acompte: await acomptesDe(id), statuts: STATUTS });
+  return c.json({ ...ligneListe(r, journal), devis: await devisDe(id), acompte: await acomptesDe(id), statuts: STATUTS, ticketEntete: (await lireTicket()).entete, gardeInfo: { franchiseJours: GARDE.franchiseJours, prixCents: GARDE.prixCents, abandonJour: GARDE.abandonJour } });
 });
 
 // Nouvelle prise en charge. enMagasin:false = rendez-vous, sousGarantie:true = garantie.
