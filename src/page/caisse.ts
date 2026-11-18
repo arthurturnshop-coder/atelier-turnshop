@@ -29,6 +29,10 @@ function recuHtml(r){
   h+="<div class='rl rt'><span>TOTAL</span><span>"+eur(r.totalCents)+"</span></div>";
   r.paiements.forEach(function(p){h+="<div class='rl'><span>Payé en "+esc((MOY[p.moyen]||p.moyen).toLowerCase())+"</span><span>"+eur(p.cents)+"</span></div>"});
   return h+"<div class='rc rm'>Merci de votre visite !</div></div>"}
+function shopHtml(r){
+  var s=r.shopify;if(!s||!s.eligible)return"";
+  if(s.nom)return"<div class='muted'>Commande Shopify "+esc(s.nom)+" créée (visible sur le compte du client).</div>";
+  return"<div class='muted'>"+(s.erreur?"Pas partie vers Shopify : "+esc(s.erreur):"Pas envoyée à Shopify.")+"</div><div class='actions'><button class='sec' data-act='cShopRetry' data-id='"+r.id+"'>Envoyer vers Shopify</button></div>"}
 function histoHtml(){
   if(!CHIST)return"";
   var h="<div class='card'><div class='step'>"+(CCLI?"Achats de "+esc(CCLI.name):"Ventes du jour")+"</div>";
@@ -36,13 +40,14 @@ function histoHtml(){
   CHIST.forEach(function(r){
     var res=r.lignes.slice(0,2).map(function(l){return esc(l.libelle)}).join(", ")+(r.lignes.length>2?"…":"");
     h+="<button class='sec hrow' data-act='cRecu' data-id='"+r.id+"'><b>"+esc(dateLongue(r.date))+"</b> · "+eur(r.totalCents)+(CCLI?"":" · "+esc(r.client||"sans client"))+"<br><span class='muted'>"+res+"</span></button>";
-    if(CHOPEN===r.id)h+=recuHtml(r)+"<div class='actions'><button class='sec' data-act='cPrint' data-id='"+r.id+"'>Imprimer le reçu</button></div>"});
+    if(CHOPEN===r.id)h+=recuHtml(r)+shopHtml(r)+"<div class='actions'><button class='sec' data-act='cPrint' data-id='"+r.id+"'>Imprimer le reçu</button></div>"});
   return h+"</div>"}
 function caisseHtml(){
   if(CAV===null&&!CAVBUSY){CAVBUSY=true;api("/caisse/avantages").then(function(d){CAV=d;CAVBUSY=false;render()}).catch(function(){CAV=[];CAVBUSY=false})}
   var brut=panierTotal(),av=avRemTotal(brut),rem=remiseCents(),net=brut-av-rem;
   var h="<div class='caisse'><h3>Caisse</h3>";
-  if(CREC)h+="<div class='card'><b>Vente enregistrée</b>"+recuHtml(CREC)+"<div class='actions'><button data-act='cPrint' data-id='"+CREC.id+"'>Imprimer le reçu</button><button class='sec' data-act='cFermeRecu'>Fermer</button></div></div>";
+  if(CREC)h+="<div class='card'><b>Vente enregistrée</b>"+recuHtml(CREC)+shopHtml(CREC)+"<div class='actions'><button data-act='cPrint' data-id='"+CREC.id+"'>Imprimer le reçu</button><button class='sec' data-act='cFermeRecu'>Fermer</button></div></div>";
+  if(CREP)h+="<div class='card avbox'><b>Facturation de la réparation n°"+CREP+"</b><div class='muted'>Les lignes du devis sont dans le panier. À l'encaissement, la commande est créée dans Shopify.</div><button class='link' data-act='cAnnuleRep'>Annuler la facturation</button></div>";
   h+="<div class='card'><div class='step'>Client (scan carte, email ou téléphone)</div><div class='search'><input id='cq' placeholder='Scan carte, email ou téléphone'><button data-act='cScan'>Chercher</button></div>";
   if(CCLI)h+="<div style='margin-top:8px'><b>"+esc(CCLI.name)+"</b> <span class='muted'>"+esc(CCLI.phone||"")+"</span> <button class='link' data-act='cClient0'>Retirer</button></div>";
   else h+="<div class='muted' style='margin-top:6px'>Vente sans client. <button class='link' data-act='cJour'>Voir les ventes du jour</button></div>";
@@ -57,6 +62,7 @@ function caisseHtml(){
   h+="<div class='card'><div class='step'>Panier</div>";
   if(!PAN.length)h+="<div class='muted'>Panier vide. Ajoute un article ci-dessous.</div>";
   else h+="<table class='panier' style='width:100%;border-collapse:collapse'><tr><th style='text-align:left'>Article</th><th>Qté</th><th>Prix €</th><th></th></tr>"+PAN.map(function(l,i){return"<tr><td>"+esc(l.libelle)+"</td><td><input type='number' min='1' value='"+l.quantite+"' data-act='cQte' data-i='"+i+"'></td><td><input value='"+esc(l.prix)+"' data-act='cPrix' data-i='"+i+"'></td><td><button class='link' data-act='cDel' data-i='"+i+"'>Retirer</button></td></tr>"}).join("")+"</table>";
+  h+="<div style='margin-top:8px'>"+prodBox("caisse")+"</div>";
   h+="<div class='dl' style='margin-top:8px'><input id='cl' class='lb' placeholder='Article (libellé)'><input id='cq2' class='q' type='number' min='1' value='1'><input id='cp' class='p' placeholder='Prix €'><button data-act='cAdd'>Ajouter</button></div></div>";
   var dispo=(CAV||[]).filter(function(a){return avApplicable(a,brut)});
   if(dispo.length){

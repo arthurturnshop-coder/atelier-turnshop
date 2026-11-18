@@ -1,5 +1,5 @@
 export const PARAMETRES = `// ---------- Paramètres (admins) ----------
-var SHOPRES="",PARAM=null,AVL=null,AVMSG="",AVDEC="achat",AVF={libelle:"",seuil:"",dd:"",df:"",effet:"cadeau",valeur:""};
+var SHOPCMD=null,SHOPRES="",PARAM=null,AVL=null,AVMSG="",AVDEC="achat",AVF={libelle:"",seuil:"",dd:"",df:"",effet:"cadeau",valeur:""};
 function avDesc(a){return esc(avLabel(a))+" · "+esc(avCondition(a))}
 function avForm(){
   var f=AVF,d=AVDEC,sel=function(val,cur,txt){return"<option value='"+val+"'"+(val===cur?" selected":"")+">"+txt+"</option>"};
@@ -13,6 +13,7 @@ function avForm(){
   return h+"<button data-act='avSave'>Ajouter</button><div class='muted'>"+esc(AVMSG)+"</div></div>"}
 function vParam(){
   if(ROLE!=="admin"){app.innerHTML="<div class='card'>Réservé aux administrateurs.</div>";return}
+  if(SHOPCMD===null){SHOPCMD=undefined;api("/reglages/commandes").then(function(d){SHOPCMD=d.actif;render()}).catch(function(){SHOPCMD=false;render()})}
   if(!PARAM||!AVL){
     app.innerHTML="<div class='card'>Chargement…</div>";
     Promise.all([api("/parametres"),api("/avantages")]).then(function(r){PARAM=r[0];AVL=r[1];render()}).catch(function(e){app.innerHTML="<div class='card'>"+esc(e.message)+"</div>"});return}
@@ -25,5 +26,6 @@ function vParam(){
   AVL.forEach(function(a){h+="<div class='avrow'><div><b>"+esc(a.libelle)+"</b>"+(a.actif?"":" <span class='tag'>désactivé</span>")+"<div class='muted'>"+avDesc(a)+"</div></div><div class='actions'><button class='sec' data-act='avEtat' data-id='"+a.id+"' data-v='"+(a.actif?0:1)+"'>"+(a.actif?"Désactiver":"Réactiver")+"</button><button class='sec' data-act='avSuppr' data-id='"+a.id+"'>Supprimer</button></div></div>"});
   h+=avForm()+"</div>";
   h+="<div class='card'><div class='step'>Connexion Shopify</div><div class='muted'>Teste la connexion au catalogue turnshop.fr.</div><button data-act='shopTest'>Tester la connexion</button><div id='shopres'>"+(SHOPRES||"")+"</div></div>";
+  h+="<div class='card'><div class='step'>Commandes Shopify à la facturation</div><div class='muted'>Quand on encaisse un devis de réparation, une commande (pièces + main-d'œuvre) est créée dans Shopify et rattachée au compte du client. Elle décompte le stock des pièces.</div><div class='big'>"+(SHOPCMD?"Activé":"Désactivé")+"</div><div class='actions'><button class='"+(SHOPCMD?"sec":"")+"' data-act='shopCmd' data-v='1'>Activer</button><button class='"+(SHOPCMD?"":"sec")+"' data-act='shopCmd' data-v='0'>Désactiver</button></div></div>";
   app.innerHTML=h}
 `;

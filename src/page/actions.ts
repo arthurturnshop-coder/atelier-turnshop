@@ -33,8 +33,17 @@ export const ACTIONS = `var ACTS={
   addLigne:async function(b){try{await api("/devis/ligne",{repairId:Number(b.dataset.id),type:v("lt"),libelle:v("ll"),quantite:v("lq"),prix:v("lp")});await recharger(Number(b.dataset.id))}catch(e){alert(e.message)}},
   delLigne:async function(b){try{await api("/devis/ligne/supprimer",{id:Number(b.dataset.id)});await recharger(FICHE.id)}catch(e){alert(e.message)}},
   supprFiche:async function(b){if(!confirm("Supprimer cette fiche de réparation ?"))return;try{var d=await api("/reparations/supprimer",{repairId:Number(b.dataset.id)});alert(d.message);FICHE=null;render()}catch(e){alert(e.message)}},
+  facturer:async function(b){
+    if(PAN.length&&!confirm("Le panier de la caisse n'est pas vide : le remplacer par ce devis ?"))return;
+    try{var f=FICHE;var d=await api("/caisse/client?id="+f.customerId);
+      PAN=f.devis.lignes.map(function(l){return{libelle:l.libelle,quantite:l.quantite,prix:String(l.prixCents/100).replace(".",","),type:l.type,variantId:l.variantId||"",sku:l.sku||""}});
+      CCLI=d.client;CFID=d.fidelite;CUSE=false;CAVOFF=[];CREC=null;CHOPEN=0;CREP=f.id;CPAY={carte:"",especes:"",virement:""};CMSG="";
+      FICHE=null;CUR=null;TAB="accueil";await chargeHisto()}catch(e){alert(e.message)}},
+  cAnnuleRep:function(){CREP=null;PAN=[];lirePay();render()},
+  cShopRetry:async function(b){try{var d=await api("/caisse/shopify",{venteId:+b.dataset.id});if(!d.ok)alert(d.erreur);await chargeHisto();if(CREC&&CREC.id===+b.dataset.id){var h=await api("/caisse/historique"+(CCLI?"?clientId="+CCLI.id:""));var m=h.ventes.filter(function(x){return x.id===CREC.id})[0];if(m){CREC=m;render()}}}catch(e){alert(e.message)}},
+  shopCmd:async function(b){try{await api("/reglages/commandes",{actif:b.dataset.v==="1"});SHOPCMD=null;render()}catch(e){alert(e.message)}},
   cScan:async function(){var q=v("cq");if(!q)return;try{var s=await api("/caisse/scan?q="+encodeURIComponent(q));if(!s.clientId){CMSG="Aucun client trouvé pour ce scan.";lirePay();render();return}var d=await api("/caisse/client?id="+s.clientId);CCLI=d.client;CFID=d.fidelite;CUSE=false;CMSG="";CAVOFF=[];CHOPEN=0;lirePay();await chargeHisto()}catch(e){alert(e.message)}},
-  cClient0:function(){CCLI=null;CFID=null;CUSE=false;CHIST=null;CHOPEN=0;CAVOFF=[];lirePay();render()},
+  cClient0:function(){CREP=null;CCLI=null;CFID=null;CUSE=false;CHIST=null;CHOPEN=0;CAVOFF=[];lirePay();render()},
   cUse:function(b){CUSE=b.dataset.v==="1";lirePay();render()},
   cAdd:function(){var l=v("cl");if(!l){alert("Donne un libellé.");return}PAN.push({libelle:l,quantite:Math.max(1,Number(v("cq2"))||1),prix:v("cp")||"0"});lirePay();render()},
   cDel:function(b){PAN.splice(+b.dataset.i,1);lirePay();render()},
@@ -45,7 +54,7 @@ export const ACTIONS = `var ACTS={
   cPrint:function(b){var old=document.querySelectorAll(".printme");for(var i=0;i<old.length;i++)old[i].classList.remove("printme");var r=document.querySelector("[data-recu='"+b.dataset.id+"']");if(!r)return;r.classList.add("printme");window.print();setTimeout(function(){r.classList.remove("printme")},500)},
   cEncaisser:async function(){lirePay();var pay=["carte","especes","virement"].map(function(m){return{moyen:m,montant:CPAY[m]}}).filter(function(p){return p.montant});
     var brut=panierTotal(),ids=avChoisis(brut).map(function(a){return a.id});
-    try{var d=await api("/caisse/encaisser",{lignes:PAN,paiements:pay,clientId:CCLI?CCLI.id:null,utiliserFidelite:CUSE,avantageIds:ids});PAN=[];CPAY={carte:"",especes:"",virement:""};CUSE=false;CAVOFF=[];CREC=d.vente;CMSG="";CHOPEN=0;if(CCLI){var x=await api("/caisse/client?id="+CCLI.id);CFID=x.fidelite}await chargeHisto()}catch(e){CMSG=e.message;render()}},
+    try{var d=await api("/caisse/encaisser",{lignes:PAN,paiements:pay,clientId:CCLI?CCLI.id:null,utiliserFidelite:CUSE,avantageIds:ids,repairId:CREP});CREP=null;PAN=[];CPAY={carte:"",especes:"",virement:""};CUSE=false;CAVOFF=[];CREC=d.vente;CMSG="";CHOPEN=0;if(CCLI){var x=await api("/caisse/client?id="+CCLI.id);CFID=x.fidelite}await chargeHisto()}catch(e){CMSG=e.message;render()}},
   shopTest:async function(){SHOPRES="<div class='muted'>Test en cours…</div>";render();try{var d=await api("/shopify/diagnostic");SHOPRES=d.etapes.map(function(e){return"<div>"+(e.ok?"✅ ":"❌ ")+"<b>"+esc(e.nom)+"</b><div class='muted'>"+esc(e.detail)+"</div></div>"}).join("")}catch(e){SHOPRES=esc(e.message)}render()},
   avSave:async function(){var dec=v("avd");try{var d=await api("/avantages",{libelle:v("avl"),declencheur:dec,seuil:v("avs"),dateDebut:v("avdd"),dateFin:v("avdf"),effet:v("ave"),valeur:v("avv")});AVL=null;AVMSG=d.message||"Avantage ajouté.";CAV=null;render()}catch(e){AVMSG=e.message;render()}},
   avEtat:async function(b){try{await api("/avantages/etat",{id:+b.dataset.id,actif:b.dataset.v==="1"});AVL=null;CAV=null;render()}catch(e){alert(e.message)}},

@@ -39,8 +39,34 @@ function rechLigne(b){var p=RPROD[+b.dataset.pi],x=p&&p.variantes[+b.dataset.vi]
 ACTS.rAddDevis=async function(b){var l=rechLigne(b);if(!l||!FICHE)return;
   try{await api("/devis/ligne",{repairId:FICHE.id,type:"piece",libelle:l.libelle,quantite:1,prix:l.prix,variantId:l.variantId,sku:l.sku});rechHide();var q=document.getElementById("rq");if(q)q.value="";await recharger(FICHE.id)}catch(e){alert(e.message)}};
 ACTS.rAddPanier=function(b){var l=rechLigne(b);if(!l)return;
-  PAN.push({libelle:l.libelle,quantite:1,prix:l.prix});rechHide();var q=document.getElementById("rq");if(q)q.value="";
+  PAN.push({libelle:l.libelle,quantite:1,prix:l.prix,type:"piece",variantId:l.variantId,sku:l.sku});rechHide();var q=document.getElementById("rq");if(q)q.value="";
   CUR=null;FICHE=null;TAB="accueil";CREC=null;render()};
+var PSRES={},PST={};
+function prodBox(ctx){return"<input data-ps='"+ctx+"' placeholder='Chercher un produit Shopify (nom, référence, code-barres)...' autocomplete='off'><div class='psres' id='pr-"+ctx+"'></div>"}
+function psHtml(ctx,d){
+  var ps=d.produits||[];PSRES[ctx]=ps;
+  if(d.produitsIndisponibles)return"<div class='muted'>Catalogue indisponible pour le moment.</div>";
+  if(!ps.length)return"<div class='muted'>Aucun produit trouvé.</div>";
+  var h="";
+  ps.forEach(function(p,pi){(p.variantes||[]).forEach(function(x,vi){
+    var vt=x.titre&&x.titre!=="Default Title"?" - "+esc(x.titre):"";
+    h+="<button class='sec hrow' data-act='psAdd' data-ctx='"+ctx+"' data-pi='"+pi+"' data-vi='"+vi+"'><b>"+esc(p.titre)+vt+"</b><br><span class='muted'>"+esc(x.prix)+" € · stock "+esc(x.stock==null?"—":x.stock)+" · sku "+esc(x.sku||"—")+"</span></button>"})});
+  return h}
+document.addEventListener("input",function(e){
+  var t=e.target;if(!t||!t.dataset||!t.dataset.ps)return;
+  var ctx=t.dataset.ps,box=document.getElementById("pr-"+ctx);if(!box)return;
+  clearTimeout(PST[ctx]);var q=t.value.trim();
+  if(q.length<2){box.innerHTML="";return}
+  PST[ctx]=setTimeout(function(){
+    box.innerHTML="<div class='muted'>Recherche…</div>";
+    api("/recherche?q="+encodeURIComponent(q)).then(function(d){if(t.value.trim()!==q)return;box.innerHTML=psHtml(ctx,d)}).catch(function(err){box.innerHTML="<div class='muted'>"+esc(err.message)+"</div>"})},300)});
+ACTS.psAdd=async function(b){
+  var ctx=b.dataset.ctx,p=(PSRES[ctx]||[])[+b.dataset.pi],x=p&&p.variantes[+b.dataset.vi];if(!x)return;
+  var vt=x.titre&&x.titre!=="Default Title"?" - "+x.titre:"";
+  var l={libelle:(p.titre+vt).slice(0,200),prix:String(x.prix||"0").replace(".",","),variantId:x.id,sku:x.sku||""};
+  if(ctx==="caisse"){lirePay();PAN.push({libelle:l.libelle,quantite:1,prix:l.prix,type:"piece",variantId:l.variantId,sku:l.sku});CREC=null;render();return}
+  if(!FICHE)return;
+  try{await api("/devis/ligne",{repairId:FICHE.id,type:"piece",libelle:l.libelle,quantite:1,prix:l.prix,variantId:l.variantId,sku:l.sku});await recharger(FICHE.id)}catch(err){alert(err.message)}};
 document.getElementById("rq").addEventListener("input",rechInput);
 document.getElementById("rq").addEventListener("keydown",function(e){if(e.key==="Escape")rechHide()});
 document.getElementById("rpanel").addEventListener("click",function(e){var b=e.target.closest("[data-cid]");if(b)rechOpen(b.dataset.cid)});

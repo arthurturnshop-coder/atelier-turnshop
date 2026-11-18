@@ -4,9 +4,9 @@ import { sql } from "../db";
 import { AppError, clean, exigeResponsable, signature } from "../util";
 
 export async function devisDe(repId: number) {
-  const lignes = (await sql`SELECT id, type, libelle, quantite, prix_unitaire_cents FROM devis_lignes WHERE reparation_id = ${repId} ORDER BY type DESC, id`) as any[];
+  const lignes = (await sql`SELECT id, type, libelle, quantite, prix_unitaire_cents, shopify_variant_id, sku FROM devis_lignes WHERE reparation_id = ${repId} ORDER BY type DESC, id`) as any[];
   const total = lignes.reduce((s, l) => s + l.quantite * l.prix_unitaire_cents, 0);
-  return { lignes: lignes.map((l) => ({ id: l.id, type: l.type, libelle: l.libelle, quantite: l.quantite, prixCents: l.prix_unitaire_cents })), totalCents: total };
+  return { lignes: lignes.map((l) => ({ id: l.id, type: l.type, libelle: l.libelle, quantite: l.quantite, prixCents: l.prix_unitaire_cents, variantId: l.shopify_variant_id ?? "", sku: l.sku ?? "" })), totalCents: total };
 }
 
 export function ligneListe(r: any, journal: any[]) {

@@ -127,6 +127,7 @@ button.link{background:none;color:#111;border:0;text-decoration:underline;min-he
 .ppanel .head{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .ppanel .head button{width:auto;margin:0}
 .ppanel .step{margin-top:8px}
+.psres{max-height:260px;overflow:auto}
 .rp-var{border-top:1px solid #eee;padding:4px 0}.rp-btns{display:flex;gap:6px;margin-top:2px}.rp-btns button{padding:4px 8px;font-size:13px}
 .caisse h3{margin:4px 0}
 .hrow{display:block;width:100%;text-align:left;margin:4px 0}

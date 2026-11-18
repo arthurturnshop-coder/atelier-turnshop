@@ -1,6 +1,7 @@
 import { app } from "../app";
 import { sql } from "../db";
 import { lireParametres } from "./parametres";
+import { commandesActives, creerCommandeShopify } from "./commandes";
 import { avantagesActifs, contexteClient, estApplicable, remiseDe } from "./avantages";
 import { AppError, clean, signature } from "../util";
 
@@ -47,6 +48,8 @@ async function detailVente(v: any) {
     lignes: lignes.map((l) => ({ libelle: l.libelle, quantite: l.quantite, prixCents: l.prix_unitaire_cents })),
     paiements: pays.map((p) => ({ moyen: p.moyen, cents: p.montant_cents })),
     avantages: avs.map((x) => ({ libelle: x.libelle, effet: x.effet, remiseCents: x.remise_cents })),
+    reparationId: v.reparation_id ?? null,
+    shopify: { nom: v.shopify_order_name ?? null, erreur: v.shopify_erreur ?? null, eligible: !!(v.reparation_id && v.client_id) },
   };
 }
 
@@ -70,6 +73,9 @@ app.post("/api/caisse/encaisser", async (c) => {
     libelle: clean(l.libelle, 200),
     quantite: Math.max(1, Math.min(999, Math.round(Number(l.quantite) || 1))),
     prixCents: Math.max(0, Math.round((Number(String(l.prix ?? "0").replace(",", ".")) || 0) * 100)),
+    type: ["piece", "main_oeuvre"].includes(l.type) ? l.type : "article",
+    variantId: clean(l.variantId, 80) || null,
+    sku: clean(l.sku, 80) || null,
   }));
   if (nettoyees.some((l: any) => !l.libelle)) throw new AppError(400, "Chaque ligne doit avoir un libellé.");
   const brut = nettoyees.reduce((s: number, l: any) => s + l.quantite * l.prixCents, 0);
@@ -113,7 +119,7 @@ app.post("/api/caisse/encaisser", async (c) => {
   const pointsGagnes = Math.floor(totalCents / 100 / p.eurosPourPalier);
   const [v] = (await sql`INSERT INTO ventes (client_id, reparation_id, magasin, vendeur, total_cents, remise_cents, points_gagnes, points_utilises) VALUES (${clientId}, ${reparationId}, ${u.magasin ?? null}, ${u.prenom}, ${totalCents}, ${remiseCents}, ${pointsGagnes}, ${remiseCents > 0 ? 1 : 0}) RETURNING id`) as any[];
   for (const l of nettoyees) {
-    await sql`INSERT INTO vente_lignes (vente_id, libelle, quantite, prix_unitaire_cents) VALUES (${v.id}, ${l.libelle}, ${l.quantite}, ${l.prixCents})`;
+    await sql`INSERT INTO vente_lignes (vente_id, libelle, quantite, prix_unitaire_cents, type, shopify_variant_id, sku) VALUES (${v.id}, ${l.libelle}, ${l.quantite}, ${l.prixCents}, ${l.type}, ${l.variantId}, ${l.sku})`;
   }
   for (const a of appliques) {
     await sql`INSERT INTO vente_avantages (vente_id, avantage_id, libelle, effet, remise_cents) VALUES (${v.id}, ${a.id}, ${a.libelle}, ${a.effet}, ${a.cents})`;
@@ -124,6 +130,7 @@ app.post("/api/caisse/encaisser", async (c) => {
   if (reparationId) {
     await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${reparationId}, 'caisse', ${`Encaissement de ${(totalCents / 100).toFixed(2)} €${signature(c)}`})`;
   }
+  if (reparationId && clientId && (await commandesActives())) await creerCommandeShopify(v.id);
   const [vv] = (await sql`SELECT v.*, trim(cl.prenom || ' ' || cl.nom) AS client_nom FROM ventes v LEFT JOIN clients cl ON cl.id = v.client_id WHERE v.id = ${v.id}`) as any[];
-  return c.json({ id: v.id, message: "Vente enregistrée (caisse interne, rien n'est envoyé à Shopify).", totalCents, remiseCents, vente: await detailVente(vv) });
+  return c.json({ id: v.id, message: "Vente enregistrée.", totalCents, remiseCents, vente: await detailVente(vv) });
 });

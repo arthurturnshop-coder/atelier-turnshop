@@ -33,3 +33,17 @@ export async function shopifyRead(query: string, variables: Record<string, unkno
 
 export const FIDELITE_QUERY = `query($q: String!) { customers(first: 1, query: $q) { nodes { id points: metafield(namespace: "fidelite", key: "points") { value } } } }`;
 export const PRODUITS_QUERY = `query($q: String!) { products(first: 8, query: $q) { nodes { id title vendor variants(first: 5) { nodes { id title sku barcode price inventoryQuantity } } } } }`;
+
+// Écriture (mutations) : renvoie les données ou lève une erreur lisible.
+export async function shopifyMutate(query: string, variables: Record<string, unknown>): Promise<any> {
+  const token = await shopifyToken();
+  const res = await fetch(`https://${SHOP}/admin/api/${SHOP_API}/graphql.json`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": token },
+    body: JSON.stringify({ query, variables }),
+    signal: AbortSignal.timeout(15000),
+  });
+  const json: any = await res.json().catch(() => ({}));
+  if (json.errors) throw new Error("Shopify : " + JSON.stringify(json.errors).slice(0, 300));
+  return json.data;
+}

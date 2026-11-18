@@ -17,10 +17,17 @@ await sql`ALTER TABLE reparations ADD COLUMN IF NOT EXISTS supprime_le TIMESTAMP
 await sql`CREATE TABLE IF NOT EXISTS devis_lignes (id SERIAL PRIMARY KEY, reparation_id INT NOT NULL REFERENCES reparations(id), type TEXT NOT NULL CHECK (type IN ('main_oeuvre','piece')), libelle TEXT NOT NULL, quantite INT NOT NULL DEFAULT 1, prix_unitaire_cents INT NOT NULL DEFAULT 0, cree_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
 await sql`ALTER TABLE devis_lignes ADD COLUMN IF NOT EXISTS shopify_variant_id TEXT`;
 await sql`ALTER TABLE devis_lignes ADD COLUMN IF NOT EXISTS sku TEXT`;
+await sql`CREATE TABLE IF NOT EXISTS reglages (cle TEXT PRIMARY KEY, valeur TEXT NOT NULL)`;
 // Caisse : ventes, lignes de vente, paiements, paramètres de fidélité.
 await sql`CREATE TABLE IF NOT EXISTS ventes (id SERIAL PRIMARY KEY, client_id INT REFERENCES clients(id), reparation_id INT REFERENCES reparations(id), magasin TEXT, vendeur TEXT, total_cents INT NOT NULL DEFAULT 0, remise_cents INT NOT NULL DEFAULT 0, points_gagnes INT NOT NULL DEFAULT 0, points_utilises INT NOT NULL DEFAULT 0, cree_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
 await sql`CREATE TABLE IF NOT EXISTS vente_lignes (id SERIAL PRIMARY KEY, vente_id INT NOT NULL REFERENCES ventes(id), libelle TEXT NOT NULL, quantite INT NOT NULL DEFAULT 1, prix_unitaire_cents INT NOT NULL DEFAULT 0)`;
 await sql`CREATE TABLE IF NOT EXISTS vente_paiements (id SERIAL PRIMARY KEY, vente_id INT NOT NULL REFERENCES ventes(id), moyen TEXT NOT NULL CHECK (moyen IN ('carte','especes','virement')), montant_cents INT NOT NULL)`;
+await sql`ALTER TABLE ventes ADD COLUMN IF NOT EXISTS shopify_order_id TEXT`;
+await sql`ALTER TABLE ventes ADD COLUMN IF NOT EXISTS shopify_order_name TEXT`;
+await sql`ALTER TABLE ventes ADD COLUMN IF NOT EXISTS shopify_erreur TEXT`;
+await sql`ALTER TABLE vente_lignes ADD COLUMN IF NOT EXISTS type TEXT`;
+await sql`ALTER TABLE vente_lignes ADD COLUMN IF NOT EXISTS shopify_variant_id TEXT`;
+await sql`ALTER TABLE vente_lignes ADD COLUMN IF NOT EXISTS sku TEXT`;
 await sql`CREATE TABLE IF NOT EXISTS avantages (id SERIAL PRIMARY KEY, libelle TEXT NOT NULL, declencheur TEXT NOT NULL CHECK (declencheur IN ('cumul','achat','date')), seuil_cents INT NOT NULL DEFAULT 0, date_debut DATE, date_fin DATE, effet TEXT NOT NULL CHECK (effet IN ('cadeau','euros','pourcent')), valeur NUMERIC NOT NULL DEFAULT 0, actif BOOLEAN NOT NULL DEFAULT true, cree_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
 await sql`CREATE TABLE IF NOT EXISTS vente_avantages (id SERIAL PRIMARY KEY, vente_id INT NOT NULL REFERENCES ventes(id), avantage_id INT, libelle TEXT NOT NULL, effet TEXT NOT NULL, remise_cents INT NOT NULL DEFAULT 0)`;
 await sql`CREATE TABLE IF NOT EXISTS parametres (cle TEXT PRIMARY KEY, valeur TEXT NOT NULL DEFAULT '', maj_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
