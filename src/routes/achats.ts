@@ -22,6 +22,22 @@ app.get("/api/achats", async (c) => {
   });
 });
 
+// Historique complet d'un fournisseur : chaque commande passée (regroupée par date) avec ses lignes et leur réception.
+app.get("/api/achats/historique", async (c) => {
+  const id = Number(c.req.query("fournisseurId"));
+  const rows = (await sql`SELECT l.id, l.libelle, l.sku, l.barcode, l.quantite, l.statut, l.commandee_le, l.recue_le, l.reparation_id, trim(cl.prenom || ' ' || cl.nom) AS client
+    FROM commande_lignes l LEFT JOIN reparations r ON r.id = l.reparation_id LEFT JOIN clients cl ON cl.id = r.client_id
+    WHERE l.fournisseur_id = ${id} AND l.commandee_le IS NOT NULL ORDER BY l.commandee_le DESC, l.id LIMIT 500`) as any[];
+  const groupes: any[] = [];
+  for (const r of rows) {
+    const cle = new Date(r.commandee_le).toISOString();
+    let g = groupes[groupes.length - 1];
+    if (!g || g.date !== cle) { g = { date: cle, lignes: [] }; groupes.push(g); }
+    g.lignes.push({ id: r.id, libelle: r.libelle, sku: r.sku ?? "", barcode: r.barcode ?? "", quantite: r.quantite, statut: r.statut, recueLe: r.recue_le, reparationId: r.reparation_id, client: r.client || "" });
+  }
+  return c.json(groupes);
+});
+
 app.post("/api/achats/fournisseur", async (c) => {
   const b = await c.req.json().catch(() => ({}));
   const nom = clean(b.nom, 80);

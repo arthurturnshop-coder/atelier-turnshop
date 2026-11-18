@@ -25,6 +25,7 @@ function vCmd(){
   CMD.fournisseurs.forEach(function(f){
     h+="<div class='card'><div class='head'><div class='big'>"+esc(f.nom)+"</div><div class='dl'><input id='fe-"+f.id+"' value='"+esc(f.email)+"' placeholder='Email de commande' class='lb'><button class='sec' data-act='fMail' data-id='"+f.id+"'>Enregistrer l'email</button></div></div>";
     if(REC&&REC.fid===f.id)h+=recepHtml(f);
+    h+="<div class='actions' style='margin-top:6px'><button class='sec' data-act='histoOpen' data-id='"+f.id+"'>"+(HISTC&&HISTC.fid===f.id?"Masquer l'historique":"Historique des commandes")+"</button></div>"+(HISTC&&HISTC.fid===f.id?histoCmdHtml():"");
     h+="<div class='step' style='margin-top:10px'>Panier ("+f.panier.length+")</div>";
     if(f.panier.length)h+="<table class='devis' style='width:100%'><tr><th>Produit</th><th class='n'>Qté</th><th></th></tr>"+f.panier.map(function(l){return ligneCmd(l,"panier")}).join("")+"</table>";
     else h+="<div class='muted'>Panier vide.</div>";
@@ -35,7 +36,7 @@ function vCmd(){
     if(f.recues.length)h+="<div class='step' style='margin-top:12px'>Reçu cette semaine</div><table class='devis' style='width:100%'>"+f.recues.map(function(l){return ligneCmd(l,"recue")}).join("")+"</table>";
     h+="</div>"});
   app.innerHTML=h}
-function cmdRun(p,msg){return p.then(function(d){CMDMSG=(d&&d.message)||msg||"";CMD=null;render()}).catch(function(e){CMDMSG=e.message;render()})}
+function cmdRun(p,msg){return p.then(function(d){HISTC=null;CMDMSG=(d&&d.message)||msg||"";CMD=null;render()}).catch(function(e){CMDMSG=e.message;render()})}
 ACTS.fAdd=function(){cmdRun(api("/achats/fournisseur",{nom:v("fn"),email:v("fe")}))};
 ACTS.fMail=function(b){cmdRun(api("/achats/fournisseur/modifier",{id:+b.dataset.id,email:v("fe-"+b.dataset.id)}))};
 ACTS.cmdLigne=function(b){var id=+b.dataset.id;cmdRun(api("/achats/ligne",{fournisseurId:id,libelle:v("cl-"+id),quantite:v("cq-"+id)}))};
@@ -57,6 +58,18 @@ ACTS.aCommander=async function(b){
       var f=fs[(+rep)-1];if(!f){alert("Numéro inconnu.");return}
       r=await api("/achats/depuis-devis",{devisLigneId:+b.dataset.id,fournisseurId:f.id})}
     DEVHINT=r.message||"";CMD=null;await recharger(FICHE.id)}catch(e){alert(e.message)}};
+// ---------- Historique des commandes fournisseur ----------
+var HISTC=null;
+function dateHeure(d){try{var x=new Date(d);return x.toLocaleDateString("fr-FR")+" à "+x.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}catch(e){return d||""}}
+ACTS.histoOpen=async function(b){var id=+b.dataset.id;if(HISTC&&HISTC.fid===id){HISTC=null;render();return}
+  try{var g=await api("/achats/historique?fournisseurId="+id);HISTC={fid:id,groupes:g};render()}catch(e){alert(e.message)}};
+function histoCmdHtml(){
+  var g=HISTC.groupes;
+  if(!g.length)return"<div class='card'><div class='muted'>Aucune commande passée avec ce fournisseur pour l'instant.</div></div>";
+  return"<div class='card'><div class='step'>Historique des commandes</div>"+g.map(function(c){
+    var tout=c.lignes.every(function(l){return l.statut==="recue"});
+    return"<div style='margin:10px 0'><b>Commande du "+esc(dateHeure(c.date))+"</b> <span class='tag "+(tout?"ok":"warn")+"'>"+(tout?"Reçue en entier":"En attente")+"</span>"
+      +"<table class='devis' style='width:100%'>"+c.lignes.map(function(l){return"<tr><td>"+esc(l.quantite)+" × "+esc(l.libelle)+(l.sku?" <span class='muted'>"+esc(l.sku)+"</span>":"")+(l.client?"<div class='muted'>Pour "+esc(l.client)+(l.reparationId?" ("+pcn(l.reparationId)+")":"")+"</div>":"")+"</td><td class='n'>"+(l.statut==="recue"?"<span class='tag ok'>Reçue le "+esc(day(l.recueLe))+"</span>":"<span class='tag warn'>Commandée</span>")+"</td></tr>"}).join("")+"</table></div>"}).join("")+"</div>"}
 // ---------- Réception par scan ----------
 var REC=null;
 function recNorm(c){return String(c||"").trim().toLowerCase()}
