@@ -1,0 +1,13 @@
+{
+  "name": "atelier-turn-shopify-app",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": ["extensions/*"],
+  "scripts": {
+    "deploy": "shopify app deploy",
+    "dev": "shopify app dev"
+  },
+  "dependencies": {
+    "@shopify/cli": "latest"
+  }
+}

@@ -1,0 +1,14 @@
+api_version = "2025-10"
+
+[[extensions]]
+type = "ui_extension"
+name = "Suivi atelier"
+handle = "suivi-atelier"
+
+[[extensions.targeting]]
+module = "./src/Page.jsx"
+target = "customer-account.page.render"
+
+[extensions.capabilities]
+network_access = true
+api_access = true

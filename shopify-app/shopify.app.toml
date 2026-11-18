@@ -1,0 +1,18 @@
+# Application « Atelier TURN » : elle ne sert qu'à afficher « Suivi atelier » dans l'espace client.
+# Le client_id est rempli automatiquement au premier "npm run deploy" (la commande te demande de créer ou choisir l'app).
+name = "Atelier TURN"
+client_id = ""
+application_url = "https://atelier-turnshop-production.up.railway.app"
+embedded = false
+
+[build]
+include_config_on_deploy = true
+
+[access_scopes]
+scopes = ""
+
+[auth]
+redirect_urls = ["https://atelier-turnshop-production.up.railway.app/auth/callback"]
+
+[webhooks]
+api_version = "2025-10"

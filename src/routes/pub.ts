@@ -12,7 +12,7 @@ import { infosGarde } from "../garde";
 // API publique pour l'espace client de turnshop.fr. Pas de mot de passe atelier :
 // chaque appel est signé par le thème Shopify (HMAC-SHA256 avec ESPACE_SECRET), valable 2 h.
 const SECRET = () => Bun.env.ESPACE_SECRET ?? "";
-app.use("/pub/*", cors({ origin: ["https://turnshop.fr", "https://www.turnshop.fr"], allowMethods: ["GET", "POST", "OPTIONS"], allowHeaders: ["content-type"], maxAge: 600 }));
+app.use("/pub/*", cors({ origin: ["https://turnshop.fr", "https://www.turnshop.fr", "https://extensions.shopifycdn.com"], allowMethods: ["GET", "POST", "OPTIONS"], allowHeaders: ["content-type"], maxAge: 600 }));
 
 await sql`ALTER TABLE reparations ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT '', ADD COLUMN IF NOT EXISTS rdv_souhaite TEXT NOT NULL DEFAULT '', ADD COLUMN IF NOT EXISTS rdv_statut TEXT NOT NULL DEFAULT ''`;
 await sql`UPDATE reparations SET rdv_statut = 'confirme' WHERE source = 'web' AND rdv_statut = ''`;
@@ -34,7 +34,36 @@ export function signer(cid: string, ts: string, email: string) {
 }
 
 type Qui = { cid: string; email: string; prenom: string; nom: string; tel: string };
-function verifie(b: any): Qui {
+// Jeton de session de l'extension d'espace client Shopify (JWT HS256 signé avec le secret de l'app).
+function jetonShopify(jwt: string): string {
+  const secret = process.env.SHOPIFY_APP_SECRET ?? "";
+  if (!secret) throw new AppError(503, "Espace client non configuré (SHOPIFY_APP_SECRET manquant).");
+  const [h, p, sg] = jwt.split(".");
+  if (!h || !p || !sg) throw new AppError(401, "Connexion requise.");
+  const attendu = createHmac("sha256", secret).update(h + "." + p).digest("base64url");
+  const a = Buffer.from(attendu), r = Buffer.from(sg);
+  if (a.length !== r.length || !timingSafeEqual(a, r)) throw new AppError(401, "Connexion requise.");
+  let c: any;
+  try { c = JSON.parse(Buffer.from(p, "base64url").toString()); } catch { throw new AppError(401, "Connexion requise."); }
+  const now = Date.now() / 1000;
+  if (!c.exp || c.exp < now - 5 || (c.nbf && c.nbf > now + 5)) throw new AppError(401, "Session expirée : recharge la page.");
+  const m = /^gid:\/\/shopify\/Customer\/(\d+)$/.exec(String(c.sub ?? ""));
+  if (!m) throw new AppError(401, "Connexion requise.");
+  return m[1];
+}
+
+async function verifie(b: any): Promise<Qui> {
+  if (typeof b.jwt === "string" && b.jwt) {
+    const cid = jetonShopify(b.jwt);
+    // L'identité vient du jeton ; email et nom viennent de Shopify (pas du navigateur).
+    let email = "", prenom = "", nom = "", tel = "";
+    try {
+      const d = await shopifyRead(`query($id: ID!){ customer(id:$id){ email firstName lastName phone } }`, { id: `gid://shopify/Customer/${cid}` });
+      const cu = d?.customer ?? {};
+      email = cu.email ?? ""; prenom = cu.firstName ?? ""; nom = cu.lastName ?? ""; tel = cu.phone ?? "";
+    } catch { /* on continue avec l'identifiant seul */ }
+    return { cid, email, prenom, nom, tel };
+  }
   if (!SECRET()) throw new AppError(503, "Espace client non configuré.");
   const cid = clean(b.cid, 30), ts = clean(b.ts, 12), email = clean(b.email, 120), sig = clean(b.sig, 80);
   if (!/^\d+$/.test(cid) || !/^\d+$/.test(ts)) throw new AppError(401, "Connexion requise.");
@@ -192,7 +221,7 @@ export async function verifierPaiementsWeb() {
 app.post("/pub/moi", async (c) => {
   limite(c);
   const b = await c.req.json().catch(() => ({}));
-  const q = verifie(b);
+  const q = await verifie(b);
   const cid = await clientDe(q);
   const blocage = await blocageCents();
   const rows = (await sql`SELECT r.*, t.marque, t.modele FROM reparations r JOIN trottinettes t ON t.id = r.trottinette_id WHERE r.client_id = ${cid} AND r.supprime_le IS NULL ORDER BY r.id DESC LIMIT 30`) as any[];
@@ -222,7 +251,7 @@ app.post("/pub/moi", async (c) => {
 app.post("/pub/rdv", async (c) => {
   limite(c);
   const b = await c.req.json().catch(() => ({}));
-  const q = verifie(b);
+  const q = await verifie(b);
   const cid = await clientDe(q);
   const magasin = clean(b.magasin, 20);
   if (!MAGASINS.includes(magasin)) throw new AppError(400, "Choisis un atelier.");
@@ -277,7 +306,7 @@ app.post("/pub/rdv", async (c) => {
 app.post("/pub/rdv/reponse", async (c) => {
   limite(c);
   const b = await c.req.json().catch(() => ({}));
-  const q = verifie(b);
+  const q = await verifie(b);
   const cid = await clientDe(q);
   const repId = Number(b.repairId);
   const [r] = (await sql`SELECT id, rdv_statut FROM reparations WHERE id = ${repId} AND client_id = ${cid} AND source = 'web' AND supprime_le IS NULL`) as any[];
@@ -302,7 +331,7 @@ app.post("/pub/rdv/reponse", async (c) => {
 app.post("/pub/payer", async (c) => {
   limite(c);
   const b = await c.req.json().catch(() => ({}));
-  const q = verifie(b);
+  const q = await verifie(b);
   const cid = await clientDe(q);
   const repId = Number(b.repairId);
   const [r] = (await sql`SELECT id FROM reparations WHERE id = ${repId} AND client_id = ${cid} AND supprime_le IS NULL`) as any[];
