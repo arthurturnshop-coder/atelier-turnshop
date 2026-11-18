@@ -3,6 +3,8 @@ import { AVIS_DELAI_HEURES, STATUTS } from "../config";
 import { sql } from "../db";
 import { envoyerPret } from "../automatisations";
 import { remiseMulti } from "./prestations";
+import { acomptesDe } from "./acomptes";
+import { infosGarde } from "../garde";
 import { AppError, clean, exigeResponsable, signature } from "../util";
 
 export async function devisDe(repId: number) {
@@ -31,6 +33,8 @@ export function ligneListe(r: any, journal: any[]) {
     avisStatut: r.avis_statut,
     avisEnvoiLe: r.avis_envoi_le,
     enMagasin: r.en_magasin !== false,
+    garde: infosGarde(r.pret_le, r.statut, r.abandonnee_le),
+    abandonnee: !!r.abandonnee_le,
     journal: journal.filter((j) => j.reparation_id === r.id).map((j) => ({ date: j.date, type: j.type, texte: j.texte })),
   };
 }
@@ -67,7 +71,7 @@ app.get("/api/reparation", async (c) => {
   const [r] = (await sql`SELECT r.*, c.prenom, c.nom, c.telephone, c.email, t.marque, t.modele, t.serie FROM reparations r JOIN clients c ON c.id = r.client_id JOIN trottinettes t ON t.id = r.trottinette_id WHERE r.id = ${id} AND r.supprime_le IS NULL`) as any[];
   if (!r) throw new AppError(404, "Réparation introuvable.");
   const journal = (await sql`SELECT reparation_id, date, type, texte FROM journal WHERE reparation_id = ${id} ORDER BY id`) as any[];
-  return c.json({ ...ligneListe(r, journal), devis: await devisDe(id), statuts: STATUTS });
+  return c.json({ ...ligneListe(r, journal), devis: await devisDe(id), acompte: await acomptesDe(id), statuts: STATUTS });
 });
 
 // Nouvelle prise en charge. enMagasin:false = rendez-vous, sousGarantie:true = garantie.
@@ -110,7 +114,7 @@ app.post("/api/reparations/maj", async (c) => {
   const changed = !!statut && statut !== r.statut;
   let touche = false;
   if (changed) {
-    await sql`UPDATE reparations SET statut = ${statut}, maj_le = now() WHERE id = ${id}`;
+    await sql`UPDATE reparations SET statut = ${statut}, maj_le = now(), pret_le = ${statut === "prêt" ? sql`now()` : (statut === "récupéré" ? sql`pret_le` : null)} WHERE id = ${id}`;
     await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${id}, 'statut', ${`Statut : ${r.statut} → ${statut}${signature(c)}`})`;
     touche = true;
     if (statut === "prêt") void envoyerPret(id);

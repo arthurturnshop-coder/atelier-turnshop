@@ -1,4 +1,5 @@
 import { sql } from "./db";
+import { GARDE, infosGarde } from "./garde";
 import { lireAuto, notifier } from "./brevo";
 import { infosTicket } from "./routes/ticket";
 
@@ -48,6 +49,26 @@ async function cycle() {
       for (const r of rows) {
         const trott = `${r.marque} ${r.modele}`.trim();
         await notifier("rdv", { clientId: r.client_id, reparationId: r.id, sujet: "Rappel de votre rendez-vous - TURN Shop", texte: `Bonjour${prenomDe(r.prenom)}, petit rappel : votre rendez-vous chez TURN Shop est demain${r.heure ? " à " + r.heure : ""} pour votre ${trott}. À demain !` });
+      }
+    }
+    // Gardiennage : trottinette prête mais pas récupérée.
+    if (auto.garde !== "off" && h.h >= 9 && h.h < 19) {
+      const prets = (await sql`SELECT r.id, r.client_id, r.pret_le, r.abandonnee_le, r.statut, c.prenom, t.marque, t.modele FROM reparations r JOIN clients c ON c.id = r.client_id JOIN trottinettes t ON t.id = r.trottinette_id WHERE r.statut = 'prêt' AND r.pret_le IS NOT NULL AND r.abandonnee_le IS NULL AND r.supprime_le IS NULL`) as any[];
+      for (const r of prets) {
+        const g = infosGarde(r.pret_le, r.statut, r.abandonnee_le);
+        if (!g) continue;
+        const trott = `${r.marque} ${r.modele}`.trim();
+        const frais = (g.fraisCents / 100).toFixed(2).replace(".", ",");
+        if (g.jours >= GARDE.abandonJour) {
+          await sql`UPDATE reparations SET abandonnee_le = now(), maj_le = now() WHERE id = ${r.id}`;
+          await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${r.id}, 'statut', ${"Trottinette considérée comme abandonnée (plus de " + GARDE.abandonJour + " jours en gardiennage)"})`;
+          await sql`INSERT INTO taches (texte, echeance, priorite, cree_par, reparation_id) VALUES (${"Trottinette abandonnée : " + r.prenom + " (" + trott + ") PC-" + String(r.id).padStart(4, "0")}, (now() AT TIME ZONE 'Europe/Paris')::date, true, 'Gardiennage', ${r.id})`;
+          await notifier("abandon", { clientId: r.client_id, reparationId: r.id, sujet: "Votre trottinette est considérée comme abandonnée - TURN Shop", texte: `Bonjour${prenomDe(r.prenom)}, votre ${trott} est en gardiennage depuis plus de ${GARDE.abandonJour} jours. Elle est désormais considérée comme abandonnée et aucun recours ne sera possible. L'équipe TURN Shop` });
+        } else if (g.jours >= GARDE.rappelJour + 7) {
+          await notifier("garde_hebdo", { clientId: r.client_id, reparationId: r.id, sujet: "Votre trottinette est en gardiennage - TURN Shop", texte: `Bonjour${prenomDe(r.prenom)}, votre ${trott} est prête depuis ${g.jours} jours et se trouve en gardiennage (frais actuels : ${frais} €, à raison de ${(GARDE.prixCents / 100).toFixed(0)} € par jour). Merci de venir la récupérer avant ${GARDE.abandonJour} jours : passé ce délai, elle sera considérée comme abandonnée et il n'y aura plus aucun recours. L'équipe TURN Shop` });
+        } else if (g.jours >= GARDE.rappelJour) {
+          await notifier("garde4", { clientId: r.client_id, reparationId: r.id, sujet: "Dernier jour pour récupérer votre trottinette - TURN Shop", texte: `Bonjour${prenomDe(r.prenom)}, votre ${trott} est prête depuis ${g.jours} jours. Il vous reste 1 jour pour venir la récupérer : ensuite, des frais de gardiennage de ${(GARDE.prixCents / 100).toFixed(0)} € par jour s'appliqueront. L'équipe TURN Shop` });
+        }
       }
     }
     if (auto.avis !== "off") {

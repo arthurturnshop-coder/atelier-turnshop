@@ -25,7 +25,7 @@ async function loadEnc(){
     var cls="tk"+(r.enMagasin===false?" abs":(r.statut==="prêt"?" pret":(r.statut==="en attente de pièce"?" cmd":"")));
     return"<button class='"+cls+"' data-act='ouvrirFiche' data-id='"+r.id+"'><div class='l1'><span><b>"+pcn(r.id)+"</b> · "+esc(r.client)+"</span><span class='tag'>"+esc(r.statut)+"</span></div>"
       +"<div>"+esc(r.trottinette)+"</div><div class='muted'>"+esc(r.panne)+"</div>"
-      +"<div class='muted'>"+(r.pieceArrivee?"<span class='tag warn'>Pièce arrivée : prévenir</span> ":"")+(r.enMagasin===false?"<span class='tag warn'>Pas en magasin</span> ":"")+(r.sousGarantie?"<span class='tag ok'>Sous garantie</span> ":"")+"Dépôt "+esc(day(r.dateDepot))+"</div></button>"}).join("")+"</div>"}
+      +"<div class='muted'>"+(r.pieceArrivee?"<span class='tag warn'>Pièce arrivée : prévenir</span> ":"")+(r.enMagasin===false?"<span class='tag warn'>Pas en magasin</span> ":"")+(r.sousGarantie?"<span class='tag ok'>Sous garantie</span> ":"")+(r.abandonnee?"<span class='tag warn'>Abandonnée</span> ":(r.garde&&r.garde.fraisCents>0?"<span class='tag warn'>Gardiennage "+eur(r.garde.fraisCents)+"</span> ":(r.garde&&r.garde.jours>=4?"<span class='tag warn'>Prête depuis "+r.garde.jours+" j</span> ":"")))+"Dépôt "+esc(day(r.dateDepot))+"</div></button>"}).join("")+"</div>"}
 
 // ---------- Fiche d'une réparation : clic sur le ticket ----------
 async function ouvrirFiche(id){
@@ -66,6 +66,7 @@ function vFiche(){
     +(f.enMagasin===false?"<div class='tag warn' style='margin:6px 0'>Trottinette pas en magasin</div><button data-act='arrivee' data-id='"+f.id+"' data-fiche='1'>Trottinette arrivée</button>":"")
     +"<div class='step' style='margin-top:10px'>Statut</div><div class='stbtns'>"+ST.map(function(s){return"<button class='"+(s===f.statut?"on":"")+"' data-act='setStatut' data-id='"+f.id+"' data-s='"+esc(s)+"'>"+esc(s)+"</button>"}).join("")+"</div>"
     +"<label class='muted' style='display:flex;gap:8px;align-items:center'><input type='checkbox' style='width:auto;margin:0' "+(f.sousGarantie?"checked ":"")+"data-act='setGarantie' data-id='"+f.id+"'> Sous garantie</label></div>"
+    +gardeHtml(f)+acompteHtml(f)
     +"<div class='card'><div class='step'>Description de la panne</div><textarea id='fp' rows='3'>"+esc(f.panne)+"</textarea>"
     +"<div class='step'>Commentaire interne (visible seulement par TURN)</div><textarea id='fc' rows='3' placeholder='Ce que le client a demandé, ce qu il faudrait lui proposer...'>"+esc(f.commentaireInterne||"")+"</textarea>"
     +"<button data-act='saveFiche' data-id='"+f.id+"'>Enregistrer la description et le commentaire</button></div>"
@@ -73,6 +74,20 @@ function vFiche(){
     +"<div class='card'><div class='step'>Historique</div>"+(f.journal||[]).slice().reverse().map(function(j){return"<div class='hist'>"+esc(dayHour(j.date))+" · "+esc(j.texte)+"</div>"}).join("")
     +"<input id='fn' placeholder='Ajouter une note à l historique'><button class='sec' data-act='addNote' data-id='"+f.id+"'>Ajouter la note</button></div>";
   app.innerHTML=h}
+function gardeHtml(f){
+  var g=f.garde;if(!g)return"";
+  if(g.abandonnee)return"<div class='card avbox'><b>Trottinette considérée comme abandonnée</b><div class='muted'>Prête depuis "+g.jours+" jours sans être récupérée.</div></div>";
+  return"<div class='card avbox'><b>Prête depuis "+g.jours+" jour"+(g.jours>1?"s":"")+"</b><div class='muted'>"
+    +(g.fraisCents>0?"Gardiennage : "+eur(g.fraisCents)+" ("+g.joursFrais+" j x "+(g.prixCents/100)+" €), ajouté à la facture. ":"Gardiennage gratuit jusqu'au 5e jour, puis "+(g.prixCents/100)+" € par jour. ")
+    +"Abandon dans "+g.abandonDans+" jours.</div></div>"}
+function acompteHtml(f){
+  var a=f.acompte||{verseCents:0,resteCents:0,liste:[]};
+  var h="<div class='card'><div class='step'>Acompte / paiement d'avance</div>";
+  if(a.verseCents>0)h+="<div>Versé : <b>"+eur(a.verseCents)+"</b> · À déduire de la facture : <b>"+eur(a.resteCents)+"</b></div>";
+  else h+="<div class='muted'>Aucun acompte versé.</div>";
+  h+="<div class='dl'><input id='ac-m' class='p' placeholder='Montant €'><select id='ac-t' class='t'><option value='carte'>Carte</option><option value='especes'>Espèces</option><option value='virement'>Virement</option></select><button data-act='acompte' data-id='"+f.id+"'>Encaisser l'acompte</button></div>";
+  if(a.resteCents>0&&estResp())h+="<div class='step' style='margin-top:10px'>Rembourser l'acompte ("+eur(a.resteCents)+")</div><div class='dl'><select id='rb-t' class='t'><option value=''>Comment ?</option><option value='carte'>Par carte</option><option value='especes'>En espèces</option><option value='virement'>Par virement</option><option value='bon'>Bon d'achat</option></select><button class='danger' data-act='rembourse' data-id='"+f.id+"' data-c='"+a.resteCents+"'>Rembourser</button></div>";
+  return h+"</div>"}
 async function recharger(id){try{FICHE=await api("/reparation?id="+id);render()}catch(e){FICHE=null;render()}}
 
 async function refresh(){if(CUR){CUR=await api("/customer?id="+CUR.id);render()}}

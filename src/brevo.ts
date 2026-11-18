@@ -7,8 +7,11 @@ export const brevoConfigure = () => !!Bun.env.BREVO_API_KEY;
 
 await sql`CREATE TABLE IF NOT EXISTS messages_envoyes (id SERIAL PRIMARY KEY, type TEXT NOT NULL, canal TEXT NOT NULL, client_id INT, reparation_id INT, vente_id INT, destinataire TEXT NOT NULL DEFAULT '', statut TEXT NOT NULL, erreur TEXT, cree_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
 
-export type Quand = "avis" | "rdv" | "piece" | "pret";
-export const QUAND: Quand[] = ["avis", "rdv", "piece", "pret"];
+export type Quand = "avis" | "rdv" | "piece" | "pret" | "garde";
+export const QUAND: Quand[] = ["avis", "rdv", "piece", "pret", "garde"];
+// Types de messages : les trois emails de gardiennage dépendent du même réglage « garde ».
+export type MsgType = Quand | "garde4" | "garde_hebdo" | "abandon";
+const REGLAGE = (t: MsgType): Quand => (t === "garde4" || t === "garde_hebdo" || t === "abandon" ? "garde" : t);
 export type Canal = "off" | "email" | "sms" | "both";
 
 export async function lireAuto(): Promise<Record<Quand, Canal>> {
@@ -51,16 +54,19 @@ export async function envoiSms(num: string, texte: string) {
 type Ctx = { clientId: number | null; reparationId?: number | null; venteId?: number | null; sujet: string; texte: string };
 
 // Envoie selon le réglage (email, SMS ou les deux). Ne lève jamais d'erreur : tout est journalisé.
-export async function notifier(quand: Quand, c: Ctx): Promise<string> {
+export async function notifier(quand: MsgType, c: Ctx): Promise<string> {
   try {
     if (!brevoConfigure() || !c.clientId) return "";
-    const canal = (await lireAuto())[quand];
+    const canal = (await lireAuto())[REGLAGE(quand)];
     if (canal === "off") return "";
     const [cl] = (await sql`SELECT email, telephone FROM clients WHERE id = ${c.clientId}`) as any[];
     if (!cl) return "";
     // Jamais deux fois le même message pour la même réparation ou vente (et un avis par client au maximum tous les 30 jours).
     if (quand === "avis") {
       const [d] = (await sql`SELECT id FROM messages_envoyes WHERE type = 'avis' AND client_id = ${c.clientId} AND statut = 'envoye' AND cree_le > now() - interval '30 days' LIMIT 1`) as any[];
+      if (d) return "";
+    } else if (quand === "garde_hebdo" && c.reparationId) {
+      const [d] = (await sql`SELECT id FROM messages_envoyes WHERE type = 'garde_hebdo' AND reparation_id = ${c.reparationId} AND statut = 'envoye' AND cree_le > now() - interval '6 days' LIMIT 1`) as any[];
       if (d) return "";
     } else if (c.reparationId) {
       const [d] = (await sql`SELECT id FROM messages_envoyes WHERE type = ${quand} AND reparation_id = ${c.reparationId} AND statut = 'envoye' LIMIT 1`) as any[];

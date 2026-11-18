@@ -60,3 +60,9 @@ for (const g of (await sql`SELECT DISTINCT fournisseur_id, commandee_le FROM com
   await sql`UPDATE commande_lignes SET commande_id = ${n.id} WHERE commande_id IS NULL AND fournisseur_id = ${g.fournisseur_id} AND commandee_le = ${g.commandee_le}`;
 }
 await sql`ALTER TABLE taches ADD COLUMN IF NOT EXISTS reparation_id INT`;
+await sql`ALTER TABLE ventes ADD COLUMN IF NOT EXISTS type TEXT NOT NULL DEFAULT 'vente', ADD COLUMN IF NOT EXISTS acompte_deduit_cents INT NOT NULL DEFAULT 0, ADD COLUMN IF NOT EXISTS utilise_cents INT NOT NULL DEFAULT 0`;
+await sql`CREATE TABLE IF NOT EXISTS vente_acomptes (id SERIAL PRIMARY KEY, vente_id INT NOT NULL REFERENCES ventes(id), acompte_id INT NOT NULL REFERENCES ventes(id), montant_cents INT NOT NULL)`;
+await sql`CREATE TABLE IF NOT EXISTS remboursements (id SERIAL PRIMARY KEY, reparation_id INT, client_id INT, montant_cents INT NOT NULL, moyen TEXT NOT NULL CHECK (moyen IN ('carte','especes','virement','bon')), motif TEXT NOT NULL DEFAULT '', par TEXT, cree_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
+await sql`CREATE TABLE IF NOT EXISTS bons_achat (id SERIAL PRIMARY KEY, client_id INT NOT NULL REFERENCES clients(id), montant_cents INT NOT NULL, motif TEXT NOT NULL DEFAULT '', cree_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
+await sql`ALTER TABLE reparations ADD COLUMN IF NOT EXISTS pret_le TIMESTAMPTZ, ADD COLUMN IF NOT EXISTS abandonnee_le TIMESTAMPTZ`;
+await sql`UPDATE reparations SET pret_le = maj_le WHERE statut = 'prêt' AND pret_le IS NULL`;

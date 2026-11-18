@@ -25,8 +25,9 @@ const PASSERELLE: Record<string, string> = { carte: "Carte (atelier)", especes: 
 // Construit la commande Shopify à partir d'une vente de l'atelier (prix TTC, TVA 20 %).
 export function construireCommande(v: any, client: any, rep: any, lignes: any[], paiements: any[]) {
   const brut = lignes.reduce((s, l) => s + l.quantite * l.prix_unitaire_cents, 0);
-  const remise = Math.max(0, brut - v.total_cents);
-  const tva = Math.round(v.total_cents - v.total_cents / 1.2);
+  const net = v.total_cents + (v.acompte_deduit_cents ?? 0);
+  const remise = Math.max(0, brut - net);
+  const tva = Math.round(net - net / 1.2);
   const nom = `${client.prenom} ${client.nom}`.trim();
   const order: any = {
     currency: "EUR",
@@ -66,6 +67,9 @@ export async function creerCommandeShopify(venteId: number): Promise<{ ok: boole
     const [rep] = (await sql`SELECT r.id, r.panne, t.marque, t.modele, t.serie FROM reparations r JOIN trottinettes t ON t.id = r.trottinette_id WHERE r.id = ${v.reparation_id}`) as any[];
     const lignes = (await sql`SELECT * FROM vente_lignes WHERE vente_id = ${v.id} ORDER BY id`) as any[];
     const paiements = (await sql`SELECT * FROM vente_paiements WHERE vente_id = ${v.id} ORDER BY id`) as any[];
+    // Les acomptes déjà encaissés comptent comme des paiements de la commande.
+    const acs = (await sql`SELECT va.montant_cents, COALESCE((SELECT moyen FROM vente_paiements WHERE vente_id = va.acompte_id ORDER BY montant_cents DESC LIMIT 1), 'carte') AS moyen FROM vente_acomptes va WHERE va.vente_id = ${v.id}`) as any[];
+    for (const a of acs) paiements.push({ moyen: a.moyen, montant_cents: a.montant_cents });
     const order = construireCommande(v, client, rep, lignes, paiements);
     const data = await shopifyMutate(
       `mutation($order: OrderCreateOrderInput!, $options: OrderCreateOptionsInput) { orderCreate(order: $order, options: $options) { order { id name customer { id } } userErrors { field message } } }`,

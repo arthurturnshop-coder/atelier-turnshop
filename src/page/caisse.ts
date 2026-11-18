@@ -1,7 +1,8 @@
 export const CAISSE = `// ---------- Caisse (colonne de droite du Dashboard) ----------
 var PAN=[],CCLI=null,CFID=null,CUSE=false,CPAY={carte:"",especes:"",virement:""},CREP=null,CMSG="";
 var CAV=null,CAVBUSY=false,CAVOFF=[],CREC=null,CHIST=null,CHOPEN=0;
-var PRESTA=null,PRESBUSY=false,DEVHINT="";
+var PRESTA=null,PRESBUSY=false,DEVHINT="",CACO=0;
+function acoDeduit(reste){return CREP&&CACO>0?Math.max(0,Math.min(CACO,reste)):0}
 function prestaLoad(){if(PRESTA===null&&!PRESBUSY){PRESBUSY=true;api("/prestations").then(function(d){PRESTA=d;PRESBUSY=false;render()}).catch(function(){PRESTA={prestations:[],multi:{seuil:2,remiseCents:0}};PRESBUSY=false;render()})}}
 function multiRem(brut){
   if(!PRESTA||brut<=0||avChoisis(brut).length)return 0;
@@ -40,8 +41,10 @@ function recuHtml(r){
   h+="<hr><div class='rl'><span>Sous-total</span><span>"+eur(r.brutCents)+"</span></div>";
   r.avantages.forEach(function(a){h+="<div class='rl'><span>"+(a.effet==="cadeau"?"Cadeau : ":"Offre : ")+esc(a.libelle)+"</span><span>"+(a.remiseCents?"-"+eur(a.remiseCents):"offert")+"</span></div>"});
   if(r.fideliteCents)h+="<div class='rl'><span>Fidélité</span><span>-"+eur(r.fideliteCents)+"</span></div>";
+  var acd=r.acompteDeduitCents||0;ttc=r.totalCents+acd;ht=Math.round(ttc/1.2);tva=ttc-ht;
   h+="<div class='rl rt'><span>TOTAL TTC</span><span>"+eur(ttc)+"</span></div>"
     +"<div class='rl rm'><span>Total HT</span><span>"+eur(ht)+"</span></div><div class='rl rm'><span>TVA 20 %</span><span>"+eur(tva)+"</span></div><hr>";
+  if(acd)h+="<div class='rl'><span>Acompte déjà versé</span><span>-"+eur(acd)+"</span></div><div class='rl'><span>Reste payé aujourd'hui</span><span>"+eur(r.totalCents)+"</span></div>";
   r.paiements.forEach(function(p){h+="<div class='rl'><span>Payé en "+esc((MOY[p.moyen]||p.moyen).toLowerCase())+"</span><span>"+eur(p.cents)+"</span></div>"});
   if(t.qrSvg)h+="<hr><div class='rc'><b>Laissez-nous un avis</b><br>et recevez une récompense !</div><div class='qr'>"+t.qrSvg+"</div>";
   return h+"<div class='rc rm'>Merci de votre visite !</div></div>"}
@@ -69,7 +72,7 @@ function histoHtml(){
 function caisseHtml(){
   if(CAV===null&&!CAVBUSY){CAVBUSY=true;api("/caisse/avantages").then(function(d){CAV=d;CAVBUSY=false;render()}).catch(function(){CAV=[];CAVBUSY=false})}
   prestaLoad();
-  var brut=panierTotal(),av=avRemTotal(brut),rem=remiseCents(),net=brut-av-rem;
+  var brut=panierTotal(),av=avRemTotal(brut),rem=remiseCents(),aco=acoDeduit(brut-av-rem),net=brut-av-rem-aco;
   var h="<div class='caisse'><h3>Caisse</h3>";
   if(CREC)h+="<div class='card'><b>Vente enregistrée</b>"+recuHtml(CREC)+shopHtml(CREC)+avisBtns(CREC)+"<div class='actions'><button data-act='cPrint' data-id='"+CREC.id+"'>Imprimer le reçu</button><button class='sec' data-act='cFermeRecu'>Fermer</button></div></div>";
   if(CREP)h+="<div class='card avbox'><b>Facturation de la réparation n°"+CREP+"</b><div class='muted'>Les lignes du devis sont dans le panier. À l'encaissement, la commande est créée dans Shopify.</div><button class='link' data-act='cAnnuleRep'>Annuler la facturation</button></div>";
@@ -99,6 +102,7 @@ function caisseHtml(){
   avChoisis(brut).forEach(function(a){h+="<div>"+(a.effet==="cadeau"?"Cadeau à remettre : ":"Offre : ")+esc(a.libelle)+(a.effet==="cadeau"?"":" : -"+eur(Math.min(avRemise(a,brut),brut)))+"</div>"});
   if(multiRem(brut))h+="<div>Remise plusieurs prestations : -"+eur(multiRem(brut))+"</div>";
   if(rem)h+="<div>Remise fidélité : -"+eur(rem)+"</div>";
+  if(aco)h+="<div>Acompte déjà versé : -"+eur(aco)+"</div>";
   h+="<div class='big'>À payer : "+eur(net)+"</div>"
     +"<div class='pay'><span>Carte</span><input id='pc' placeholder='0,00' value='"+esc(CPAY.carte)+"'></div><div class='pay'><span>Espèces</span><input id='pe' placeholder='0,00' value='"+esc(CPAY.especes)+"'></div><div class='pay'><span>Virement</span><input id='pv' placeholder='0,00' value='"+esc(CPAY.virement)+"'></div>"
     +"<div class='actions'><button class='sec' data-act='cTout' data-m='carte'>Tout en carte</button><button class='sec' data-act='cTout' data-m='especes'>Tout en espèces</button><button class='sec' data-act='cTout' data-m='virement'>Tout en virement</button></div>"

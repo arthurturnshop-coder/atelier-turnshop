@@ -14,6 +14,7 @@ import "./routes/diagnostic";
 import "./routes/ticket";
 import "./routes/achats";
 import "./routes/commandes";
+import "./routes/acomptes";
 import "./routes/caisse";
 import "./automatisations";
 import { HTML } from "./page";

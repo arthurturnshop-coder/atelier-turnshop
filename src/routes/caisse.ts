@@ -12,13 +12,14 @@ import { AppError, clean, signature } from "../util";
 // Les points Shopify (lecture seule) restent affichés à part dans le profil.
 export async function soldeFidelite(clientId: number) {
   const p = await lireParametres();
-  const [dep] = (await sql`SELECT COALESCE(sum(total_cents), 0)::int AS n FROM ventes WHERE client_id = ${clientId}`) as any[];
+  const [dep] = (await sql`SELECT COALESCE(sum(total_cents + acompte_deduit_cents), 0)::int AS n FROM ventes WHERE client_id = ${clientId} AND type = 'vente'`) as any[];
   const [uti] = (await sql`SELECT COALESCE(sum(remise_cents), 0)::int AS n FROM ventes WHERE client_id = ${clientId}`) as any[];
   // Le bon d'achat ne devient utilisable que le lendemain : seules les ventes d'avant aujourd'hui (heure de Paris) comptent.
-  const [avant] = (await sql`SELECT COALESCE(sum(total_cents), 0)::int AS n FROM ventes WHERE client_id = ${clientId} AND cree_le < date_trunc('day', now() AT TIME ZONE 'Europe/Paris') AT TIME ZONE 'Europe/Paris'`) as any[];
+  const [avant] = (await sql`SELECT COALESCE(sum(total_cents + acompte_deduit_cents), 0)::int AS n FROM ventes WHERE client_id = ${clientId} AND type = 'vente' AND cree_le < date_trunc('day', now() AT TIME ZONE 'Europe/Paris') AT TIME ZONE 'Europe/Paris'`) as any[];
   const depenseEuros = dep.n / 100;
   const gagneEuros = Math.floor(avant.n / 100 / p.eurosPourPalier) * p.remiseEuros;
-  const disponibleEuros = Math.max(0, gagneEuros - uti.n / 100);
+  const [bons] = (await sql`SELECT COALESCE(sum(montant_cents), 0)::int AS n FROM bons_achat WHERE client_id = ${clientId}`) as any[];
+  const disponibleEuros = Math.max(0, gagneEuros + bons.n / 100 - uti.n / 100);
   const prochainPalierIn = p.eurosPourPalier - (depenseEuros % p.eurosPourPalier);
   return { depenseEuros, disponibleEuros, prochainPalierIn, regle: p };
 }
@@ -95,7 +96,7 @@ app.get("/api/code", async (c) => {
 });
 
 // Détail complet d'une vente (pour le reçu).
-async function detailVente(v: any) {
+export async function detailVente(v: any) {
   const lignes = (await sql`SELECT libelle, quantite, prix_unitaire_cents FROM vente_lignes WHERE vente_id = ${v.id} ORDER BY id`) as any[];
   const pays = (await sql`SELECT moyen, montant_cents FROM vente_paiements WHERE vente_id = ${v.id} ORDER BY id`) as any[];
   const avs = (await sql`SELECT libelle, effet, remise_cents FROM vente_avantages WHERE vente_id = ${v.id} ORDER BY id`) as any[];
@@ -103,6 +104,7 @@ async function detailVente(v: any) {
   const [co] = v.client_id ? ((await sql`SELECT prenom, telephone, email FROM clients WHERE id = ${v.client_id}`) as any[]) : [];
   return {
     contact: { prenom: co?.prenom ?? "", tel: co?.telephone ?? "", email: co?.email ?? "" },
+    type: v.type ?? "vente", acompteDeduitCents: v.acompte_deduit_cents ?? 0,
     id: v.id, date: v.cree_le, magasin: v.magasin, vendeur: v.vendeur, client: v.client_nom || null,
     totalCents: v.total_cents, fideliteCents: v.remise_cents, brutCents: brut,
     lignes: lignes.map((l) => ({ libelle: l.libelle, quantite: l.quantite, prixCents: l.prix_unitaire_cents })),
@@ -170,7 +172,20 @@ app.post("/api/caisse/encaisser", async (c) => {
     const s = await soldeFidelite(clientId);
     remiseCents = Math.min(Math.round(s.disponibleEuros * 100), brut - remAvantages);
   }
-  const totalCents = brut - remAvantages - remiseCents;
+  // Acomptes déjà versés sur cette réparation : déduits du total, dans l'ordre, sans jamais dépasser ce qui reste à payer.
+  const deduits: { id: number; cents: number }[] = [];
+  let aDeduire = brut - remAvantages - remiseCents;
+  if (reparationId) {
+    const ac = (await sql`SELECT id, total_cents - utilise_cents AS reste FROM ventes WHERE reparation_id = ${reparationId} AND type = 'acompte' AND total_cents - utilise_cents > 0 ORDER BY id`) as any[];
+    for (const a of ac) {
+      const x = Math.min(a.reste, aDeduire);
+      if (x <= 0) break;
+      deduits.push({ id: a.id, cents: x });
+      aDeduire -= x;
+    }
+  }
+  const acompteDeduit = deduits.reduce((s, d) => s + d.cents, 0);
+  const totalCents = brut - remAvantages - remiseCents - acompteDeduit;
 
   const paiements = (Array.isArray(b.paiements) ? b.paiements : []).map((p: any) => ({
     moyen: String(p.moyen ?? ""),
@@ -182,10 +197,14 @@ app.post("/api/caisse/encaisser", async (c) => {
 
   const u = c.get("user");
   const p = await lireParametres();
-  const pointsGagnes = Math.floor(totalCents / 100 / p.eurosPourPalier);
-  const [v] = (await sql`INSERT INTO ventes (client_id, reparation_id, magasin, vendeur, total_cents, remise_cents, points_gagnes, points_utilises) VALUES (${clientId}, ${reparationId}, ${u.magasin ?? null}, ${u.prenom}, ${totalCents}, ${remiseCents}, ${pointsGagnes}, ${remiseCents > 0 ? 1 : 0}) RETURNING id`) as any[];
+  const pointsGagnes = Math.floor((totalCents + acompteDeduit) / 100 / p.eurosPourPalier);
+  const [v] = (await sql`INSERT INTO ventes (client_id, reparation_id, magasin, vendeur, total_cents, remise_cents, points_gagnes, points_utilises, acompte_deduit_cents) VALUES (${clientId}, ${reparationId}, ${u.magasin ?? null}, ${u.prenom}, ${totalCents}, ${remiseCents}, ${pointsGagnes}, ${remiseCents > 0 ? 1 : 0}, ${acompteDeduit}) RETURNING id`) as any[];
   for (const l of nettoyees) {
     await sql`INSERT INTO vente_lignes (vente_id, libelle, quantite, prix_unitaire_cents, type, shopify_variant_id, sku) VALUES (${v.id}, ${l.libelle}, ${l.quantite}, ${l.prixCents}, ${l.type}, ${l.variantId}, ${l.sku})`;
+  }
+  for (const d of deduits) {
+    await sql`INSERT INTO vente_acomptes (vente_id, acompte_id, montant_cents) VALUES (${v.id}, ${d.id}, ${d.cents})`;
+    await sql`UPDATE ventes SET utilise_cents = utilise_cents + ${d.cents} WHERE id = ${d.id}`;
   }
   for (const a of appliques) {
     await sql`INSERT INTO vente_avantages (vente_id, avantage_id, libelle, effet, remise_cents) VALUES (${v.id}, ${a.id}, ${a.libelle}, ${a.effet}, ${a.cents})`;

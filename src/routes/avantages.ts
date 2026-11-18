@@ -35,7 +35,7 @@ export async function avantagesActifs(): Promise<Avantage[]> {
 
 // Ce qu'on sait d'un client : total dépensé en caisse et avantages "cumul" déjà reçus.
 export async function contexteClient(clientId: number) {
-  const [dep] = (await sql`SELECT COALESCE(sum(total_cents), 0)::int AS n FROM ventes WHERE client_id = ${clientId}`) as any[];
+  const [dep] = (await sql`SELECT COALESCE(sum(total_cents + acompte_deduit_cents), 0)::int AS n FROM ventes WHERE client_id = ${clientId} AND type = 'vente'`) as any[];
   const recus = (await sql`SELECT DISTINCT va.avantage_id FROM vente_avantages va JOIN ventes v ON v.id = va.vente_id WHERE v.client_id = ${clientId} AND va.avantage_id IS NOT NULL`) as any[];
   return { depenseCents: dep.n as number, recus: recus.map((r) => r.avantage_id as number) };
 }
