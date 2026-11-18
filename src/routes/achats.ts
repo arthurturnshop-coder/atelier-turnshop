@@ -11,7 +11,7 @@ app.get("/api/achats", async (c) => {
   const fournisseurs = (await sql`SELECT id, nom, email FROM fournisseurs WHERE actif = true ORDER BY nom`) as any[];
   const lignes = (await sql`SELECT l.*, trim(cl.prenom || ' ' || cl.nom) AS client FROM commande_lignes l LEFT JOIN reparations r ON r.id = l.reparation_id LEFT JOIN clients cl ON cl.id = r.client_id
     WHERE l.statut <> 'recue' OR l.recue_le > now() - interval '7 days' ORDER BY l.id`) as any[];
-  const vers = (l: any) => ({ id: l.id, libelle: l.libelle, sku: l.sku ?? "", variantId: l.variant_id ?? "", quantite: l.quantite, reparationId: l.reparation_id, client: l.client || "", statut: l.statut, commandeLe: l.commandee_le, recueLe: l.recue_le });
+  const vers = (l: any) => ({ id: l.id, libelle: l.libelle, sku: l.sku ?? "", barcode: l.barcode ?? "", variantId: l.variant_id ?? "", quantite: l.quantite, reparationId: l.reparation_id, client: l.client || "", statut: l.statut, commandeLe: l.commandee_le, recueLe: l.recue_le });
   return c.json({
     fournisseurs: fournisseurs.map((f) => ({
       id: f.id, nom: f.nom, email: f.email,
@@ -43,7 +43,7 @@ app.post("/api/achats/ligne", async (c) => {
   if (!libelle) throw new AppError(400, "Le libellé est obligatoire.");
   const [f] = await sql`SELECT id FROM fournisseurs WHERE id = ${Number(b.fournisseurId)} AND actif = true`;
   if (!f) throw new AppError(400, "Choisis un fournisseur.");
-  await sql`INSERT INTO commande_lignes (fournisseur_id, libelle, sku, variant_id, quantite) VALUES (${f.id}, ${libelle}, ${clean(b.sku, 80) || null}, ${clean(b.variantId, 80) || null}, ${nettoyerQte(b.quantite)})`;
+  await sql`INSERT INTO commande_lignes (fournisseur_id, libelle, sku, barcode, variant_id, quantite) VALUES (${f.id}, ${libelle}, ${clean(b.sku, 80) || null}, ${clean(b.barcode, 80) || null}, ${clean(b.variantId, 80) || null}, ${nettoyerQte(b.quantite)})`;
   return c.json({ message: "Ajouté au panier." });
 });
 
@@ -52,18 +52,32 @@ app.post("/api/achats/depuis-devis", async (c) => {
   const b = await c.req.json().catch(() => ({}));
   const [d] = (await sql`SELECT * FROM devis_lignes WHERE id = ${Number(b.devisLigneId)} AND type = 'piece'`) as any[];
   if (!d) throw new AppError(404, "Ligne de pièce introuvable.");
-  const [f] = await sql`SELECT id, nom FROM fournisseurs WHERE id = ${Number(b.fournisseurId)} AND actif = true`;
-  if (!f) throw new AppError(400, "Choisis un fournisseur (à créer dans l'onglet Commandes).");
+  // Quel fournisseur ? 1) celui choisi, 2) celui déjà utilisé pour ce produit, 3) celui dont le nom correspond à la marque Shopify, 4) l'unique fournisseur.
+  const fs = (await sql`SELECT id, nom FROM fournisseurs WHERE actif = true ORDER BY nom`) as any[];
+  let f: any = fs.find((x) => x.id === Number(b.fournisseurId));
+  let raison = "";
+  if (!f && (d.shopify_variant_id || d.sku)) {
+    const [h] = (await sql`SELECT fournisseur_id FROM commande_lignes WHERE (${d.shopify_variant_id ?? ""} <> '' AND variant_id = ${d.shopify_variant_id ?? ""}) OR (${d.sku ?? ""} <> '' AND sku = ${d.sku ?? ""}) ORDER BY id DESC LIMIT 1`) as any[];
+    f = h && fs.find((x) => x.id === h.fournisseur_id);
+    if (f) raison = "habituel pour ce produit";
+  }
+  if (!f && d.marque) {
+    const mq = String(d.marque).toLowerCase();
+    f = fs.find((x) => mq.includes(x.nom.toLowerCase()) || x.nom.toLowerCase().includes(mq));
+    if (f) raison = `marque ${d.marque}`;
+  }
+  if (!f && fs.length === 1) { f = fs[0]; raison = "seul fournisseur"; }
+  if (!f) return c.json({ choix: true, fournisseurs: fs, message: "Choisis un fournisseur." });
   const [deja] = await sql`SELECT id FROM commande_lignes WHERE devis_ligne_id = ${d.id} AND statut <> 'recue'`;
   if (deja) throw new AppError(400, "Cette pièce est déjà dans un panier ou commandée.");
-  await sql`INSERT INTO commande_lignes (fournisseur_id, libelle, sku, variant_id, quantite, reparation_id, devis_ligne_id) VALUES (${f.id}, ${d.libelle}, ${d.sku}, ${d.shopify_variant_id}, ${d.quantite}, ${d.reparation_id}, ${d.id})`;
+  await sql`INSERT INTO commande_lignes (fournisseur_id, libelle, sku, barcode, variant_id, quantite, reparation_id, devis_ligne_id) VALUES (${f.id}, ${d.libelle}, ${d.sku}, ${d.barcode}, ${d.shopify_variant_id}, ${d.quantite}, ${d.reparation_id}, ${d.id})`;
   const [r] = (await sql`SELECT statut FROM reparations WHERE id = ${d.reparation_id}`) as any[];
   if (r && r.statut !== "en attente de pièce") {
     await sql`UPDATE reparations SET statut = 'en attente de pièce', piece_arrivee = false, maj_le = now() WHERE id = ${d.reparation_id}`;
     await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${d.reparation_id}, 'statut', ${`Statut : ${r.statut} → en attente de pièce${signature(c)}`})`;
   }
   await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${d.reparation_id}, 'note', ${`Pièce à commander chez ${f.nom} : ${d.quantite} × ${d.libelle}${signature(c)}`})`;
-  return c.json({ message: `Ajouté au panier ${f.nom}.` });
+  return c.json({ message: `Ajouté au panier ${f.nom}${raison ? ` (${raison})` : ""}.` });
 });
 
 app.post("/api/achats/ligne/maj", async (c) => {

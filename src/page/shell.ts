@@ -153,8 +153,8 @@ nav button.on{background:#fff;color:#111;border-bottom-color:#111}
 input,select,textarea{border:1px solid #bbb;background:#fff;padding:11px}
 input:focus,select:focus,textarea:focus{outline:2px solid #111;outline-offset:0}
 button{width:auto;min-width:0;min-height:42px;padding:10px 20px;font-size:15px;font-weight:600;letter-spacing:.03em}
-button:hover{background:#333}
-button.sec:hover{background:#111;color:#fff}
+button:hover{outline:1px solid #111;outline-offset:2px}
+button.sec:hover{outline:1px solid #111;outline-offset:2px}
 button.link{padding:4px 0}
 .card{border:1px solid #cfcfcf;padding:16px;box-shadow:none}
 .card .step{text-transform:uppercase;letter-spacing:.06em;font-size:13px}
@@ -179,5 +179,6 @@ a.btn{display:inline-block;background:#111;color:#fff;text-decoration:none;paddi
 @media(min-width:1000px){.dash{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}.dright{position:sticky;top:8px}}
 @media(min-width:800px){.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}.grid .card{margin:10px 0}}
 .presta{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:6px 0}.presta button{text-align:left}
+.tache{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid #e3e3e3}.tache.top{border-left:4px solid #111;padding-left:8px;background:#fafafa}.tache.fait .tx{text-decoration:line-through;color:#888}.tache .tx{flex:1}.tache .tbtn{white-space:nowrap}.chk{min-height:26px;width:26px;min-width:26px;padding:0;background:#fff;color:#111;border:2px solid #111;font-size:15px}.rec-ok{border-left:4px solid #1a7f37;padding:8px 12px;background:#f0faf2}.rec-ko{border-left:4px solid #b42318;padding:8px 12px;background:#fdf1f0}
 </style></head><body><header><span>Atelier TURN</span><div id="rech" class="rech" style="display:none"><input id="rq" type="search" placeholder="Chercher : n° PC, client, modèle, produit..." autocomplete="off"><div id="rpanel" class="rpanel" style="display:none"></div></div><span id="who"></span></header><nav id="nav"></nav><main id="app">Chargement…</main>
 <script>`;

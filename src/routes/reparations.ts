@@ -5,10 +5,10 @@ import { remiseMulti } from "./prestations";
 import { AppError, clean, exigeResponsable, signature } from "../util";
 
 export async function devisDe(repId: number) {
-  const lignes = (await sql`SELECT d.id, d.type, d.libelle, d.quantite, d.prix_unitaire_cents, d.shopify_variant_id, d.sku, (SELECT statut FROM commande_lignes cl WHERE cl.devis_ligne_id = d.id ORDER BY cl.id DESC LIMIT 1) AS cmd FROM devis_lignes d WHERE d.reparation_id = ${repId} ORDER BY d.type DESC, d.id`) as any[];
+  const lignes = (await sql`SELECT d.id, d.type, d.libelle, d.quantite, d.prix_unitaire_cents, d.shopify_variant_id, d.sku, d.barcode, d.marque, (SELECT statut FROM commande_lignes cl WHERE cl.devis_ligne_id = d.id ORDER BY cl.id DESC LIMIT 1) AS cmd FROM devis_lignes d WHERE d.reparation_id = ${repId} ORDER BY d.type DESC, d.id`) as any[];
   const total = lignes.reduce((s, l) => s + l.quantite * l.prix_unitaire_cents, 0);
-  const remiseMultiCents = await remiseMulti(lignes.map((l) => ({ type: l.type, quantite: l.quantite })), total);
-  return { remiseMultiCents, netCents: total - remiseMultiCents, lignes: lignes.map((l) => ({ id: l.id, type: l.type, libelle: l.libelle, quantite: l.quantite, prixCents: l.prix_unitaire_cents, variantId: l.shopify_variant_id ?? "", sku: l.sku ?? "", commande: l.cmd ?? "" })), totalCents: total };
+  const remiseMultiCents = await remiseMulti(lignes.map((l) => ({ type: l.type, quantite: l.quantite, libelle: l.libelle })), total);
+  return { remiseMultiCents, netCents: total - remiseMultiCents, lignes: lignes.map((l) => ({ id: l.id, type: l.type, libelle: l.libelle, quantite: l.quantite, prixCents: l.prix_unitaire_cents, variantId: l.shopify_variant_id ?? "", sku: l.sku ?? "", barcode: l.barcode ?? "", commande: l.cmd ?? "" })), totalCents: total };
 }
 
 export function ligneListe(r: any, journal: any[]) {
@@ -146,7 +146,7 @@ app.post("/api/devis/ligne", async (c) => {
   if (!libelle) throw new AppError(400, "Le libellé est obligatoire.");
   const quantite = Math.max(1, Math.min(999, Math.round(Number(b.quantite) || 1)));
   const prixCents = Math.max(0, Math.round((Number(String(b.prix ?? "0").replace(",", ".")) || 0) * 100));
-  await sql`INSERT INTO devis_lignes (reparation_id, type, libelle, quantite, prix_unitaire_cents, shopify_variant_id, sku) VALUES (${repId}, ${type}, ${libelle}, ${quantite}, ${prixCents}, ${clean(b.variantId, 80) || null}, ${clean(b.sku, 80) || null})`;
+  await sql`INSERT INTO devis_lignes (reparation_id, type, libelle, quantite, prix_unitaire_cents, shopify_variant_id, sku, barcode, marque) VALUES (${repId}, ${type}, ${libelle}, ${quantite}, ${prixCents}, ${clean(b.variantId, 80) || null}, ${clean(b.sku, 80) || null}, ${clean(b.barcode, 80) || null}, ${clean(b.marque, 80) || null})`;
   await sql`UPDATE reparations SET maj_le = now() WHERE id = ${repId}`;
   return c.json({ devis: await devisDe(repId) });
 });

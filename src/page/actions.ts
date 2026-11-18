@@ -64,8 +64,14 @@ export const ACTIONS = `var ACTS={
       DEVHINT=x.avecPiece?"Choisis maintenant : "+(x.pieceAide||"la pièce")+" (cherche-la dans le catalogue ci-dessous).":"";
       await recharger(FICHE.id);
       if(x.avecPiece){setTimeout(function(){var i=document.querySelector("input[data-ps=devis]");if(i){i.focus();i.scrollIntoView({block:"center"})}},50)}}catch(e){alert(e.message)}},
-  psSave:async function(){try{var d=await api("/prestations",{id:PSEDIT,nom:v("ps-nom"),prix:v("ps-prix"),avecPiece:!!document.getElementById("ps-piece").checked,pieceAide:v("ps-aide")});PSMSG=d.message;PSEDIT=0;PSF={nom:"",prix:"",avecPiece:false,aide:""};PRESTA=null;render()}catch(e){PSMSG=e.message;render()}},
-  psEdit:function(b){var x=(PRESTA?PRESTA.prestations:[]).filter(function(p){return p.id===+b.dataset.id})[0];if(!x)return;PSEDIT=x.id;PSF={nom:x.nom,prix:String(x.prixCents/100).replace(".",","),avecPiece:x.avecPiece,aide:x.pieceAide};PSMSG="";render()},
+  tAdd:async function(){var t=v("tt-txt");if(!t)return;try{await api("/taches",{texte:t,echeance:v("tt-date"),priorite:!!document.getElementById("tt-prio").checked,epingle:!!document.getElementById("tt-pin").checked});TACH=null;render()}catch(e){alert(e.message)}},
+  tFait:async function(b){try{await api("/taches/maj",{id:+b.dataset.id,fait:b.dataset.v==="1"});TACH=null;render()}catch(e){alert(e.message)}},
+  tPin:async function(b){try{await api("/taches/maj",{id:+b.dataset.id,epingle:b.dataset.v==="1"});TACH=null;render()}catch(e){alert(e.message)}},
+  tPrio:async function(b){try{await api("/taches/maj",{id:+b.dataset.id,priorite:b.dataset.v==="1"});TACH=null;render()}catch(e){alert(e.message)}},
+  tSuppr:async function(b){try{await api("/taches/supprimer",{id:+b.dataset.id});TACH=null;render()}catch(e){alert(e.message)}},
+  copier:function(b){var t=b.dataset.t||"";if(navigator.clipboard)navigator.clipboard.writeText(t).then(function(){b.textContent="Copié";setTimeout(function(){b.textContent=b.dataset.l||"Copier"},1200)},function(){prompt("Copie :",t)});else prompt("Copie :",t)},
+  psSave:async function(){try{var d=await api("/prestations",{id:PSEDIT,nom:v("ps-nom"),prix:v("ps-prix"),avecPiece:!!document.getElementById("ps-piece").checked,pieceAide:v("ps-aide"),qteSeuil:v("ps-qs"),qteRemise:v("ps-qr")});PSMSG=d.message;PSEDIT=0;PSF={nom:"",prix:"",avecPiece:false,aide:"",qs:"",qr:""};PRESTA=null;render()}catch(e){PSMSG=e.message;render()}},
+  psEdit:function(b){var x=(PRESTA?PRESTA.prestations:[]).filter(function(p){return p.id===+b.dataset.id})[0];if(!x)return;PSEDIT=x.id;PSF={nom:x.nom,prix:String(x.prixCents/100).replace(".",","),avecPiece:x.avecPiece,aide:x.pieceAide,qs:x.qteSeuil?String(x.qteSeuil):"",qr:x.qteRemiseCents?String(x.qteRemiseCents/100).replace(".",","):""};PSMSG="";render()},
   psEtat:async function(b){try{await api("/prestations/etat",{id:+b.dataset.id,actif:b.dataset.v==="1"});PRESTA=null;render()}catch(e){alert(e.message)}},
   psSuppr:async function(b){if(!confirm("Supprimer cette prestation ?"))return;try{await api("/prestations/supprimer",{id:+b.dataset.id});PRESTA=null;render()}catch(e){alert(e.message)}},
   multiSave:async function(){try{var d=await api("/reglages/multi",{seuil:v("mu-n"),remise:v("mu-e")});PSMSG=d.message;PRESTA=null;render()}catch(e){PSMSG=e.message;render()}},

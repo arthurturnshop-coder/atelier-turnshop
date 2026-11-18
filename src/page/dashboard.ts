@@ -10,6 +10,25 @@ function blocConsignes(){
       return"<div class='lab'>"+esc(CLAB[k])+"</div><div class='txt'>"+esc(CONS[k])+"</div>"}).join("")
     :"<div class='muted'>Aucune consigne pour l'instant.</div>")
     +"<button class='sec' data-act='editCons'>Modifier les consignes</button></div>"}
+var TACH=null,TACHBUSY=false;
+function tacheLoad(){if(TACH===null&&!TACHBUSY){TACHBUSY=true;api("/taches").then(function(d){TACH=d;TACHBUSY=false;render()}).catch(function(){TACH=[];TACHBUSY=false;render()})}}
+function jourCourt(d){return d?d.slice(8,10)+"/"+d.slice(5,7):""}
+function blocTaches(){
+  tacheLoad();
+  var l=TACH||[],auj=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
+  var h="<div class='card taches'><b>À faire</b>";
+  h+="<div class='dl' style='margin-top:8px'><input id='tt-txt' class='lb' placeholder='Nouvelle tâche (ex : commander pneus Kukirin)'><input id='tt-date' type='date' class='p'><button data-act='tAdd'>Ajouter</button></div>"
+    +"<div class='muted' style='display:flex;gap:16px'><label><input type='checkbox' id='tt-prio' style='width:auto;margin:0'> Priorité</label><label><input type='checkbox' id='tt-pin' style='width:auto;margin:0'> Épingler en haut</label></div>";
+  if(!l.length)h+="<div class='muted' style='margin-top:8px'>Rien à faire. Les papiers volants peuvent partir.</div>";
+  l.forEach(function(t){
+    var late=!t.fait&&t.echeance&&t.echeance<auj;
+    h+="<div class='tache"+(t.fait?" fait":"")+((t.priorite||t.epingle)&&!t.fait?" top":"")+"'>"
+      +"<button class='chk' data-act='tFait' data-id='"+t.id+"' data-v='"+(t.fait?"0":"1")+"'>"+(t.fait?"✓":"")+"</button>"
+      +"<div class='tx'>"+(t.priorite&&!t.fait?"<span class='tag warn'>PRIORITÉ</span> ":"")+(t.epingle&&!t.fait?"<span class='tag'>Épinglée</span> ":"")+esc(t.texte)
+      +(t.echeance?" <span class='tag"+(late?" warn":"")+"'>"+jourCourt(t.echeance)+"</span>":"")
+      +"<div class='muted'>"+(t.fait&&t.faitPar?"Fait par "+esc(t.faitPar):(t.creePar?"Par "+esc(t.creePar):""))+"</div></div>"
+      +"<div class='tbtn'>"+(t.fait?"":"<button class='link' data-act='tPrio' data-id='"+t.id+"' data-v='"+(t.priorite?"0":"1")+"'>"+(t.priorite?"Retirer priorité":"Priorité")+"</button> <button class='link' data-act='tPin' data-id='"+t.id+"' data-v='"+(t.epingle?"0":"1")+"'>"+(t.epingle?"Désépingler":"Épingler")+"</button> ")+"<button class='link' data-act='tSuppr' data-id='"+t.id+"'>Suppr.</button></div></div>"});
+  return h+"</div>"}
 function blocChiffres(){
   if(!CHIF)return"<div class='card'><b>Chiffres du jour</b><div class='muted'>Chargement…</div></div>";
   var items=[["receptionsAujourdhui","Réceptions aujourd'hui"],["enCours","Réparations en cours"],["pretesARendre","Prêtes à rendre"],["recuperees","Récupérées aujourd'hui"],["nouveauxClients","Nouveaux clients"],["avisProgrammes","Avis Google programmés"]];
@@ -35,7 +54,7 @@ function vAccueil(){
     h+="<div class='card'><b>"+esc(c.name||"Sans nom")+"</b>"+(enCours?" <span class='tag'>"+enCours+" en cours</span>":"")
       +"<div class='muted'>"+esc(c.phone||"")+(c.phone&&c.email?" · ":"")+esc(c.email||"")+"</div>"
       +"<div class='actions'><button class='sec' data-act='open' data-i='"+i+"'>Voir le profil</button><button data-act='priseEnCharge' data-i='"+i+"'>Créer une prise en charge</button></div></div>"});
-  h+="<div class='grid'>"+blocConsignes()+blocChiffres()+"</div></div><div class='dright'>"+caisseHtml()+"</div></div>";
+  h+=blocTaches()+"<div class='grid'>"+blocConsignes()+blocChiffres()+"</div></div><div class='dright'>"+caisseHtml()+"</div></div>";
   app.innerHTML=h;caisseBind();
   var q=document.getElementById("q");if(q)q.addEventListener("keydown",function(e){if(e.key==="Enter")ACTS.search()});
   if(!CONS||!CHIF)loadAccueil()}

@@ -75,7 +75,7 @@ app.get("/api/code", async (c) => {
         const v = (p.variants?.nodes ?? []).find((x: any) => (x.barcode ?? "").toLowerCase() === q.toLowerCase() || (x.sku ?? "").toLowerCase() === q.toLowerCase());
         if (v) {
           const vt = v.title && v.title !== "Default Title" ? ` - ${v.title}` : "";
-          return c.json({ produit: { libelle: `${p.title}${vt}`.slice(0, 200), prix: String(v.price ?? "0"), variantId: v.id, sku: v.sku ?? "", stock: v.inventoryQuantity ?? null } });
+          return c.json({ produit: { libelle: `${p.title}${vt}`.slice(0, 200), prix: String(v.price ?? "0"), variantId: v.id, sku: v.sku ?? "", barcode: v.barcode ?? "", marque: p.vendor ?? "", stock: v.inventoryQuantity ?? null } });
         }
       }
     } catch (e: any) {

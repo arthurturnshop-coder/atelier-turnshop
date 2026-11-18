@@ -44,11 +44,11 @@ function rechOpen(id){
     .catch(function(e){rechShow("<div class='rp-muted'>"+esc(e.message)+"</div>")})}
 function rechLigne(b){var p=RPROD[+b.dataset.pi],x=p&&p.variantes[+b.dataset.vi];if(!x)return null;
   var vt=x.titre&&x.titre!=="Default Title"?" - "+x.titre:"";
-  return{libelle:(p.titre+vt).slice(0,200),prix:String(x.prix||"0").replace(".",","),variantId:x.id,sku:x.sku||""}}
+  return{libelle:(p.titre+vt).slice(0,200),prix:String(x.prix||"0").replace(".",","),variantId:x.id,sku:x.sku||"",barcode:x.barcode||"",marque:p.marque||""}}
 ACTS.rAddDevis=async function(b){var l=rechLigne(b);if(!l||!FICHE)return;
-  try{await api("/devis/ligne",{repairId:FICHE.id,type:"piece",libelle:l.libelle,quantite:1,prix:l.prix,variantId:l.variantId,sku:l.sku});rechHide();var q=document.getElementById("rq");if(q)q.value="";await recharger(FICHE.id)}catch(e){alert(e.message)}};
+  try{await api("/devis/ligne",{repairId:FICHE.id,type:"piece",libelle:l.libelle,quantite:1,prix:l.prix,variantId:l.variantId,sku:l.sku,barcode:l.barcode,marque:l.marque});rechHide();var q=document.getElementById("rq");if(q)q.value="";await recharger(FICHE.id)}catch(e){alert(e.message)}};
 ACTS.rAddPanier=function(b){var l=rechLigne(b);if(!l)return;
-  PAN.push({libelle:l.libelle,quantite:1,prix:l.prix,type:"piece",variantId:l.variantId,sku:l.sku});rechHide();var q=document.getElementById("rq");if(q)q.value="";
+  PAN.push({libelle:l.libelle,quantite:1,prix:l.prix,type:"piece",variantId:l.variantId,sku:l.sku,barcode:l.barcode,marque:l.marque});rechHide();var q=document.getElementById("rq");if(q)q.value="";
   CUR=null;FICHE=null;TAB="accueil";CREC=null;render()};
 var PSRES={},PST={};
 function prodBox(ctx){return"<input data-ps='"+ctx+"' placeholder='Chercher un produit Shopify (nom, référence, code-barres)...' autocomplete='off'><div class='psres' id='pr-"+ctx+"'></div>"}
@@ -76,11 +76,11 @@ document.addEventListener("input",function(e){
 ACTS.psAdd=async function(b){
   var ctx=b.dataset.ctx,p=(PSRES[ctx]||[])[+b.dataset.pi],x=p&&p.variantes[+b.dataset.vi];if(!x)return;
   var vt=x.titre&&x.titre!=="Default Title"?" - "+x.titre:"";
-  var l={libelle:(p.titre+vt).slice(0,200),prix:String(x.prix||"0").replace(".",","),variantId:x.id,sku:x.sku||""};
+  var l={libelle:(p.titre+vt).slice(0,200),prix:String(x.prix||"0").replace(".",","),variantId:x.id,sku:x.sku||"",barcode:x.barcode||"",marque:p.marque||""};
   if(ctx==="caisse"){lirePay();PAN.push({libelle:l.libelle,quantite:1,prix:l.prix,type:"piece",variantId:l.variantId,sku:l.sku});CREC=null;render();return}
-  if(ctx.indexOf("cmd")===0){try{var d=await api("/achats/ligne",{fournisseurId:+ctx.slice(3),libelle:l.libelle,sku:l.sku,variantId:l.variantId,quantite:1});CMDMSG=d.message;CMD=null;render()}catch(err){alert(err.message)}return}
+  if(ctx.indexOf("cmd")===0){try{var d=await api("/achats/ligne",{fournisseurId:+ctx.slice(3),libelle:l.libelle,sku:l.sku,barcode:l.barcode,variantId:l.variantId,quantite:1});CMDMSG=d.message;CMD=null;render()}catch(err){alert(err.message)}return}
   if(!FICHE)return;
-  try{await api("/devis/ligne",{repairId:FICHE.id,type:"piece",libelle:l.libelle,quantite:1,prix:l.prix,variantId:l.variantId,sku:l.sku});await recharger(FICHE.id)}catch(err){alert(err.message)}};
+  try{await api("/devis/ligne",{repairId:FICHE.id,type:"piece",libelle:l.libelle,quantite:1,prix:l.prix,variantId:l.variantId,sku:l.sku,barcode:l.barcode,marque:l.marque});await recharger(FICHE.id)}catch(err){alert(err.message)}};
 document.getElementById("rq").addEventListener("input",rechInput);
 document.getElementById("rq").addEventListener("keydown",function(e){if(e.key==="Escape")rechHide();if(e.key==="Enter"){var q=v("rq");var mpc=q.match(/^(?:pc|#)[ -]*0*([0-9]+)$/i);if(mpc){rechHide();document.getElementById("rq").value="";ouvrirFiche(Number(mpc[1]));return}if(q.length>=4&&q.indexOf(" ")<0){scanCode(q,"caisse",true).then(function(){})}}});
 document.getElementById("rpanel").addEventListener("click",function(e){var r=e.target.closest("[data-rid]");if(r){rechHide();var q=document.getElementById("rq");if(q)q.value="";ouvrirFiche(Number(r.dataset.rid));return}var b=e.target.closest("[data-cid]");if(b)rechOpen(b.dataset.cid)});

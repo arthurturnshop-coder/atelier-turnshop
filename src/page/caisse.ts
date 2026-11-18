@@ -4,10 +4,14 @@ var CAV=null,CAVBUSY=false,CAVOFF=[],CREC=null,CHIST=null,CHOPEN=0;
 var PRESTA=null,PRESBUSY=false,DEVHINT="";
 function prestaLoad(){if(PRESTA===null&&!PRESBUSY){PRESBUSY=true;api("/prestations").then(function(d){PRESTA=d;PRESBUSY=false;render()}).catch(function(){PRESTA={prestations:[],multi:{seuil:2,remiseCents:0}};PRESBUSY=false;render()})}}
 function multiRem(brut){
-  var m=PRESTA&&PRESTA.multi;if(!m||!m.remiseCents||brut<=0)return 0;
-  var nb=PAN.filter(function(l){return l.type==="main_oeuvre"}).reduce(function(s,l){return s+l.quantite},0);
-  if(nb<m.seuil||avChoisis(brut).length)return 0;
-  return Math.min(m.remiseCents,brut)}
+  if(!PRESTA||brut<=0||avChoisis(brut).length)return 0;
+  var m=PRESTA.multi||{seuil:2,remiseCents:0},mo=PAN.filter(function(l){return l.type==="main_oeuvre"});
+  var nb=mo.reduce(function(s,l){return s+l.quantite},0),best=nb>=m.seuil?(m.remiseCents||0):0;
+  PRESTA.prestations.forEach(function(p){
+    if(!p.actif||!(p.qteSeuil>0)||!(p.qteRemiseCents>0))return;
+    var q=mo.filter(function(l){return l.libelle.trim().toLowerCase()===p.nom.trim().toLowerCase()}).reduce(function(s,l){return s+l.quantite},0);
+    if(q>=p.qteSeuil&&p.qteRemiseCents>best)best=p.qteRemiseCents});
+  return Math.min(best,brut)}
 var MOY={carte:"Carte",especes:"Espèces",virement:"Virement"};
 function pxCents(s){return Math.round(Number(String(s).replace(",","."))*100)||0}
 function panierTotal(){return PAN.reduce(function(s,l){return s+l.quantite*pxCents(l.prix)},0)}
@@ -94,8 +98,8 @@ function caisseHtml(){
   h+=histoHtml()+"</div>";
   return h}
 async function ajouterProduit(p,ctx){
-  if(ctx==="devis"){if(!FICHE)return;DEVHINT="";await api("/devis/ligne",{repairId:FICHE.id,type:"piece",libelle:p.libelle,quantite:1,prix:String(p.prix).replace(".",","),variantId:p.variantId,sku:p.sku});await recharger(FICHE.id);return}
-  if(ctx.indexOf("cmd")===0){var d=await api("/achats/ligne",{fournisseurId:+ctx.slice(3),libelle:p.libelle,sku:p.sku,variantId:p.variantId,quantite:1});CMDMSG=d.message;CMD=null;render();return}
+  if(ctx==="devis"){if(!FICHE)return;DEVHINT="";await api("/devis/ligne",{repairId:FICHE.id,type:"piece",libelle:p.libelle,quantite:1,prix:String(p.prix).replace(".",","),variantId:p.variantId,sku:p.sku,barcode:p.barcode,marque:p.marque});await recharger(FICHE.id);return}
+  if(ctx.indexOf("cmd")===0){var d=await api("/achats/ligne",{fournisseurId:+ctx.slice(3),libelle:p.libelle,sku:p.sku,barcode:p.barcode,variantId:p.variantId,quantite:1});CMDMSG=d.message;CMD=null;render();return}
   lirePay();CUR=null;FICHE=null;TAB="accueil";CREC=null;
   var ex=PAN.filter(function(l){return l.variantId&&l.variantId===p.variantId})[0];
   if(ex)ex.quantite++;else PAN.push({libelle:p.libelle,quantite:1,prix:String(p.prix).replace(".",","),type:"piece",variantId:p.variantId,sku:p.sku});
@@ -116,12 +120,12 @@ var SCBUF="",SCLAST=0;
 document.addEventListener("keydown",function(e){
   var t=e.target,tag=t&&t.tagName?t.tagName:"";
   if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT")return;
-  var sctx=document.getElementById("cq")?"caisse":(FICHE&&TAB==="enc"?"devis":"");
+  var sctx=document.getElementById("cq")?"caisse":(FICHE&&TAB==="enc"?"devis":"");if(REC&&TAB==="cmd")sctx="recep";
   if(!sctx||e.ctrlKey||e.metaKey||e.altKey)return;
   var now=Date.now();
   if(now-SCLAST>80)SCBUF="";
   SCLAST=now;
-  if(e.key==="Enter"){if(SCBUF.length>=4){var code=SCBUF;SCBUF="";scanCode(code,sctx)}return}
+  if(e.key==="Enter"){if(SCBUF.length>=4){var code=SCBUF;SCBUF="";if(sctx==="recep")recepScan(code);else scanCode(code,sctx)}return}
   if(e.key.length===1)SCBUF+=e.key});
 function caisseBind(){var q=document.getElementById("cq");if(q)q.addEventListener("keydown",function(e){if(e.key==="Enter")ACTS.cScan()})}
 function chargeHisto(){

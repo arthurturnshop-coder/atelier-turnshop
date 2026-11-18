@@ -1,5 +1,5 @@
 export const PARAMETRES = `// ---------- Paramètres (admins) ----------
-var PSEDIT=0,PSMSG="",PSF={nom:"",prix:"",avecPiece:false,aide:""};
+var PSEDIT=0,PSMSG="",PSF={nom:"",prix:"",avecPiece:false,aide:"",qs:"",qr:""};
 var TICK=null,TICKMSG="",SHOPCMD=null,SHOPRES="",PARAM=null,AVL=null,AVMSG="",AVDEC="achat",AVF={libelle:"",seuil:"",dd:"",df:"",effet:"cadeau",valeur:""};
 function avDesc(a){return esc(avLabel(a))+" · "+esc(avCondition(a))}
 function avForm(){
@@ -30,9 +30,10 @@ function vParam(){
   prestaLoad();
   if(PRESTA){h+="<div class='card'><div class='step'>Prestations (main-d'œuvre du devis)</div><div class='muted'>Ces boutons apparaissent dans les devis. Si la prestation demande une pièce (ex : pneu), l'atelier propose de la choisir dans le catalogue.</div>";
     if(!PRESTA.prestations.length)h+="<div class='muted' style='margin:8px 0'>Aucune prestation.</div>";
-    PRESTA.prestations.forEach(function(x){h+="<div class='avrow'><div><b>"+esc(x.nom)+"</b> · "+eur(x.prixCents)+(x.actif?"":" <span class='tag'>désactivée</span>")+(x.avecPiece?"<div class='muted'>Avec choix : "+esc(x.pieceAide||"pièce")+"</div>":"")+"</div><div class='actions'><button class='sec' data-act='psEdit' data-id='"+x.id+"'>Modifier</button><button class='sec' data-act='psEtat' data-id='"+x.id+"' data-v='"+(x.actif?"0":"1")+"'>"+(x.actif?"Désactiver":"Activer")+"</button><button class='danger' data-act='psSuppr' data-id='"+x.id+"'>Supprimer</button></div></div>"});
+    PRESTA.prestations.forEach(function(x){h+="<div class='avrow'><div><b>"+esc(x.nom)+"</b> · "+eur(x.prixCents)+(x.actif?"":" <span class='tag'>désactivée</span>")+(x.avecPiece?"<div class='muted'>Avec choix : "+esc(x.pieceAide||"pièce")+"</div>":"")+(x.qteSeuil>0&&x.qteRemiseCents>0?"<div class='muted'>Dès "+x.qteSeuil+" fois : -"+eur(x.qteRemiseCents)+"</div>":"")+"</div><div class='actions'><button class='sec' data-act='psEdit' data-id='"+x.id+"'>Modifier</button><button class='sec' data-act='psEtat' data-id='"+x.id+"' data-v='"+(x.actif?"0":"1")+"'>"+(x.actif?"Désactiver":"Activer")+"</button><button class='danger' data-act='psSuppr' data-id='"+x.id+"'>Supprimer</button></div></div>"});
     h+="<div class='step' style='margin-top:10px'>"+(PSEDIT?"Modifier la prestation":"Nouvelle prestation")+"</div><input id='ps-nom' placeholder='Ex : Pneu + pose' value='"+esc(PSF.nom)+"'><input id='ps-prix' placeholder='Prix main-d&#39;œuvre € (ex : 30)' value='"+esc(PSF.prix)+"'>"
       +"<label class='muted' style='display:flex;gap:8px;align-items:center'><input type='checkbox' id='ps-piece' style='width:auto;margin:0' "+(PSF.avecPiece?"checked":"")+"> Il faut choisir une pièce en plus</label><input id='ps-aide' placeholder='Quelle pièce ? (ex : pneu)' value='"+esc(PSF.aide)+"'>"
+      +"<div class='muted'>Condition de remise propre à cette prestation (laisser vide si aucune) :</div><div class='dl'><span class='muted'>Dès</span><input id='ps-qs' class='q' type='number' min='0' value='"+esc(PSF.qs)+"'><span class='muted'>fois cette prestation, remise de</span><input id='ps-qr' class='p' placeholder='€' value='"+esc(PSF.qr)+"'></div>"
       +"<button data-act='psSave'>"+(PSEDIT?"Enregistrer":"Ajouter")+"</button>"
       +"<div class='step' style='margin-top:14px'>Remise plusieurs prestations</div><div class='muted'>Appliquée automatiquement, seulement si aucune offre ou cadeau n'est utilisé.</div>"
       +"<div class='dl'><input id='mu-n' class='q' type='number' min='2' value='"+PRESTA.multi.seuil+"'><span class='muted'>prestations ou plus =</span><input id='mu-e' class='p' value='"+esc(String(PRESTA.multi.remiseCents/100).replace(".",","))+"'><span class='muted'>€ de remise</span><button data-act='multiSave'>Enregistrer</button></div>"

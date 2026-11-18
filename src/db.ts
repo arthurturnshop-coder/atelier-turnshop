@@ -47,3 +47,6 @@ export const PROFILS_INITIAUX: [string, string, string][] = [
 for (const [prenom, role, magasins] of PROFILS_INITIAUX) {
   await sql`INSERT INTO utilisateurs (prenom, role, magasins) VALUES (${prenom}, ${role}, ${magasins}) ON CONFLICT (prenom) DO NOTHING`;
 }
+await sql`ALTER TABLE devis_lignes ADD COLUMN IF NOT EXISTS barcode TEXT, ADD COLUMN IF NOT EXISTS marque TEXT`;
+await sql`ALTER TABLE commande_lignes ADD COLUMN IF NOT EXISTS barcode TEXT`;
+await sql`CREATE TABLE IF NOT EXISTS taches (id SERIAL PRIMARY KEY, texte TEXT NOT NULL, echeance DATE, epingle BOOLEAN NOT NULL DEFAULT false, priorite BOOLEAN NOT NULL DEFAULT false, fait BOOLEAN NOT NULL DEFAULT false, fait_le TIMESTAMPTZ, fait_par TEXT, cree_par TEXT, cree_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
