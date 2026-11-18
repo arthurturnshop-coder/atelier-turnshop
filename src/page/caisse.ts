@@ -13,7 +13,7 @@ function multiRem(brut){
     var q=mo.filter(function(l){return l.libelle.trim().toLowerCase()===p.nom.trim().toLowerCase()}).reduce(function(s,l){return s+l.quantite},0);
     if(q>=p.qteSeuil&&p.qteRemiseCents>best)best=p.qteRemiseCents});
   return Math.min(best,brut)}
-var MOY={carte:"Carte",especes:"Espèces",virement:"Virement"};
+var MOY={carte:"Carte",especes:"Espèces",virement:"Virement",en_ligne:"En ligne"};
 function pxCents(s){return Math.round(Number(String(s).replace(",","."))*100)||0}
 function panierTotal(){return PAN.reduce(function(s,l){return s+l.quantite*pxCents(l.prix)},0)}
 function avApplicable(a,brut){

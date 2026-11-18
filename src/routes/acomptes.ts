@@ -4,6 +4,7 @@ import { sql } from "../db";
 import "./auth";
 import { detailVente } from "./caisse";
 import { AppError, clean, exigeResponsable, signature } from "../util";
+import { rembourserEnLigne } from "./pub";
 
 const MOYENS = ["carte", "especes", "virement"];
 const pcn = (id: number) => "PC-" + String(id).padStart(4, "0");
@@ -50,10 +51,19 @@ app.post("/api/reparations/rembourser", async (c) => {
   const ac = await acomptesDe(repId);
   if (ac.resteCents <= 0) throw new AppError(400, "Aucun acompte à rembourser sur cette réparation.");
   const u = c.get("user");
+  // Acompte payé en ligne : remboursé sur la carte du client par Shopify, ou transformé en bon d'achat.
+  const [{ n: enLigne }] = (await sql`SELECT count(*)::int AS n FROM paiements_web WHERE reparation_id = ${repId} AND statut = 'paye' AND rembourse_le IS NULL`) as any[];
+  let msgLigne = "";
+  if (enLigne > 0) {
+    if (moyen !== "carte" && moyen !== "bon") throw new AppError(400, "Ce paiement a été fait en ligne : rembourse par carte (via Shopify) ou en bon d'achat.");
+    if (moyen === "carte") {
+      try { msgLigne = await rembourserEnLigne(repId); } catch (e: any) { throw new AppError(502, "Remboursement Shopify impossible : " + String(e?.message ?? e).slice(0, 200) + ". Fais-le dans Shopify (Commandes) puis note-le ici."); }
+    }
+  }
   await sql`UPDATE ventes SET utilise_cents = total_cents WHERE reparation_id = ${repId} AND type = 'acompte'`;
   await sql`INSERT INTO remboursements (reparation_id, client_id, montant_cents, moyen, motif, par) VALUES (${repId}, ${r.client_id}, ${ac.resteCents}, ${moyen}, ${"Acompte " + pcn(repId)}, ${u.prenom})`;
   if (moyen === "bon") await sql`INSERT INTO bons_achat (client_id, montant_cents, motif) VALUES (${r.client_id}, ${ac.resteCents}, ${"Remboursement acompte " + pcn(repId)})`;
   const nom: Record<string, string> = { carte: "par carte", especes: "en espèces", virement: "par virement", bon: "en bon d'achat" };
   await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${repId}, 'caisse', ${`Acompte remboursé ${nom[moyen]} : ${(ac.resteCents / 100).toFixed(2)} €${signature(c)}`})`;
-  return c.json({ message: moyen === "bon" ? "Bon d'achat créé sur la fiche du client." : `Rembourse ${(ac.resteCents / 100).toFixed(2).replace(".", ",")} € ${nom[moyen]} au client.`, acompte: await acomptesDe(repId) });
+  return c.json({ message: msgLigne ? msgLigne : moyen === "bon" ? "Bon d'achat créé sur la fiche du client." : `Rembourse ${(ac.resteCents / 100).toFixed(2).replace(".", ",")} € ${nom[moyen]} au client.`, acompte: await acomptesDe(repId) });
 });

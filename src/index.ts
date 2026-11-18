@@ -9,6 +9,7 @@ import "./routes/parametres";
 import "./routes/avantages";
 import "./routes/prestations";
 import "./routes/modeles";
+import "./routes/pub";
 import "./routes/taches";
 import "./routes/brevo";
 import "./routes/diagnostic";

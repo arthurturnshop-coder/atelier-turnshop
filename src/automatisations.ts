@@ -1,5 +1,6 @@
 import { sql } from "./db";
 import { GARDE, infosGarde } from "./garde";
+import { verifierPaiementsWeb } from "./routes/pub";
 import { lireAuto, notifier } from "./brevo";
 import { infosTicket } from "./routes/ticket";
 
@@ -51,6 +52,7 @@ async function cycle() {
         await notifier("rdv", { clientId: r.client_id, reparationId: r.id, sujet: "Rappel de votre rendez-vous - TURN Shop", texte: `Bonjour${prenomDe(r.prenom)}, petit rappel : votre rendez-vous chez TURN Shop est demain${r.heure ? " à " + r.heure : ""} pour votre ${trott}. À demain !` });
       }
     }
+    try { await verifierPaiementsWeb(); } catch { /* réessai au prochain cycle */ }
     // Gardiennage : trottinette prête mais pas récupérée.
     if (auto.garde !== "off" && h.h >= 9 && h.h < 19) {
       const prets = (await sql`SELECT r.id, r.client_id, r.pret_le, r.abandonnee_le, r.statut, c.prenom, t.marque, t.modele FROM reparations r JOIN clients c ON c.id = r.client_id JOIN trottinettes t ON t.id = r.trottinette_id WHERE r.statut = 'prêt' AND r.pret_le IS NOT NULL AND r.abandonnee_le IS NULL AND r.supprime_le IS NULL`) as any[];
