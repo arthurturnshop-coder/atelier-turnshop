@@ -1,6 +1,7 @@
 import { app } from "../app";
 import { sql } from "../db";
 import { lireParametres } from "./parametres";
+import { shopifyRead } from "../shopify";
 import { commandesActives, creerCommandeShopify } from "./commandes";
 import { avantagesActifs, contexteClient, estApplicable, remiseDe } from "./avantages";
 import { AppError, clean, signature } from "../util";
@@ -26,15 +27,35 @@ app.get("/api/caisse/client", async (c) => {
   return c.json({ client: { id: cl.id, name: `${cl.prenom} ${cl.nom}`.trim(), phone: cl.telephone, email: cl.email }, fidelite: { ...(await soldeFidelite(id)), depenseCents: ctx.depenseCents, recus: ctx.recus } });
 });
 
-// Trouver un client à partir d'un scan (douchette = clavier) : email, téléphone ou numéro de client.
+// Trouver un client à partir d'un scan (douchette = clavier) : email, téléphone, numéro de client,
+// ou contenu du QR code de la carte (email, lien ou identifiant client Shopify).
+// Si le client n'existe pas encore dans l'atelier mais existe dans Shopify, on le crée ici.
 app.get("/api/caisse/scan", async (c) => {
-  const q = clean(c.req.query("q"), 120);
-  if (!q) return c.json({ client: null });
+  const q = clean(c.req.query("q"), 300);
+  if (!q) return c.json({ clientId: null });
+  const email = (q.match(/[^\s<>"'?&=:]+@[^\s<>"'?&=]+\.[a-z]{2,}/i) ?? [])[0] ?? "";
+  const gid = (q.match(/(?:Customer\/|customers\/)(\d{6,})/i) ?? [])[1] ?? "";
+  const tel = q.replace(/[\s.\-]/g, "");
   const num = /^\d+$/.test(q) && q.length < 8 ? Number(q) : 0;
-  const [cl] = (await sql`SELECT id FROM clients WHERE email ILIKE ${q} OR replace(telephone, ' ', '') = ${q.replace(/\s/g, "")} OR id = ${num} ORDER BY id LIMIT 1`) as any[];
-  return c.json({ clientId: cl ? cl.id : null });
+  const gidLike = gid ? `%/${gid}` : "";
+  const [cl] = (await sql`SELECT id FROM clients WHERE (${email} <> '' AND email ILIKE ${email}) OR (${email} = '' AND email ILIKE ${q}) OR replace(telephone, ' ', '') = ${tel} OR id = ${num} OR (${gidLike} <> '' AND shopify_id LIKE ${gidLike}) ORDER BY id LIMIT 1`) as any[];
+  if (cl) return c.json({ clientId: cl.id });
+  // Pas trouvé dans l'atelier : on cherche dans Shopify.
+  try {
+    const terme = email ? `email:${email}` : gid ? `id:${gid}` : /^\+?\d{9,15}$/.test(tel) ? `phone:${tel}` : "";
+    if (!terme) return c.json({ clientId: null });
+    const data = await shopifyRead(`query($q: String!) { customers(first: 1, query: $q) { nodes { id firstName lastName email phone } } }`, { q: terme });
+    const s = data?.customers?.nodes?.[0];
+    if (!s) return c.json({ clientId: null });
+    const [deja] = (await sql`SELECT id FROM clients WHERE shopify_id = ${s.id}`) as any[];
+    if (deja) return c.json({ clientId: deja.id });
+    const [neuf] = (await sql`INSERT INTO clients (prenom, nom, telephone, email, shopify_id) VALUES (${clean(s.firstName, 80)}, ${clean(s.lastName, 80) || clean(s.email, 80) || "Client"}, ${clean(s.phone, 40)}, ${clean(s.email, 120)}, ${s.id}) RETURNING id`) as any[];
+    return c.json({ clientId: neuf.id, cree: true });
+  } catch (e: any) {
+    console.log(JSON.stringify({ event: "scan-shopify", message: String(e?.message ?? e).slice(0, 200) }));
+    return c.json({ clientId: null });
+  }
 });
-
 
 // Détail complet d'une vente (pour le reçu).
 async function detailVente(v: any) {

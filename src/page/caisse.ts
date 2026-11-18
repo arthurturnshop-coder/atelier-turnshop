@@ -79,6 +79,16 @@ function caisseHtml(){
     +"<button data-act='cEncaisser'>Encaisser</button><div class='muted'>"+esc(CMSG)+"</div></div>";
   h+=histoHtml()+"</div>";
   return h}
+var SCBUF="",SCLAST=0;
+document.addEventListener("keydown",function(e){
+  var t=e.target,tag=t&&t.tagName?t.tagName:"";
+  if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT")return;
+  if(!document.getElementById("cq")||e.ctrlKey||e.metaKey||e.altKey)return;
+  var now=Date.now();
+  if(now-SCLAST>80)SCBUF="";
+  SCLAST=now;
+  if(e.key==="Enter"){if(SCBUF.length>=4){var q=document.getElementById("cq");q.value=SCBUF;SCBUF="";ACTS.cScan()}return}
+  if(e.key.length===1)SCBUF+=e.key});
 function caisseBind(){var q=document.getElementById("cq");if(q)q.addEventListener("keydown",function(e){if(e.key==="Enter")ACTS.cScan()})}
 function chargeHisto(){
   var url="/caisse/historique"+(CCLI?"?clientId="+CCLI.id:"");
