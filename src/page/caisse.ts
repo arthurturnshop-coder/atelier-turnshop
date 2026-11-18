@@ -84,15 +84,35 @@ function caisseHtml(){
     +"<button data-act='cEncaisser'>Encaisser</button><div class='muted'>"+esc(CMSG)+"</div></div>";
   h+=histoHtml()+"</div>";
   return h}
+async function ajouterProduit(p,ctx){
+  if(ctx==="devis"){if(!FICHE)return;await api("/devis/ligne",{repairId:FICHE.id,type:"piece",libelle:p.libelle,quantite:1,prix:String(p.prix).replace(".",","),variantId:p.variantId,sku:p.sku});await recharger(FICHE.id);return}
+  if(ctx.indexOf("cmd")===0){var d=await api("/achats/ligne",{fournisseurId:+ctx.slice(3),libelle:p.libelle,sku:p.sku,variantId:p.variantId,quantite:1});CMDMSG=d.message;CMD=null;render();return}
+  lirePay();CUR=null;FICHE=null;TAB="accueil";CREC=null;
+  var ex=PAN.filter(function(l){return l.variantId&&l.variantId===p.variantId})[0];
+  if(ex)ex.quantite++;else PAN.push({libelle:p.libelle,quantite:1,prix:String(p.prix).replace(".",","),type:"piece",variantId:p.variantId,sku:p.sku});
+  CMSG="Ajouté : "+p.libelle+(p.stock==null?"":" (stock "+p.stock+")");render()}
+async function scanCode(q,ctx,silent){
+  q=(q||"").trim();if(!q)return;
+  try{
+    var r=await api("/code?q="+encodeURIComponent(q));
+    if(r.produit){await ajouterProduit(r.produit,ctx);return}
+    if(ctx!=="caisse"){if(!silent)alert("Code inconnu : "+q);return}
+    var cid=r.clientId;
+    if(!cid){var s=await api("/caisse/scan?q="+encodeURIComponent(q));cid=s.clientId}
+    if(!cid){if(silent)return;CMSG=(r.erreurProduit?"Catalogue indisponible. ":"")+"Code inconnu : "+q+" (ni produit, ni client).";lirePay();render();return}
+    var d=await api("/caisse/client?id="+cid);
+    CUR=null;FICHE=null;TAB="accueil";CCLI=d.client;CFID=d.fidelite;CUSE=false;CMSG="";CAVOFF=[];CHOPEN=0;lirePay();await chargeHisto()
+  }catch(e){if(!silent)alert(e.message)}}
 var SCBUF="",SCLAST=0;
 document.addEventListener("keydown",function(e){
   var t=e.target,tag=t&&t.tagName?t.tagName:"";
   if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT")return;
-  if(!document.getElementById("cq")||e.ctrlKey||e.metaKey||e.altKey)return;
+  var sctx=document.getElementById("cq")?"caisse":(FICHE&&TAB==="enc"?"devis":"");
+  if(!sctx||e.ctrlKey||e.metaKey||e.altKey)return;
   var now=Date.now();
   if(now-SCLAST>80)SCBUF="";
   SCLAST=now;
-  if(e.key==="Enter"){if(SCBUF.length>=4){var q=document.getElementById("cq");q.value=SCBUF;SCBUF="";ACTS.cScan()}return}
+  if(e.key==="Enter"){if(SCBUF.length>=4){var code=SCBUF;SCBUF="";scanCode(code,sctx)}return}
   if(e.key.length===1)SCBUF+=e.key});
 function caisseBind(){var q=document.getElementById("cq");if(q)q.addEventListener("keydown",function(e){if(e.key==="Enter")ACTS.cScan()})}
 function chargeHisto(){

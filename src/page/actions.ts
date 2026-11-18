@@ -45,7 +45,7 @@ export const ACTIONS = `var ACTS={
   shopCmd:async function(b){try{await api("/reglages/commandes",{actif:b.dataset.v==="1"});SHOPCMD=null;render()}catch(e){alert(e.message)}},
   raccFin:function(){RACC="";render()},
   racc:function(b){RACC=b.dataset.k;CUR=null;RES=[];SEARCHED=false;NEWCLI=false;FICHE=null;TAB="accueil";render()},
-  cScan:async function(){var q=v("cq");if(!q)return;try{var s=await api("/caisse/scan?q="+encodeURIComponent(q));if(!s.clientId){CMSG="Aucun client trouvé pour ce scan.";lirePay();render();return}var d=await api("/caisse/client?id="+s.clientId);CCLI=d.client;CFID=d.fidelite;CUSE=false;CMSG="";CAVOFF=[];CHOPEN=0;lirePay();await chargeHisto()}catch(e){alert(e.message)}},
+  cScan:function(){return scanCode(v("cq"),"caisse")},
   cClient0:function(){CREP=null;CCLI=null;CFID=null;CUSE=false;CHIST=null;CHOPEN=0;CAVOFF=[];lirePay();render()},
   cUse:function(b){CUSE=b.dataset.v==="1";lirePay();render()},
   cAdd:function(){var l=v("cl");if(!l){alert("Donne un libellé.");return}PAN.push({libelle:l,quantite:Math.max(1,Number(v("cq2"))||1),prix:v("cp")||"0"});lirePay();render()},

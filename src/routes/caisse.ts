@@ -58,6 +58,33 @@ app.get("/api/caisse/scan", async (c) => {
   }
 });
 
+// Un code scanné : code-barres / référence d'un produit Shopify, ou client (carte, QR, téléphone, email).
+app.get("/api/code", async (c) => {
+  const q = clean(c.req.query("q"), 300).trim();
+  if (!q) return c.json({});
+  const num = /^\d+$/.test(q) && q.length < 8 ? Number(q) : 0;
+  const tel = q.replace(/[\s.\-]/g, "");
+  const [local] = (await sql`SELECT id FROM clients WHERE replace(telephone, ' ', '') = ${tel} OR id = ${num} OR email ILIKE ${q} LIMIT 1`) as any[];
+  if (local) return c.json({ clientId: local.id });
+  if (/^[A-Za-z0-9._\-\/]{4,40}$/.test(q)) {
+    try {
+      const t = q.replace(/["\\]/g, "");
+      const data = await shopifyRead(`query($q: String!) { products(first: 3, query: $q) { nodes { title variants(first: 50) { nodes { id title sku barcode price inventoryQuantity } } } } }`, { q: `barcode:${t} OR sku:${t}` });
+      for (const p of data?.products?.nodes ?? []) {
+        const v = (p.variants?.nodes ?? []).find((x: any) => (x.barcode ?? "").toLowerCase() === q.toLowerCase() || (x.sku ?? "").toLowerCase() === q.toLowerCase());
+        if (v) {
+          const vt = v.title && v.title !== "Default Title" ? ` - ${v.title}` : "";
+          return c.json({ produit: { libelle: `${p.title}${vt}`.slice(0, 200), prix: String(v.price ?? "0"), variantId: v.id, sku: v.sku ?? "", stock: v.inventoryQuantity ?? null } });
+        }
+      }
+    } catch (e: any) {
+      console.log(JSON.stringify({ event: "scan-produit", message: String(e?.message ?? e).slice(0, 200) }));
+      return c.json({ erreurProduit: true });
+    }
+  }
+  return c.json({});
+});
+
 // Détail complet d'une vente (pour le reçu).
 async function detailVente(v: any) {
   const lignes = (await sql`SELECT libelle, quantite, prix_unitaire_cents FROM vente_lignes WHERE vente_id = ${v.id} ORDER BY id`) as any[];

@@ -58,6 +58,10 @@ function psHtml(ctx,d){
     var vt=x.titre&&x.titre!=="Default Title"?" - "+esc(x.titre):"";
     h+="<button class='sec hrow' data-act='psAdd' data-ctx='"+ctx+"' data-pi='"+pi+"' data-vi='"+vi+"'><b>"+esc(p.titre)+vt+"</b><br><span class='muted'>"+esc(x.prix)+" € · "+stockTxt(x)+" · sku "+esc(x.sku||"—")+"</span></button>"})});
   return h}
+document.addEventListener("keydown",function(e){
+  var t=e.target;if(e.key!=="Enter"||!t||!t.dataset||!t.dataset.ps)return;
+  var q=t.value.trim();if(q.length<4||q.indexOf(" ")>=0)return;
+  scanCode(q,t.dataset.ps,true)});
 document.addEventListener("input",function(e){
   var t=e.target;if(!t||!t.dataset||!t.dataset.ps)return;
   var ctx=t.dataset.ps,box=document.getElementById("pr-"+ctx);if(!box)return;
@@ -75,7 +79,7 @@ ACTS.psAdd=async function(b){
   if(!FICHE)return;
   try{await api("/devis/ligne",{repairId:FICHE.id,type:"piece",libelle:l.libelle,quantite:1,prix:l.prix,variantId:l.variantId,sku:l.sku});await recharger(FICHE.id)}catch(err){alert(err.message)}};
 document.getElementById("rq").addEventListener("input",rechInput);
-document.getElementById("rq").addEventListener("keydown",function(e){if(e.key==="Escape")rechHide()});
+document.getElementById("rq").addEventListener("keydown",function(e){if(e.key==="Escape")rechHide();if(e.key==="Enter"){var q=v("rq");if(q.length>=4&&!q.indexOf(" ")>=0){scanCode(q,"caisse",true).then(function(){})}}});
 document.getElementById("rpanel").addEventListener("click",function(e){var b=e.target.closest("[data-cid]");if(b)rechOpen(b.dataset.cid)});
 document.addEventListener("click",function(e){if(!e.target.closest("#rech"))rechHide()});
 document.addEventListener("click",function(e){var b=e.target.closest("[data-act]");if(!b||b.tagName==="INPUT"||b.tagName==="SELECT")return;var f=ACTS[b.dataset.act];if(f)f(b)});
