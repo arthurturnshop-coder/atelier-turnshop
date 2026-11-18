@@ -53,6 +53,8 @@ function prestaBox(f){
   if(!l.length)h+="<div class='muted'>Aucune prestation. Un admin peut en créer dans ⚙ Paramètres.</div>";
   else h+="<div class='presta'>"+l.map(function(x){return"<button class='sec' data-act='addPresta' data-id='"+x.id+"'><b>"+esc(x.nom)+"</b><br><span class='muted'>"+eur(x.prixCents)+(x.avecPiece?" + "+esc(x.pieceAide||"pièce"):"")+"</span></button>"}).join("")+"</div>";
   if(PRESTA&&PRESTA.multi&&PRESTA.multi.remiseCents)h+="<div class='muted'>"+PRESTA.multi.seuil+" prestations ou plus : -"+eur(PRESTA.multi.remiseCents)+" (sans offre cumulée)</div>";
+  var xo=DEVOPT?(PRESTA?PRESTA.prestations:[]).filter(function(p){return p.id===DEVOPT})[0]:null;
+  if(xo&&(xo.options||[]).length)h+="<div class='step' style='margin-top:10px'>Options pour "+esc(xo.nom)+"</div><div class='presta'>"+xo.options.map(function(o){return"<button class='sec' data-act='addOpt' data-pid='"+xo.id+"' data-id='"+o.id+"'><b>"+esc(o.nom)+"</b><br><span class='muted'>+"+eur(o.prixCents)+"</span></button>"}).join("")+"</div>";
   if(DEVHINT)h+="<div class='card avbox'><b>"+esc(DEVHINT)+"</b></div>";
   return h}
 function vFiche(){
@@ -62,7 +64,7 @@ function vFiche(){
     +"<div class='actions' style='margin:0'><button class='sec' data-act='pOpenCli' data-cid='"+f.customerId+"'>Voir le profil du client</button>"
     +(estResp()?"<button class='danger' data-act='supprFiche' data-id='"+f.id+"'>Supprimer</button>":"")+"</div></div>"
     +(f.pieceArrivee?"<div class='card avbox'><b>Pièce arrivée : prévenir le client</b><div class='muted'>"+esc(f.phone||"")+" "+esc(f.email||"")+"</div><div class='actions'>"+(f.email?"<a class='btn' href='mailto:"+esc(f.email)+"?subject="+encodeURIComponent("Votre pièce est arrivée - TURN Shop")+"&body="+encodeURIComponent("Bonjour, la pièce pour votre "+f.trottinette+" est arrivée. Nous pouvons poursuivre la réparation. L'équipe TURN Shop")+"'>Envoyer un email</a>":"")+"<button data-act='clientPrevenu' data-id='"+f.id+"'>Client prévenu</button></div></div>":"")
-    +(f.source==="web"?"<div class='card avbox'><b>Demande faite en ligne par le client</b><div class='muted'>"+esc(f.magasin||"")+" · créneau souhaité : "+esc(f.rdvSouhaite||"")+". Planifie-la dans le Planning pour confirmer.</div></div>":"")
+    +(f.source==="web"?"<div class='card avbox'><b>Demande faite en ligne par le client</b><div class='muted'>"+esc(f.magasin||"")+" · créneau souhaité : "+esc(f.rdvSouhaite||"")+". Planifie-la dans le Planning pour confirmer.</div>"+(f.devis.lignes.length?"":"<div class='muted'>Panne non chiffrée : blocage de rendez-vous demandé au client (déduit de la facture, gardé s'il ne vient pas, remboursable avec « Rembourser l'acompte » ci-dessous).</div>")+"</div>":"")
     +"<div class='muted'>"+(f.phone?esc(f.phone)+" · ":"")+"Dépôt "+esc(day(f.dateDepot))+"</div>"
     +(f.enMagasin===false?"<div class='tag warn' style='margin:6px 0'>Trottinette pas en magasin</div><button data-act='arrivee' data-id='"+f.id+"' data-fiche='1'>Trottinette arrivée</button>":"")
     +"<div class='step' style='margin-top:10px'>Statut</div><div class='stbtns'>"+ST.map(function(s){return"<button class='"+(s===f.statut?"on":"")+"' data-act='setStatut' data-id='"+f.id+"' data-s='"+esc(s)+"'>"+esc(s)+"</button>"}).join("")+"</div>"

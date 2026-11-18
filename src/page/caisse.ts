@@ -1,7 +1,7 @@
 export const CAISSE = `// ---------- Caisse (colonne de droite du Dashboard) ----------
 var PAN=[],CCLI=null,CFID=null,CUSE=false,CPAY={carte:"",especes:"",virement:""},CREP=null,CMSG="";
 var CAV=null,CAVBUSY=false,CAVOFF=[],CREC=null,CHIST=null,CHOPEN=0;
-var PRESTA=null,PRESBUSY=false,DEVHINT="",CACO=0;
+var PRESTA=null,PRESBUSY=false,DEVHINT="",CACO=0,DEVOPT=0;
 function acoDeduit(reste){return CREP&&CACO>0?Math.max(0,Math.min(CACO,reste)):0}
 function prestaLoad(){if(PRESTA===null&&!PRESBUSY){PRESBUSY=true;api("/prestations").then(function(d){PRESTA=d;PRESBUSY=false;render()}).catch(function(){PRESTA={prestations:[],multi:{seuil:2,remiseCents:0}};PRESBUSY=false;render()})}}
 function multiRem(brut){

@@ -77,6 +77,7 @@ export const ACTIONS = `var ACTS={
   shopTest:async function(){SHOPRES="<div class='muted'>Test en cours…</div>";render();try{var d=await api("/shopify/diagnostic");SHOPRES=d.etapes.map(function(e){return"<div>"+(e.ok?"✅ ":"❌ ")+"<b>"+esc(e.nom)+"</b><div class='muted'>"+esc(e.detail)+"</div></div>"}).join("")}catch(e){SHOPRES=esc(e.message)}render()},
   addPresta:async function(b){var x=(PRESTA?PRESTA.prestations:[]).filter(function(p){return p.id===+b.dataset.id})[0];if(!x||!FICHE)return;
     try{await api("/devis/ligne",{repairId:FICHE.id,type:"main_oeuvre",libelle:x.nom,quantite:1,prix:String(x.prixCents/100).replace(".",",")});
+      DEVOPT=(x.options||[]).length?x.id:0;
       DEVHINT=x.avecPiece?"Choisis maintenant : "+(x.pieceAide||"la pièce")+" (cherche-la dans le catalogue ci-dessous).":"";
       await recharger(FICHE.id);
       if(x.avecPiece){setTimeout(function(){var i=document.querySelector("input[data-ps=devis]");if(i){i.focus();i.scrollIntoView({block:"center"})}},50)}}catch(e){alert(e.message)}},
@@ -107,6 +108,10 @@ export const ACTIONS = `var ACTS={
   modSuppr:async function(b){if(!confirm("Supprimer ce modèle et ses pièces ?"))return;try{await api("/modeles/supprimer",{id:+b.dataset.id});MODS=null;render()}catch(e){alert(e.message)}},
   modPieceSuppr:async function(b){try{await api("/modeles/piece/supprimer",{id:+b.dataset.id});MODS=null;render()}catch(e){alert(e.message)}},
   modImport:async function(){try{var d=await api("/modeles/import",{csv:v("mod-csv")});MODMSG=d.message;MODS=null;render()}catch(e){alert(e.message)}},
+  poAdd:async function(b){var id=b.dataset.id;try{await api("/prestations/option",{prestationId:+id,nom:v("po-n-"+id),prix:v("po-p-"+id),type:v("po-t-"+id)});PRESTA=null;render()}catch(e){alert(e.message)}},
+  poSuppr:async function(b){try{await api("/prestations/option/supprimer",{id:+b.dataset.id});PRESTA=null;render()}catch(e){alert(e.message)}},
+  addOpt:async function(b){var x=(PRESTA?PRESTA.prestations:[]).filter(function(p){return p.id===+b.dataset.pid})[0],o=x&&(x.options||[]).filter(function(y){return y.id===+b.dataset.id})[0];if(!o||!FICHE)return;
+    try{await api("/devis/ligne",{repairId:FICHE.id,type:o.type,libelle:o.nom,quantite:1,prix:String(o.prixCents/100).replace(".",",")});await recharger(FICHE.id)}catch(e){alert(e.message)}},
   psSuppr:async function(b){if(!confirm("Supprimer cette prestation ?"))return;try{await api("/prestations/supprimer",{id:+b.dataset.id});PRESTA=null;render()}catch(e){alert(e.message)}},
   multiSave:async function(){try{var d=await api("/reglages/multi",{seuil:v("mu-n"),remise:v("mu-e")});PSMSG=d.message;PRESTA=null;render()}catch(e){PSMSG=e.message;render()}},
   avSave:async function(){var dec=v("avd");try{var d=await api("/avantages",{libelle:v("avl"),declencheur:dec,seuil:v("avs"),dateDebut:v("avdd"),dateFin:v("avdf"),effet:v("ave"),valeur:v("avv")});AVL=null;AVMSG=d.message||"Avantage ajouté.";CAV=null;render()}catch(e){AVMSG=e.message;render()}},

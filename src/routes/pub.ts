@@ -104,11 +104,19 @@ async function variantesParSku(pieces: any[]) {
 }
 
 // ---- Modèles et pièces compatibles (public, sans donnée personnelle) ----
+// Les 10 marques les plus courantes (les plus réparées, puis celles qui ont le plus de modèles).
+app.get("/pub/marques", async (c) => {
+  limite(c);
+  const rows = (await sql`SELECT m.marque, count(*)::int AS nb, (SELECT count(*)::int FROM trottinettes t WHERE lower(t.marque) = lower(m.marque)) AS reps FROM modeles m WHERE m.actif = true GROUP BY m.marque ORDER BY reps DESC, nb DESC, m.marque LIMIT 10`) as any[];
+  return c.json({ marques: rows.map((r) => r.marque) });
+});
+
 app.get("/pub/modeles", async (c) => {
   limite(c);
   const q = clean(c.req.query("q"), 60).toLowerCase();
+  const marque = clean(c.req.query("marque"), 60).toLowerCase();
   const ms = (await sql`SELECT id, marque, modele FROM modeles WHERE actif = true ORDER BY marque, modele`) as any[];
-  const f = ms.filter((m) => !q || `${m.marque} ${m.modele}`.toLowerCase().includes(q)).slice(0, 30);
+  const f = ms.filter((m) => (!marque || m.marque.toLowerCase() === marque) && (!q || `${m.marque} ${m.modele}`.toLowerCase().includes(q))).slice(0, 40);
   return c.json({ modeles: f.map((m) => ({ id: m.id, nom: `${m.marque} ${m.modele}` })) });
 });
 
@@ -121,12 +129,19 @@ app.get("/pub/modeles/:id", async (c) => {
   await variantesParSku(ps);
   const prix = await prixVariantes(ps.map((p) => p.variant_id).filter(Boolean));
   const prestas = (await sql`SELECT id, nom, prix_cents, avec_piece, piece_aide FROM prestations WHERE actif = true ORDER BY nom`) as any[];
+  const opts = (await sql`SELECT id, prestation_id, nom, prix_cents FROM prestation_options ORDER BY id`) as any[];
   return c.json({
     modele: { id: m.id, nom: `${m.marque} ${m.modele}` },
     pieces: ps.map((p) => ({ id: p.id, libelle: p.libelle, categorie: p.categorie, prixCents: prix[p.variant_id]?.prix ?? null, enStock: prix[p.variant_id]?.stock == null ? null : prix[p.variant_id].stock > 0 })),
-    prestations: prestas.map((p) => ({ id: p.id, nom: p.nom, prixCents: p.prix_cents, avecPiece: p.avec_piece === true, aide: p.piece_aide })),
+    prestations: prestas.map((p) => ({ id: p.id, nom: p.nom, prixCents: p.prix_cents, avecPiece: p.avec_piece === true, aide: p.piece_aide, options: opts.filter((o) => o.prestation_id === p.id).map((o) => ({ id: o.id, nom: o.nom, prixCents: o.prix_cents })) })),
   });
 });
+
+// Montant du blocage de rendez-vous (réglage "blocage_rdv_cents", 20 € par défaut).
+async function blocageCents() {
+  const [l] = (await sql`SELECT valeur FROM reglages WHERE cle = 'blocage_rdv_cents'`) as any[];
+  return Math.max(100, Number(l?.valeur ?? 2000) || 2000);
+}
 
 // ---- Mon espace : mes réparations ----
 async function paiementsEnAttente(repId: number) {
@@ -162,6 +177,7 @@ app.post("/pub/moi", async (c) => {
   const b = await c.req.json().catch(() => ({}));
   const q = verifie(b);
   const cid = await clientDe(q);
+  const blocage = await blocageCents();
   const rows = (await sql`SELECT r.*, t.marque, t.modele FROM reparations r JOIN trottinettes t ON t.id = r.trottinette_id WHERE r.client_id = ${cid} AND r.supprime_le IS NULL ORDER BY r.id DESC LIMIT 30`) as any[];
   const reparations = [];
   for (const r of rows) {
@@ -177,6 +193,9 @@ app.post("/pub/moi", async (c) => {
       verseCents: ac.verseCents, resteAPayerCents: Math.max(0, dv.netCents - ac.verseCents),
       gardiennage: g && g.fraisCents > 0 ? { jours: g.joursFrais, fraisCents: g.fraisCents } : null, abandonnee: !!r.abandonnee_le,
       peutPayer: r.statut !== "récupéré" && dv.netCents - ac.verseCents > 0,
+      // Panne non chiffrable : un blocage de rendez-vous est demandé (déduit de la facture, gardé si le client ne vient pas).
+      besoinBlocage: r.source === "web" && r.statut !== "récupéré" && dv.netCents === 0 && ac.verseCents === 0 && r.en_magasin === false,
+      blocageCents: blocage,
     });
   }
   return c.json({ prenom: q.prenom, reparations });
@@ -220,6 +239,12 @@ app.post("/pub/rdv", async (c) => {
     const [p] = (await sql`SELECT nom, prix_cents FROM prestations WHERE id = ${pid} AND actif = true`) as any[];
     if (p) await sql`INSERT INTO devis_lignes (reparation_id, type, libelle, quantite, prix_unitaire_cents) VALUES (${r.id}, 'main_oeuvre', ${p.nom}, 1, ${p.prix_cents})`;
   }
+  // Options choisies (ex : valve tubeless) : seulement si leur prestation est aussi choisie.
+  const optionIds: number[] = (Array.isArray(b.optionIds) ? b.optionIds : []).map(Number).filter(Boolean).slice(0, 20);
+  if (optionIds.length && prestaIds.length) {
+    const os = (await sql`SELECT nom, prix_cents, type FROM prestation_options WHERE id = ANY(${optionIds}) AND prestation_id = ANY(${prestaIds})`) as any[];
+    for (const o of os) await sql`INSERT INTO devis_lignes (reparation_id, type, libelle, quantite, prix_unitaire_cents) VALUES (${r.id}, ${o.type}, ${o.nom}, 1, ${o.prix_cents})`;
+  }
   if (pieceIds.length && m) {
     const ps = (await sql`SELECT id, libelle, sku, variant_id FROM modele_pieces WHERE modele_id = ${m.id} AND id = ANY(${pieceIds})`) as any[];
     await variantesParSku(ps);
@@ -241,11 +266,15 @@ app.post("/pub/payer", async (c) => {
   const [r] = (await sql`SELECT id FROM reparations WHERE id = ${repId} AND client_id = ${cid} AND supprime_le IS NULL`) as any[];
   if (!r) throw new AppError(404, "Réparation introuvable.");
   const dv = await devisDe(repId), ac = await acomptesDe(repId);
+  const blocageMode = b.mode === "blocage";
   const reste = dv.netCents - ac.verseCents;
-  if (dv.netCents <= 0 || reste <= 0) throw new AppError(400, "Rien à payer pour le moment.");
+  if (blocageMode) {
+    if (dv.netCents > 0 || ac.verseCents > 0) throw new AppError(400, "Le blocage de rendez-vous n'est pas nécessaire ici.");
+  } else if (dv.netCents <= 0 || reste <= 0) throw new AppError(400, "Rien à payer pour le moment.");
   const [lim] = (await sql`SELECT valeur FROM reglages WHERE cle = 'acompte_web_cents'`) as any[];
   const acompte = Math.min(reste, Math.max(100, Number(lim?.valeur ?? 2000) || 2000));
-  const montant = b.mode === "acompte" ? acompte : reste;
+  const montant = blocageMode ? await blocageCents() : b.mode === "acompte" ? acompte : reste;
+  const nomPaiement = blocageMode ? "Blocage de rendez-vous" : b.mode === "acompte" ? "Acompte" : "Paiement";
   // On réutilise un lien déjà créé pour le même montant.
   const [dej] = (await sql`SELECT url FROM paiements_web WHERE reparation_id = ${repId} AND statut = 'attente' AND montant_cents = ${montant} AND url <> '' AND cree_le > now() - interval '2 days' ORDER BY id DESC LIMIT 1`) as any[];
   if (dej) return c.json({ url: dej.url, montantCents: montant });
@@ -255,8 +284,8 @@ app.post("/pub/payer", async (c) => {
       purchasingEntity: { customerId: `gid://shopify/Customer/${q.cid}` },
       email: q.email || undefined,
       tags: ["atelier", "paiement-en-ligne", pcn(repId)],
-      note: `${b.mode === "acompte" ? "Acompte" : "Paiement"} réparation ${pcn(repId)} (espace client)`,
-      lineItems: [{ title: `${b.mode === "acompte" ? "Acompte" : "Paiement"} réparation ${pcn(repId)}`, quantity: 1, originalUnitPrice: (montant / 100).toFixed(2), requiresShipping: false, taxable: true }],
+      note: `${nomPaiement} réparation ${pcn(repId)} (espace client)`,
+      lineItems: [{ title: `${nomPaiement} ${pcn(repId)}`, quantity: 1, originalUnitPrice: (montant / 100).toFixed(2), requiresShipping: false, taxable: true }],
     },
   }); } catch { throw new AppError(502, "Paiement indisponible pour le moment, réessaie dans quelques minutes."); }
   const er = d.draftOrderCreate?.userErrors?.[0];
