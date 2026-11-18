@@ -4,7 +4,7 @@ import { sql } from "../db";
 import "./auth";
 import { AppError, clean, exigeAdmin } from "../util";
 
-const vers = (r: any) => ({ recurrente: r.recurrente_id != null, id: r.id, texte: r.texte, echeance: r.echeance ?? null, epingle: r.epingle === true, priorite: r.priorite === true, fait: r.fait === true, faitPar: r.fait_par ?? "", creePar: r.cree_par ?? "" });
+const vers = (r: any) => ({ reparationId: r.reparation_id ?? null, tel: r.telephone ?? "", client: r.client ?? "", trott: r.trott ?? "", recurrente: r.recurrente_id != null, id: r.id, texte: r.texte, echeance: r.echeance ?? null, epingle: r.epingle === true, priorite: r.priorite === true, fait: r.fait === true, faitPar: r.fait_par ?? "", creePar: r.cree_par ?? "" });
 
 // ---------- Tâches récurrentes ----------
 const AUJ = async () => ((await sql`SELECT to_char((now() AT TIME ZONE 'Europe/Paris')::date, 'YYYY-MM-DD') AS d`) as any[])[0].d as string;
@@ -42,6 +42,23 @@ async function genererRecurrentes() {
     if (!pris) continue;
     const [ouverte] = (await sql`SELECT id FROM taches WHERE recurrente_id = ${r.id} AND fait = false LIMIT 1`) as any[];
     if (!ouverte) await sql`INSERT INTO taches (texte, echeance, priorite, cree_par, recurrente_id) VALUES (${r.texte}, ${r.prochaine}::date, ${r.priorite}, 'Récurrente', ${r.id})`;
+  }
+}
+
+// Rappels de rendez-vous : la veille (ou le jour même) d'un RDV, une tâche prioritaire « Rappeler le client » apparaît.
+async function genererRappels() {
+  const auj = await AUJ();
+  const demain = ajoute(auj, 1);
+  const rows = (await sql`SELECT r.id, to_char(COALESCE((r.debut AT TIME ZONE 'Europe/Paris')::date, r.date_depot), 'YYYY-MM-DD') AS jour, to_char(r.debut AT TIME ZONE 'Europe/Paris', 'HH24:MI') AS heure,
+      trim(c.prenom || ' ' || c.nom) AS client, t.marque, t.modele
+    FROM reparations r JOIN clients c ON c.id = r.client_id JOIN trottinettes t ON t.id = r.trottinette_id
+    WHERE r.supprime_le IS NULL AND r.en_magasin = false AND r.statut = 'reçu'
+      AND COALESCE((r.debut AT TIME ZONE 'Europe/Paris')::date, r.date_depot) BETWEEN ${auj}::date AND ${demain}::date
+      AND NOT EXISTS (SELECT 1 FROM taches k WHERE k.reparation_id = r.id AND k.cree_par = 'Rappel RDV')`) as any[];
+  for (const r of rows) {
+    const quand = r.jour === auj ? "aujourd'hui" : "demain";
+    const texte = `Rappeler ${r.client} : RDV ${quand}${r.heure ? " à " + r.heure : ""} (${`${r.marque} ${r.modele}`.trim()})`;
+    await sql`INSERT INTO taches (texte, echeance, priorite, cree_par, reparation_id) VALUES (${texte}, ${auj}::date, true, 'Rappel RDV', ${r.id})`;
   }
 }
 
@@ -86,9 +103,12 @@ app.post("/api/recurrentes/supprimer", async (c) => {
 // À faire : d'abord les tâches ouvertes (épinglées / prioritaires en haut, puis par date), puis les faites récemment.
 app.get("/api/taches", async (c) => {
   await genererRecurrentes();
-  const rows = (await sql`SELECT id, recurrente_id, texte, to_char(echeance, 'YYYY-MM-DD') AS echeance, epingle, priorite, fait, fait_par, cree_par FROM taches
-    WHERE fait = false OR fait_le > now() - interval '2 days'
-    ORDER BY fait, (epingle OR priorite) DESC, echeance NULLS LAST, id`) as any[];
+  await genererRappels();
+  const rows = (await sql`SELECT k.id, k.recurrente_id, k.reparation_id, k.texte, to_char(k.echeance, 'YYYY-MM-DD') AS echeance, k.epingle, k.priorite, k.fait, k.fait_par, k.cree_par,
+      cl.telephone, trim(cl.prenom || ' ' || cl.nom) AS client, t.marque || ' ' || t.modele AS trott
+    FROM taches k LEFT JOIN reparations r ON r.id = k.reparation_id LEFT JOIN clients cl ON cl.id = r.client_id LEFT JOIN trottinettes t ON t.id = r.trottinette_id
+    WHERE k.fait = false OR k.fait_le > now() - interval '2 days'
+    ORDER BY k.fait, (k.epingle OR k.priorite) DESC, k.echeance NULLS LAST, k.id`) as any[];
   return c.json(rows.map(vers));
 });
 

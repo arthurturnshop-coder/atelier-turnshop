@@ -29,7 +29,8 @@ function blocTaches(){
       +"<button class='chk' data-act='tFait' data-id='"+t.id+"' data-v='"+(t.fait?"0":"1")+"'>"+(t.fait?"✓":"")+"</button>"
       +"<div class='tx'>"+(t.priorite&&!t.fait?"<span class='tag warn'>PRIORITÉ</span> ":"")+(t.epingle&&!t.fait?"<span class='tag'>Épinglée</span> ":"")+esc(t.texte)
       +(t.echeance?" <span class='tag"+(late?" warn":"")+"'>"+jourCourt(t.echeance)+"</span>":"")
-      +"<div class='muted'>"+(t.fait&&t.faitPar?"Fait par "+esc(t.faitPar):(t.creePar?"Par "+esc(t.creePar):""))+"</div></div>"
+      +"<div class='muted'>"+(t.fait&&t.faitPar?"Fait par "+esc(t.faitPar):(t.creePar?"Par "+esc(t.creePar):""))+"</div>"
+      +(t.reparationId&&!t.fait?"<div class='actions' style='margin:4px 0'>"+(t.tel?"<a class='btn' href='tel:"+esc(t.tel.replace(/ /g,""))+"'>Appeler "+esc(t.tel)+"</a><a class='btn' href='sms:"+esc(t.tel.replace(/ /g,""))+"?&body="+encodeURIComponent("Bonjour, petit rappel de votre rendez-vous chez TURN Shop pour votre "+(t.trott||"trottinette")+". À bientôt !")+"'>Envoyer un SMS</a>":"")+"<button class='sec' data-act='ouvrirFiche' data-id='"+t.reparationId+"'>Ouvrir la fiche</button></div>":"")+"</div>"
       +(rec?"":"<div class='tbtn'>"+(t.fait?"":"<button class='link' data-act='tPrio' data-id='"+t.id+"' data-v='"+(t.priorite?"0":"1")+"'>"+(t.priorite?"Retirer priorité":"Priorité")+"</button> <button class='link' data-act='tPin' data-id='"+t.id+"' data-v='"+(t.epingle?"0":"1")+"'>"+(t.epingle?"Désépingler":"Épingler")+"</button> ")+"<button class='link' data-act='tSuppr' data-id='"+t.id+"'>Suppr.</button></div>")+"</div>"});
   if(rec){
     trecLoad();

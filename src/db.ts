@@ -59,3 +59,4 @@ for (const g of (await sql`SELECT DISTINCT fournisseur_id, commandee_le FROM com
   const [n] = (await sql`INSERT INTO commandes (fournisseur_id, cree_le) VALUES (${g.fournisseur_id}, ${g.commandee_le}) RETURNING id`) as any[];
   await sql`UPDATE commande_lignes SET commande_id = ${n.id} WHERE commande_id IS NULL AND fournisseur_id = ${g.fournisseur_id} AND commandee_le = ${g.commandee_le}`;
 }
+await sql`ALTER TABLE taches ADD COLUMN IF NOT EXISTS reparation_id INT`;
