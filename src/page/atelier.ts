@@ -25,7 +25,7 @@ async function loadEnc(){
     var cls="tk"+(r.enMagasin===false?" abs":(r.statut==="prêt"?" pret":(r.statut==="en attente de pièce"?" cmd":"")));
     return"<button class='"+cls+"' data-act='ouvrirFiche' data-id='"+r.id+"'><div class='l1'><span><b>"+pcn(r.id)+"</b> · "+esc(r.client)+"</span><span class='tag'>"+esc(r.statut)+"</span></div>"
       +"<div>"+esc(r.trottinette)+"</div><div class='muted'>"+esc(r.panne)+"</div>"
-      +"<div class='muted'>"+(r.pieceArrivee?"<span class='tag warn'>Pièce arrivée : prévenir</span> ":"")+(r.source==="web"?"<span class='tag ok'>Demande en ligne</span> ":"")+(r.enMagasin===false?"<span class='tag warn'>Pas en magasin</span> ":"")+(r.sousGarantie?"<span class='tag ok'>Sous garantie</span> ":"")+(r.abandonnee?"<span class='tag warn'>Abandonnée</span> ":(r.garde&&r.garde.fraisCents>0?"<span class='tag warn'>Gardiennage "+eur(r.garde.fraisCents)+"</span> ":(r.garde&&r.garde.jours>=4?"<span class='tag warn'>Prête depuis "+r.garde.jours+" j</span> ":"")))+"Dépôt "+esc(day(r.dateDepot))+"</div></button>"}).join("")+"</div>"}
+      +"<div class='muted'>"+(r.pieceArrivee?"<span class='tag warn'>Pièce arrivée : prévenir</span> ":"")+(r.source==="web"?"<span class='tag ok'>Demande en ligne</span> ":"")+(r.rdvStatut==="attente"?"<span class='tag warn'>RDV à valider</span> ":"")+(r.enMagasin===false?"<span class='tag warn'>Pas en magasin</span> ":"")+(r.sousGarantie?"<span class='tag ok'>Sous garantie</span> ":"")+(r.abandonnee?"<span class='tag warn'>Abandonnée</span> ":(r.garde&&r.garde.fraisCents>0?"<span class='tag warn'>Gardiennage "+eur(r.garde.fraisCents)+"</span> ":(r.garde&&r.garde.jours>=4?"<span class='tag warn'>Prête depuis "+r.garde.jours+" j</span> ":"")))+"Dépôt "+esc(day(r.dateDepot))+"</div></button>"}).join("")+"</div>"}
 
 // ---------- Fiche d'une réparation : clic sur le ticket ----------
 async function ouvrirFiche(id){
@@ -64,7 +64,7 @@ function vFiche(){
     +"<div class='actions' style='margin:0'><button class='sec' data-act='pOpenCli' data-cid='"+f.customerId+"'>Voir le profil du client</button>"
     +(estResp()?"<button class='danger' data-act='supprFiche' data-id='"+f.id+"'>Supprimer</button>":"")+"</div></div>"
     +(f.pieceArrivee?"<div class='card avbox'><b>Pièce arrivée : prévenir le client</b><div class='muted'>"+esc(f.phone||"")+" "+esc(f.email||"")+"</div><div class='actions'>"+(f.email?"<a class='btn' href='mailto:"+esc(f.email)+"?subject="+encodeURIComponent("Votre pièce est arrivée - TURN Shop")+"&body="+encodeURIComponent("Bonjour, la pièce pour votre "+f.trottinette+" est arrivée. Nous pouvons poursuivre la réparation. L'équipe TURN Shop")+"'>Envoyer un email</a>":"")+"<button data-act='clientPrevenu' data-id='"+f.id+"'>Client prévenu</button></div></div>":"")
-    +(f.source==="web"?"<div class='card avbox'><b>Demande faite en ligne par le client</b><div class='muted'>"+esc(f.magasin||"")+" · créneau souhaité : "+esc(f.rdvSouhaite||"")+". Planifie-la dans le Planning pour confirmer.</div>"+(f.devis.lignes.length?"":"<div class='muted'>Panne non chiffrée : blocage de rendez-vous demandé au client (déduit de la facture, gardé s'il ne vient pas, remboursable avec « Rembourser l'acompte » ci-dessous).</div>")+"</div>":"")
+    +(f.source==="web"?webHtml(f):"")
     +"<div class='muted'>"+(f.phone?esc(f.phone)+" · ":"")+"Dépôt "+esc(day(f.dateDepot))+"</div>"
     +(f.enMagasin===false?"<div class='tag warn' style='margin:6px 0'>Trottinette pas en magasin</div><button data-act='arrivee' data-id='"+f.id+"' data-fiche='1'>Trottinette arrivée</button>":"")
     +"<div class='step' style='margin-top:10px'>Statut</div><div class='stbtns'>"+ST.map(function(s){return"<button class='"+(s===f.statut?"on":"")+"' data-act='setStatut' data-id='"+f.id+"' data-s='"+esc(s)+"'>"+esc(s)+"</button>"}).join("")+"</div>"
@@ -83,6 +83,16 @@ function gardeHtml(f){
   return"<div class='card avbox'><b>Prête depuis "+g.jours+" jour"+(g.jours>1?"s":"")+"</b><div class='muted'>"
     +(g.fraisCents>0?"Gardiennage : "+eur(g.fraisCents)+" ("+g.joursFrais+" j x "+(g.prixCents/100)+" €), ajouté à la facture. ":"Gardiennage gratuit jusqu'au 5e jour, puis "+(g.prixCents/100)+" € par jour. ")
     +"Abandon dans "+g.abandonDans+" jours.</div></div>"}
+function webHtml(f){
+  var st=f.rdvStatut||"confirme";
+  var h="<div class='card avbox'><b>Demande faite en ligne par le client</b><div class='muted'>"+esc(f.magasin||"")+" · créneau souhaité : "+esc(f.rdvSouhaite||"")+"</div>";
+  if(!f.devis.lignes.length)h+="<div class='muted'>Panne non chiffrée : blocage de rendez-vous demandé au client (déduit de la facture, gardé s'il ne vient pas, remboursable avec « Rembourser l'acompte » ci-dessous).</div>";
+  if(st==="attente"){
+    h+="<div class='step' style='margin-top:8px'>À valider</div><div class='dl'><button data-act='rdvAct' data-a='accepter' data-id='"+f.id+"'>Accepter le créneau</button><button class='danger' data-act='rdvAct' data-a='refuser' data-id='"+f.id+"'>Refuser</button></div>"
+    +"<div class='dl'><input id='rdv-d' type='date' class='t'><select id='rdv-c' class='t'><option value='matin'>Matin</option><option value='après-midi'>Après-midi</option></select><button data-act='rdvAct' data-a='proposer' data-id='"+f.id+"'>Proposer un autre créneau</button></div>";
+  }else if(st==="propose")h+="<div class='muted'><span class='tag warn'>Autre créneau proposé</span> En attente de la réponse du client.</div>";
+  else if(st==="confirme")h+="<div class='muted'><span class='tag ok'>RDV confirmé</span> Place-le dans le Planning.</div>";
+  return h+"</div>"}
 function acompteHtml(f){
   var a=f.acompte||{verseCents:0,resteCents:0,liste:[]};
   var h="<div class='card'><div class='step'>Acompte / paiement d'avance</div>";

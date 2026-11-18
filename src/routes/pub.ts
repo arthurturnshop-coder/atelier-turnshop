@@ -14,7 +14,8 @@ import { infosGarde } from "../garde";
 const SECRET = () => Bun.env.ESPACE_SECRET ?? "";
 app.use("/pub/*", cors({ origin: ["https://turnshop.fr", "https://www.turnshop.fr"], allowMethods: ["GET", "POST", "OPTIONS"], allowHeaders: ["content-type"], maxAge: 600 }));
 
-await sql`ALTER TABLE reparations ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT '', ADD COLUMN IF NOT EXISTS rdv_souhaite TEXT NOT NULL DEFAULT ''`;
+await sql`ALTER TABLE reparations ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT '', ADD COLUMN IF NOT EXISTS rdv_souhaite TEXT NOT NULL DEFAULT '', ADD COLUMN IF NOT EXISTS rdv_statut TEXT NOT NULL DEFAULT ''`;
+await sql`UPDATE reparations SET rdv_statut = 'confirme' WHERE source = 'web' AND rdv_statut = ''`;
 await sql`CREATE TABLE IF NOT EXISTS paiements_web (id SERIAL PRIMARY KEY, reparation_id INT NOT NULL REFERENCES reparations(id), client_id INT NOT NULL REFERENCES clients(id), montant_cents INT NOT NULL, draft_id TEXT NOT NULL, order_id TEXT, url TEXT NOT NULL DEFAULT '', statut TEXT NOT NULL DEFAULT 'attente', vente_id INT, rembourse_le TIMESTAMPTZ, cree_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
 
 // Limite simple : 30 appels par minute et par IP.
@@ -58,14 +59,30 @@ async function clientDe(q: Qui): Promise<number> {
 
 const pcn = (id: number) => "PC-" + String(id).padStart(4, "0");
 
-// Ce que voit le client : "en cours" ou "terminé", plus une phrase claire.
+// Ce que voit le client : "en cours" ou "terminé", une phrase claire et la frise d'avancement (comme un suivi de colis).
 export function etatClient(r: any) {
-  if (r.statut === "récupéré") return { groupe: "termine", libelle: "Terminée et récupérée" };
-  if (r.statut === "prêt") return { groupe: "termine", libelle: "Terminée : ta trottinette est prête à récupérer" };
-  if (r.en_magasin === false && !r.debut) return { groupe: "cours", libelle: "Demande reçue : nous confirmons ton rendez-vous" };
-  if (r.en_magasin === false) return { groupe: "cours", libelle: "Rendez-vous confirmé" };
-  const m: Record<string, string> = { "reçu": "Prise en charge à l'atelier", diagnostic: "Diagnostic en cours", "devis envoyé": "Devis à valider", "en attente de pièce": "En attente d'une pièce", "en réparation": "En cours de réparation" };
-  return { groupe: "cours", libelle: m[r.statut] ?? r.statut };
+  const web = r.source === "web";
+  const rs = r.rdv_statut ?? "";
+  let etape = "recu", groupe = "cours", libelle = "";
+  if (r.statut === "récupéré") { etape = "termine"; groupe = "termine"; libelle = "Terminée et récupérée"; }
+  else if (r.statut === "prêt") { etape = "termine"; groupe = "termine"; libelle = "Terminée : ta trottinette est prête à récupérer"; }
+  else if (web && rs === "refuse") { etape = "demande"; groupe = "termine"; libelle = "Demande annulée"; }
+  else if (web && rs === "attente") { etape = "demande"; libelle = "Demande reçue : l'atelier doit confirmer ton rendez-vous"; }
+  else if (web && rs === "propose") { etape = "demande"; libelle = "L'atelier te propose un autre créneau : à toi de répondre"; }
+  else if (r.statut === "devis envoyé") { etape = "validation"; libelle = "Devis à valider : on attend ta réponse"; }
+  else if (r.statut === "en attente de pièce") { etape = "commande"; libelle = "Pièce en commande"; }
+  else if (r.statut === "diagnostic" || r.statut === "en réparation") { etape = "en_cours"; libelle = r.statut === "diagnostic" ? "Diagnostic en cours" : "En cours de réparation"; }
+  else if (web && r.en_magasin === false) { etape = "rdv"; libelle = "Rendez-vous confirmé : apporte ta trottinette à l'atelier"; }
+  else if (r.debut) { etape = "planifie"; libelle = "Réparation planifiée"; }
+  else { etape = "recu"; libelle = "Trottinette réceptionnée à l'atelier"; }
+  const ordre = [...(web ? ["demande", "rdv"] : []), "recu", "planifie", "en_cours", "commande", "validation", "termine"];
+  const noms: Record<string, string> = { demande: "Demande envoyée", rdv: "Rendez-vous confirmé", recu: "Réceptionnée à l'atelier", planifie: "Planifiée", en_cours: "En cours", commande: "En commande", validation: "Validation client en attente", termine: "Terminée" };
+  const ci = ordre.indexOf(etape);
+  const etapes = ordre
+    .map((k, i) => ({ k, l: noms[k], etat: i < ci ? "fait" : i === ci ? "courant" : "a_venir" }))
+    // « En commande » et « Validation client » ne s'affichent que lorsqu'on y est.
+    .filter((e) => !((e.k === "commande" || e.k === "validation") && e.k !== etape));
+  return { groupe, libelle, etape, etapes };
 }
 
 // ---- Prix du catalogue (cache 5 min) ----
@@ -187,14 +204,14 @@ app.post("/pub/moi", async (c) => {
     const ac = await acomptesDe(r.id);
     const g = infosGarde(r.pret_le, r.statut, r.abandonnee_le);
     reparations.push({
-      id: r.id, numero: pcn(r.id), trottinette: `${r.marque} ${r.modele}`, panne: r.panne, groupe: e.groupe, etat: e.libelle,
+      id: r.id, numero: pcn(r.id), trottinette: `${r.marque} ${r.modele}`, panne: r.panne, groupe: e.groupe, etat: e.libelle, etape: e.etape, etapes: e.etapes, rdvStatut: r.rdv_statut ?? "",
       depot: r.date_depot, rdv: r.debut, rdvSouhaite: r.rdv_souhaite, magasin: r.magasin,
       devis: dv.lignes.map((l) => ({ libelle: l.libelle, quantite: l.quantite, prixCents: l.prixCents })), remiseCents: dv.remiseMultiCents, totalCents: dv.netCents,
       verseCents: ac.verseCents, resteAPayerCents: Math.max(0, dv.netCents - ac.verseCents),
       gardiennage: g && g.fraisCents > 0 ? { jours: g.joursFrais, fraisCents: g.fraisCents } : null, abandonnee: !!r.abandonnee_le,
-      peutPayer: r.statut !== "récupéré" && dv.netCents - ac.verseCents > 0,
+      peutPayer: r.statut !== "récupéré" && r.rdv_statut !== "refuse" && dv.netCents - ac.verseCents > 0,
       // Panne non chiffrable : un blocage de rendez-vous est demandé (déduit de la facture, gardé si le client ne vient pas).
-      besoinBlocage: r.source === "web" && r.statut !== "récupéré" && dv.netCents === 0 && ac.verseCents === 0 && r.en_magasin === false,
+      besoinBlocage: r.source === "web" && r.rdv_statut !== "refuse" && r.statut !== "récupéré" && dv.netCents === 0 && ac.verseCents === 0 && r.en_magasin === false,
       blocageCents: blocage,
     });
   }
@@ -232,7 +249,7 @@ app.post("/pub/rdv", async (c) => {
 
   const sujet = panne || "Demande en ligne (voir le devis)";
   const quand = `${date} ${creneau}`;
-  const [r] = (await sql`INSERT INTO reparations (client_id, trottinette_id, panne, en_magasin, magasin, source, rdv_souhaite, statut) VALUES (${cid}, ${t.id}, ${sujet}, false, ${magasin}, 'web', ${quand}, 'reçu') RETURNING id`) as any[];
+  const [r] = (await sql`INSERT INTO reparations (client_id, trottinette_id, panne, en_magasin, magasin, source, rdv_souhaite, rdv_statut, statut) VALUES (${cid}, ${t.id}, ${sujet}, false, ${magasin}, 'web', ${quand}, 'attente', 'reçu') RETURNING id`) as any[];
 
   // Devis pré-rempli : prestations (main-d'œuvre) puis pièces compatibles avec leur prix du catalogue.
   for (const pid of prestaIds) {
@@ -254,6 +271,31 @@ app.post("/pub/rdv", async (c) => {
   await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${r.id}, 'statut', ${`Demande de rendez-vous en ligne : ${magasin}, ${quand}`})`;
   await sql`INSERT INTO taches (texte, echeance, priorite, cree_par, reparation_id) VALUES (${`Demande RDV en ligne ${pcn(r.id)} : ${q.prenom} ${q.nom} - ${tMarque} ${tModele} - ${magasin}, ${quand}`}, (now() AT TIME ZONE 'Europe/Paris')::date, true, 'Espace client', ${r.id})`;
   return c.json({ message: "Demande envoyée : nous confirmons ton créneau très vite.", repairId: r.id, numero: pcn(r.id) });
+});
+
+// ---- Réponse du client à une proposition de créneau ----
+app.post("/pub/rdv/reponse", async (c) => {
+  limite(c);
+  const b = await c.req.json().catch(() => ({}));
+  const q = verifie(b);
+  const cid = await clientDe(q);
+  const repId = Number(b.repairId);
+  const [r] = (await sql`SELECT id, rdv_statut FROM reparations WHERE id = ${repId} AND client_id = ${cid} AND source = 'web' AND supprime_le IS NULL`) as any[];
+  if (!r) throw new AppError(404, "Demande introuvable.");
+  if (r.rdv_statut !== "propose") throw new AppError(400, "Aucune proposition en attente.");
+  if (b.reponse === "accepter") {
+    await sql`UPDATE reparations SET rdv_statut = 'confirme', maj_le = now() WHERE id = ${repId}`;
+    await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${repId}, 'statut', 'Le client a accepté le créneau proposé (espace client)')`;
+    await sql`INSERT INTO taches (texte, echeance, priorite, cree_par, reparation_id) VALUES (${`Créneau accepté par le client ${pcn(repId)} : à planifier`}, (now() AT TIME ZONE 'Europe/Paris')::date, false, 'Espace client', ${repId})`;
+    return c.json({ message: "Rendez-vous confirmé, merci !" });
+  }
+  if (b.reponse === "annuler") {
+    await sql`UPDATE reparations SET rdv_statut = 'refuse', maj_le = now() WHERE id = ${repId}`;
+    await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${repId}, 'statut', 'Le client a refusé le créneau proposé : demande annulée (espace client)')`;
+    await sql`INSERT INTO taches (texte, echeance, priorite, cree_par, reparation_id) VALUES (${`Demande annulée par le client ${pcn(repId)} : rembourser l'acompte s'il y en a un`}, (now() AT TIME ZONE 'Europe/Paris')::date, true, 'Espace client', ${repId})`;
+    return c.json({ message: "Demande annulée. Si tu as versé un acompte, il te sera remboursé." });
+  }
+  throw new AppError(400, "Réponse inconnue.");
 });
 
 // ---- Paiement en ligne (commande brouillon Shopify + lien de paiement) ----

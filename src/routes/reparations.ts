@@ -35,6 +35,7 @@ export function ligneListe(r: any, journal: any[]) {
     enMagasin: r.en_magasin !== false,
     source: r.source ?? "",
     rdvSouhaite: r.rdv_souhaite ?? "",
+    rdvStatut: r.rdv_statut ?? "",
     magasin: r.magasin ?? "",
     garde: infosGarde(r.pret_le, r.statut, r.abandonnee_le),
     abandonnee: !!r.abandonnee_le,

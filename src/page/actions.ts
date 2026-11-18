@@ -41,6 +41,10 @@ export const ACTIONS = `var ACTS={
   addNote:async function(b){var n=v("fn");if(!n)return;try{await api("/reparations/maj",{repairId:Number(b.dataset.id),note:n});await recharger(Number(b.dataset.id))}catch(e){alert(e.message)}},
   addLigne:async function(b){try{await api("/devis/ligne",{repairId:Number(b.dataset.id),type:v("lt"),libelle:v("ll"),quantite:v("lq"),prix:v("lp")});await recharger(Number(b.dataset.id))}catch(e){alert(e.message)}},
   delLigne:async function(b){try{await api("/devis/ligne/supprimer",{id:Number(b.dataset.id)});await recharger(FICHE.id)}catch(e){alert(e.message)}},
+  rdvAct:async function(b){var a=b.dataset.a,body={repairId:+b.dataset.id,action:a};
+    if(a==="proposer"){var dt=v("rdv-d");if(!dt){alert("Choisis une date.");return}body.date=dt;body.creneau=v("rdv-c")}
+    if(a==="refuser"&&!confirm("Refuser cette demande ? Elle sera retirée de la liste."))return;
+    try{var d=await api("/reparations/rdv",body);alert(d.message);if(d.supprime){FICHE=null;render()}else await recharger(+b.dataset.id)}catch(e){alert(e.message)}},
   supprFiche:async function(b){if(!confirm("Supprimer cette fiche de réparation ?"))return;try{var d=await api("/reparations/supprimer",{repairId:Number(b.dataset.id)});alert(d.message);FICHE=null;render()}catch(e){alert(e.message)}},
   facturer:async function(b){
     if(PAN.length&&!confirm("Le panier de la caisse n'est pas vide : le remplacer par ce devis ?"))return;
