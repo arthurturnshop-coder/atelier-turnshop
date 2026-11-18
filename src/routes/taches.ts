@@ -2,6 +2,7 @@ import { app } from "../app";
 import { sql } from "../db";
 // Doit passer après la protection /api/* (voir auth.ts).
 import "./auth";
+import { lireAuto, numeroSms } from "../brevo";
 import { AppError, clean, exigeAdmin } from "../util";
 
 const vers = (r: any) => ({ reparationId: r.reparation_id ?? null, tel: r.telephone ?? "", client: r.client ?? "", trott: r.trott ?? "", recurrente: r.recurrente_id != null, id: r.id, texte: r.texte, echeance: r.echeance ?? null, epingle: r.epingle === true, priorite: r.priorite === true, fait: r.fait === true, faitPar: r.fait_par ?? "", creePar: r.cree_par ?? "" });
@@ -49,12 +50,15 @@ async function genererRecurrentes() {
 async function genererRappels() {
   const auj = await AUJ();
   const demain = ajoute(auj, 1);
-  const rows = (await sql`SELECT r.id, to_char(COALESCE((r.debut AT TIME ZONE 'Europe/Paris')::date, r.date_depot), 'YYYY-MM-DD') AS jour, to_char(r.debut AT TIME ZONE 'Europe/Paris', 'HH24:MI') AS heure,
+  const rows0 = (await sql`SELECT r.id, c.email, c.telephone, to_char(COALESCE((r.debut AT TIME ZONE 'Europe/Paris')::date, r.date_depot), 'YYYY-MM-DD') AS jour, to_char(r.debut AT TIME ZONE 'Europe/Paris', 'HH24:MI') AS heure,
       trim(c.prenom || ' ' || c.nom) AS client, t.marque, t.modele
     FROM reparations r JOIN clients c ON c.id = r.client_id JOIN trottinettes t ON t.id = r.trottinette_id
     WHERE r.supprime_le IS NULL AND r.en_magasin = false AND r.statut = 'reçu'
       AND COALESCE((r.debut AT TIME ZONE 'Europe/Paris')::date, r.date_depot) BETWEEN ${auj}::date AND ${demain}::date
       AND NOT EXISTS (SELECT 1 FROM taches k WHERE k.reparation_id = r.id AND k.cree_par = 'Rappel RDV')`) as any[];
+  // Si l'envoi automatique du rappel est actif et que le client a un contact valable, inutile de créer une tâche.
+  const canal = (await lireAuto()).rdv;
+  const rows = rows0.filter((r) => !((canal === "email" || canal === "both") && String(r.email ?? "").trim() || (canal === "sms" || canal === "both") && numeroSms(r.telephone)));
   for (const r of rows) {
     const quand = r.jour === auj ? "aujourd'hui" : "demain";
     const texte = `Rappeler ${r.client} : RDV ${quand}${r.heure ? " à " + r.heure : ""} (${`${r.marque} ${r.modele}`.trim()})`;

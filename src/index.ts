@@ -9,11 +9,13 @@ import "./routes/parametres";
 import "./routes/avantages";
 import "./routes/prestations";
 import "./routes/taches";
+import "./routes/brevo";
 import "./routes/diagnostic";
 import "./routes/ticket";
 import "./routes/achats";
 import "./routes/commandes";
 import "./routes/caisse";
+import "./automatisations";
 import { HTML } from "./page";
 
 app.get("/", (c) => c.html(HTML));

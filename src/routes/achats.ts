@@ -2,6 +2,7 @@ import { app } from "../app";
 import { sql } from "../db";
 // Doit passer après la protection /api/* (voir auth.ts).
 import "./auth";
+import { envoyerPieceArrivee } from "../automatisations";
 import { AppError, clean, signature } from "../util";
 
 const nettoyerQte = (n: any) => Math.max(1, Math.min(999, Math.round(Number(n) || 1)));
@@ -138,6 +139,7 @@ app.post("/api/achats/recevoir", async (c) => {
     await sql`UPDATE reparations SET statut = 'en réparation', piece_arrivee = true, maj_le = now() WHERE id = ${rid}`;
     await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${rid}, 'statut', ${`Pièce(s) reçue(s) : ${r?.statut ?? ""} → en réparation. Client à prévenir${signature(c)}`})`;
     prets++;
+    void envoyerPieceArrivee(rid);
   }
   return c.json({ message: prets ? `${prets} réparation(s) repassent à faire : pense à prévenir le client.` : "Réception enregistrée." });
 });

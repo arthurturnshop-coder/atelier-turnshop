@@ -4,6 +4,7 @@ import { lireParametres } from "./parametres";
 import { shopifyRead } from "../shopify";
 import { infosTicket } from "./ticket";
 import { commandesActives, creerCommandeShopify } from "./commandes";
+import { envoyerAvis } from "../automatisations";
 import { remiseMulti } from "./prestations";
 import { avantagesActifs, contexteClient, estApplicable, remiseDe } from "./avantages";
 import { AppError, clean, signature } from "../util";
@@ -194,6 +195,7 @@ app.post("/api/caisse/encaisser", async (c) => {
     await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${reparationId}, 'caisse', ${`Encaissement de ${(totalCents / 100).toFixed(2)} €${signature(c)}`})`;
   }
   if (reparationId && clientId && (await commandesActives())) await creerCommandeShopify(v.id);
+  if (clientId) void envoyerAvis(v.id);
   const [vv] = (await sql`SELECT v.*, trim(cl.prenom || ' ' || cl.nom) AS client_nom FROM ventes v LEFT JOIN clients cl ON cl.id = v.client_id WHERE v.id = ${v.id}`) as any[];
   return c.json({ id: v.id, message: "Vente enregistrée.", totalCents, remiseCents, vente: await detailVente(vv) });
 });

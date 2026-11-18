@@ -1,0 +1,67 @@
+import { sql } from "./db";
+import { lireAuto, notifier } from "./brevo";
+import { infosTicket } from "./routes/ticket";
+
+// Textes des messages envoyés aux clients.
+const prenomDe = (p: string) => (p && p.trim() ? ` ${p.trim()}` : "");
+
+export async function envoyerAvis(venteId: number) {
+  const [v] = (await sql`SELECT v.id, v.client_id, v.magasin, v.reparation_id, c.prenom FROM ventes v JOIN clients c ON c.id = v.client_id WHERE v.id = ${venteId}`) as any[];
+  if (!v) return;
+  const { avisUrl } = await infosTicket(v.magasin ?? null);
+  if (!avisUrl) return;
+  const texte = `Bonjour${prenomDe(v.prenom)}, merci pour votre visite chez TURN Shop ! Votre avis nous aide beaucoup, et une récompense vous attend : ${avisUrl}`;
+  const r = await notifier("avis", { clientId: v.client_id, venteId, reparationId: null, sujet: "Votre avis sur TURN Shop", texte });
+  if (r && v.reparation_id) await sql`UPDATE reparations SET avis_statut = 'envoye', avis_envoi_le = NULL WHERE id = ${v.reparation_id}`;
+}
+
+async function repInfo(id: number) {
+  const [r] = (await sql`SELECT r.id, r.client_id, r.magasin, r.debut, r.date_depot, c.prenom, t.marque, t.modele FROM reparations r JOIN clients c ON c.id = r.client_id JOIN trottinettes t ON t.id = r.trottinette_id WHERE r.id = ${id}`) as any[];
+  return r;
+}
+
+export async function envoyerPieceArrivee(repId: number) {
+  const r = await repInfo(repId);
+  if (!r) return;
+  const trott = `${r.marque} ${r.modele}`.trim();
+  await notifier("piece", { clientId: r.client_id, reparationId: repId, sujet: "Votre pièce est arrivée - TURN Shop", texte: `Bonjour${prenomDe(r.prenom)}, la pièce pour votre ${trott} est arrivée. Nous poursuivons la réparation et nous vous prévenons dès qu'elle est prête. L'équipe TURN Shop` });
+}
+
+export async function envoyerPret(repId: number) {
+  const r = await repInfo(repId);
+  if (!r) return;
+  const trott = `${r.marque} ${r.modele}`.trim();
+  await notifier("pret", { clientId: r.client_id, reparationId: repId, sujet: "Votre trottinette est prête - TURN Shop", texte: `Bonjour${prenomDe(r.prenom)}, votre ${trott} est prête ! Vous pouvez venir la récupérer à la boutique. L'équipe TURN Shop` });
+}
+
+// Tourne toutes les 10 minutes : rappels de rendez-vous (veille, entre 9 h et 19 h) et demandes d'avis programmées.
+async function cycle() {
+  try {
+    const auto = await lireAuto();
+    const [h] = (await sql`SELECT extract(hour FROM now() AT TIME ZONE 'Europe/Paris')::int AS h, to_char(((now() AT TIME ZONE 'Europe/Paris')::date + 1), 'YYYY-MM-DD') AS demain`) as any[];
+    if (auto.rdv !== "off" && h.h >= 9 && h.h < 19) {
+      const rows = (await sql`SELECT r.id, r.client_id, to_char(r.debut AT TIME ZONE 'Europe/Paris', 'HH24:MI') AS heure, c.prenom, t.marque, t.modele
+        FROM reparations r JOIN clients c ON c.id = r.client_id JOIN trottinettes t ON t.id = r.trottinette_id
+        WHERE r.supprime_le IS NULL AND r.en_magasin = false AND r.statut = 'reçu'
+          AND COALESCE((r.debut AT TIME ZONE 'Europe/Paris')::date, r.date_depot) = ${h.demain}::date
+          AND NOT EXISTS (SELECT 1 FROM messages_envoyes m WHERE m.type = 'rdv' AND m.reparation_id = r.id AND m.statut = 'envoye')`) as any[];
+      for (const r of rows) {
+        const trott = `${r.marque} ${r.modele}`.trim();
+        await notifier("rdv", { clientId: r.client_id, reparationId: r.id, sujet: "Rappel de votre rendez-vous - TURN Shop", texte: `Bonjour${prenomDe(r.prenom)}, petit rappel : votre rendez-vous chez TURN Shop est demain${r.heure ? " à " + r.heure : ""} pour votre ${trott}. À demain !` });
+      }
+    }
+    if (auto.avis !== "off") {
+      const rows = (await sql`SELECT r.id, r.client_id, r.magasin, c.prenom FROM reparations r JOIN clients c ON c.id = r.client_id WHERE r.avis_statut = 'programme' AND r.avis_envoi_le <= now() AND r.supprime_le IS NULL LIMIT 20`) as any[];
+      for (const r of rows) {
+        const { avisUrl } = await infosTicket(r.magasin ?? null);
+        if (!avisUrl) continue;
+        const ok = await notifier("avis", { clientId: r.client_id, reparationId: null, sujet: "Votre avis sur TURN Shop", texte: `Bonjour${prenomDe(r.prenom)}, merci pour votre visite chez TURN Shop ! Votre avis nous aide beaucoup, et une récompense vous attend : ${avisUrl}` });
+        if (ok) await sql`UPDATE reparations SET avis_statut = 'envoye', avis_envoi_le = NULL WHERE id = ${r.id}`;
+      }
+    }
+  } catch (e: any) {
+    console.log(JSON.stringify({ event: "automatisations", message: String(e?.message ?? e).slice(0, 300) }));
+  }
+}
+setInterval(cycle, 10 * 60 * 1000);
+setTimeout(cycle, 30 * 1000);

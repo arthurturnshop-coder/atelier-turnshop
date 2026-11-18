@@ -1,6 +1,7 @@
 import { app } from "../app";
 import { AVIS_DELAI_HEURES, STATUTS } from "../config";
 import { sql } from "../db";
+import { envoyerPret } from "../automatisations";
 import { remiseMulti } from "./prestations";
 import { AppError, clean, exigeResponsable, signature } from "../util";
 
@@ -112,6 +113,7 @@ app.post("/api/reparations/maj", async (c) => {
     await sql`UPDATE reparations SET statut = ${statut}, maj_le = now() WHERE id = ${id}`;
     await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${id}, 'statut', ${`Statut : ${r.statut} → ${statut}${signature(c)}`})`;
     touche = true;
+    if (statut === "prêt") void envoyerPret(id);
   }
   if (typeof b.commentaireInterne === "string" && b.commentaireInterne.trim() !== r.commentaire_interne) {
     await sql`UPDATE reparations SET commentaire_interne = ${clean(b.commentaireInterne, 2000)}, maj_le = now() WHERE id = ${id}`;
