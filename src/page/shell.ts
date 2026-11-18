@@ -169,6 +169,8 @@ button.link{padding:4px 0}
 .mags button{width:100%}
 .login button{width:auto;min-width:200px}
 .hrow{width:100%;text-align:left}
+a.btn{display:inline-block;background:#111;color:#fff;text-decoration:none;padding:10px 20px;font-weight:600;font-size:15px}
+.spacer{flex:1 1 auto}
 .pay input{max-width:220px}
 .avatar{border-radius:0}
 @page{size:80mm auto;margin:3mm}

@@ -17,6 +17,9 @@ await sql`ALTER TABLE reparations ADD COLUMN IF NOT EXISTS supprime_le TIMESTAMP
 await sql`CREATE TABLE IF NOT EXISTS devis_lignes (id SERIAL PRIMARY KEY, reparation_id INT NOT NULL REFERENCES reparations(id), type TEXT NOT NULL CHECK (type IN ('main_oeuvre','piece')), libelle TEXT NOT NULL, quantite INT NOT NULL DEFAULT 1, prix_unitaire_cents INT NOT NULL DEFAULT 0, cree_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
 await sql`ALTER TABLE devis_lignes ADD COLUMN IF NOT EXISTS shopify_variant_id TEXT`;
 await sql`ALTER TABLE devis_lignes ADD COLUMN IF NOT EXISTS sku TEXT`;
+await sql`ALTER TABLE reparations ADD COLUMN IF NOT EXISTS piece_arrivee BOOLEAN NOT NULL DEFAULT false`;
+await sql`CREATE TABLE IF NOT EXISTS fournisseurs (id SERIAL PRIMARY KEY, nom TEXT NOT NULL, email TEXT NOT NULL DEFAULT '', actif BOOLEAN NOT NULL DEFAULT true)`;
+await sql`CREATE TABLE IF NOT EXISTS commande_lignes (id SERIAL PRIMARY KEY, fournisseur_id INT NOT NULL REFERENCES fournisseurs(id), libelle TEXT NOT NULL, sku TEXT, variant_id TEXT, quantite INT NOT NULL DEFAULT 1, reparation_id INT REFERENCES reparations(id), devis_ligne_id INT, statut TEXT NOT NULL DEFAULT 'panier' CHECK (statut IN ('panier','commandee','recue')), cree_le TIMESTAMPTZ NOT NULL DEFAULT now(), commandee_le TIMESTAMPTZ, recue_le TIMESTAMPTZ)`;
 await sql`CREATE TABLE IF NOT EXISTS reglages (cle TEXT PRIMARY KEY, valeur TEXT NOT NULL)`;
 // Caisse : ventes, lignes de vente, paiements, paramètres de fidélité.
 await sql`CREATE TABLE IF NOT EXISTS ventes (id SERIAL PRIMARY KEY, client_id INT REFERENCES clients(id), reparation_id INT REFERENCES reparations(id), magasin TEXT, vendeur TEXT, total_cents INT NOT NULL DEFAULT 0, remise_cents INT NOT NULL DEFAULT 0, points_gagnes INT NOT NULL DEFAULT 0, points_utilises INT NOT NULL DEFAULT 0, cree_le TIMESTAMPTZ NOT NULL DEFAULT now())`;

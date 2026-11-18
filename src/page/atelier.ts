@@ -1,6 +1,6 @@
 export const ATELIER = `// ---------- Atelier : sous-menu Liste / Planning ----------
 function subHtml(){
-  return "<div class='sub'><button class='"+(ATSUB==="liste"?"":"sec")+"' data-act='subEnc' data-sub='liste'>Liste</button><button class='"+(ATSUB==="planning"?"":"sec")+"' data-act='subEnc' data-sub='planning'>Planning</button></div>"}
+  return "<div class='sub'><button class='"+(ATSUB==="liste"?"":"sec")+"' data-act='subEnc' data-sub='liste'>Liste</button><button class='"+(ATSUB==="planning"?"":"sec")+"' data-act='subEnc' data-sub='planning'>Planning</button><span class='spacer'></span><button data-act='racc' data-k='prise'>+ Prise en charge</button><button class='sec' data-act='racc' data-k='rdv'>+ Rendez-vous</button><button class='sec' data-act='racc' data-k='devis'>+ Devis</button></div>"}
 function vEnc(){
   if(ATSUB==="planning"){
     if(!PJOUR)PJOUR=aujourdhui();
@@ -25,7 +25,7 @@ async function loadEnc(){
     var cls="tk"+(r.enMagasin===false?" abs":(r.statut==="prêt"?" pret":(r.statut==="en attente de pièce"?" cmd":"")));
     return"<button class='"+cls+"' data-act='ouvrirFiche' data-id='"+r.id+"'><div class='l1'><span>"+esc(r.client)+"</span><span class='tag'>"+esc(r.statut)+"</span></div>"
       +"<div>"+esc(r.trottinette)+"</div><div class='muted'>"+esc(r.panne)+"</div>"
-      +"<div class='muted'>"+(r.enMagasin===false?"<span class='tag warn'>Pas en magasin</span> ":"")+(r.sousGarantie?"<span class='tag ok'>Sous garantie</span> ":"")+"Dépôt "+esc(day(r.dateDepot))+"</div></button>"}).join("")+"</div>"}
+      +"<div class='muted'>"+(r.pieceArrivee?"<span class='tag warn'>Pièce arrivée : prévenir</span> ":"")+(r.enMagasin===false?"<span class='tag warn'>Pas en magasin</span> ":"")+(r.sousGarantie?"<span class='tag ok'>Sous garantie</span> ":"")+"Dépôt "+esc(day(r.dateDepot))+"</div></button>"}).join("")+"</div>"}
 
 // ---------- Fiche d'une réparation : clic sur le ticket ----------
 async function ouvrirFiche(id){
@@ -36,7 +36,7 @@ function devisHtml(f){
   function table(titre,lignes){
     if(!lignes.length)return"<div class='muted'>"+titre+" : aucune ligne.</div>";
     return"<div class='step'>"+titre+"</div><table><tr><th>Libellé</th><th class='n'>Qté</th><th class='n'>Prix</th><th class='n'>Total</th><th></th></tr>"
-      +lignes.map(function(l){return"<tr><td>"+esc(l.libelle)+"</td><td class='n'>"+l.quantite+"</td><td class='n'>"+eur(l.prixCents)+"</td><td class='n'>"+eur(l.quantite*l.prixCents)+"</td><td class='n'><button class='link' data-act='delLigne' data-id='"+l.id+"'>Retirer</button></td></tr>"}).join("")+"</table>"}
+      +lignes.map(function(l){return"<tr><td>"+esc(l.libelle)+"</td><td class='n'>"+l.quantite+"</td><td class='n'>"+eur(l.prixCents)+"</td><td class='n'>"+eur(l.quantite*l.prixCents)+"</td><td class='n'>"+(l.type==="piece"?(l.commande?"<span class='tag "+(l.commande==="recue"?"ok":"warn")+"'>"+({panier:"À commander",commandee:"Commandée",recue:"Reçue"}[l.commande]||"")+"</span> ":"<button class='sec' data-act='aCommander' data-id='"+l.id+"'>À commander</button> "):"")+"<button class='link' data-act='delLigne' data-id='"+l.id+"'>Retirer</button></td></tr>"}).join("")+"</table>"}
   return"<div class='devis'>"+table("Forfaits main-d'œuvre",mo)+table("Pièces détachées",pi)
     +"<div class='tot'>Total du devis : "+eur(d.totalCents)+"</div>"
     +(d.lignes.length?"<button data-act='facturer' data-id='"+f.id+"'>Facturer ce devis (passer en caisse)</button>":"")
@@ -51,6 +51,7 @@ function vFiche(){
     +"<div class='card fiche'><div class='head'><div><div class='big'>"+esc(f.client)+"</div><div>"+esc(f.trottinette)+"</div></div>"
     +"<div class='actions' style='margin:0'><button class='sec' data-act='pOpenCli' data-cid='"+f.customerId+"'>Voir le profil du client</button>"
     +(estResp()?"<button class='danger' data-act='supprFiche' data-id='"+f.id+"'>Supprimer</button>":"")+"</div></div>"
+    +(f.pieceArrivee?"<div class='card avbox'><b>Pièce arrivée : prévenir le client</b><div class='muted'>"+esc(f.phone||"")+" "+esc(f.email||"")+"</div><div class='actions'>"+(f.email?"<a class='btn' href='mailto:"+esc(f.email)+"?subject="+encodeURIComponent("Votre pièce est arrivée - TURN Shop")+"&body="+encodeURIComponent("Bonjour, la pièce pour votre "+f.trottinette+" est arrivée. Nous pouvons poursuivre la réparation. L'équipe TURN Shop")+"'>Envoyer un email</a>":"")+"<button data-act='clientPrevenu' data-id='"+f.id+"'>Client prévenu</button></div></div>":"")
     +"<div class='muted'>"+(f.phone?esc(f.phone)+" · ":"")+"Dépôt "+esc(day(f.dateDepot))+"</div>"
     +(f.enMagasin===false?"<div class='tag warn' style='margin:6px 0'>Trottinette pas en magasin</div><button data-act='arrivee' data-id='"+f.id+"' data-fiche='1'>Trottinette arrivée</button>":"")
     +"<div class='step' style='margin-top:10px'>Statut</div><div class='stbtns'>"+ST.map(function(s){return"<button class='"+(s===f.statut?"on":"")+"' data-act='setStatut' data-id='"+f.id+"' data-s='"+esc(s)+"'>"+esc(s)+"</button>"}).join("")+"</div>"

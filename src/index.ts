@@ -9,6 +9,7 @@ import "./routes/parametres";
 import "./routes/avantages";
 import "./routes/diagnostic";
 import "./routes/ticket";
+import "./routes/achats";
 import "./routes/commandes";
 import "./routes/caisse";
 import { HTML } from "./page";

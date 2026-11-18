@@ -4,9 +4,9 @@ import { sql } from "../db";
 import { AppError, clean, exigeResponsable, signature } from "../util";
 
 export async function devisDe(repId: number) {
-  const lignes = (await sql`SELECT id, type, libelle, quantite, prix_unitaire_cents, shopify_variant_id, sku FROM devis_lignes WHERE reparation_id = ${repId} ORDER BY type DESC, id`) as any[];
+  const lignes = (await sql`SELECT d.id, d.type, d.libelle, d.quantite, d.prix_unitaire_cents, d.shopify_variant_id, d.sku, (SELECT statut FROM commande_lignes cl WHERE cl.devis_ligne_id = d.id ORDER BY cl.id DESC LIMIT 1) AS cmd FROM devis_lignes d WHERE d.reparation_id = ${repId} ORDER BY d.type DESC, d.id`) as any[];
   const total = lignes.reduce((s, l) => s + l.quantite * l.prix_unitaire_cents, 0);
-  return { lignes: lignes.map((l) => ({ id: l.id, type: l.type, libelle: l.libelle, quantite: l.quantite, prixCents: l.prix_unitaire_cents, variantId: l.shopify_variant_id ?? "", sku: l.sku ?? "" })), totalCents: total };
+  return { lignes: lignes.map((l) => ({ id: l.id, type: l.type, libelle: l.libelle, quantite: l.quantite, prixCents: l.prix_unitaire_cents, variantId: l.shopify_variant_id ?? "", sku: l.sku ?? "", commande: l.cmd ?? "" })), totalCents: total };
 }
 
 export function ligneListe(r: any, journal: any[]) {
@@ -15,6 +15,8 @@ export function ligneListe(r: any, journal: any[]) {
     customerId: r.client_id,
     client: `${r.prenom} ${r.nom}`.trim(),
     phone: r.telephone ?? "",
+    email: r.email ?? "",
+    pieceArrivee: r.piece_arrivee === true,
     trottinette: `${r.marque} ${r.modele} (N° ${r.serie})`,
     statut: r.statut,
     panne: r.panne,
@@ -33,7 +35,7 @@ export function ligneListe(r: any, journal: any[]) {
 // Liste des réparations : vue = rdv | afaire | commande | pretes | garantie | tout. Compteurs renvoyés avec.
 app.get("/api/reparations", async (c) => {
   const vue = clean(c.req.query("vue"), 20) || "tout";
-  const rows = (await sql`SELECT r.*, c.prenom, c.nom, c.telephone, t.marque, t.modele, t.serie FROM reparations r JOIN clients c ON c.id = r.client_id JOIN trottinettes t ON t.id = r.trottinette_id WHERE r.supprime_le IS NULL AND r.statut <> 'récupéré' ORDER BY r.maj_le DESC, r.id DESC LIMIT 300`) as any[];
+  const rows = (await sql`SELECT r.*, c.prenom, c.nom, c.telephone, c.email, t.marque, t.modele, t.serie FROM reparations r JOIN clients c ON c.id = r.client_id JOIN trottinettes t ON t.id = r.trottinette_id WHERE r.supprime_le IS NULL AND r.statut <> 'récupéré' ORDER BY r.maj_le DESC, r.id DESC LIMIT 300`) as any[];
   const compteurs = {
     rdv: rows.filter((r) => r.en_magasin === false).length,
     afaire: rows.filter((r) => r.en_magasin !== false && ["reçu", "diagnostic", "devis envoyé", "en réparation"].includes(r.statut)).length,
@@ -59,7 +61,7 @@ app.get("/api/reparations", async (c) => {
 // Fiche détaillée d'une réparation (ouverte au clic sur le ticket).
 app.get("/api/reparation", async (c) => {
   const id = Number(c.req.query("id"));
-  const [r] = (await sql`SELECT r.*, c.prenom, c.nom, c.telephone, t.marque, t.modele, t.serie FROM reparations r JOIN clients c ON c.id = r.client_id JOIN trottinettes t ON t.id = r.trottinette_id WHERE r.id = ${id} AND r.supprime_le IS NULL`) as any[];
+  const [r] = (await sql`SELECT r.*, c.prenom, c.nom, c.telephone, c.email, t.marque, t.modele, t.serie FROM reparations r JOIN clients c ON c.id = r.client_id JOIN trottinettes t ON t.id = r.trottinette_id WHERE r.id = ${id} AND r.supprime_le IS NULL`) as any[];
   if (!r) throw new AppError(404, "Réparation introuvable.");
   const journal = (await sql`SELECT reparation_id, date, type, texte FROM journal WHERE reparation_id = ${id} ORDER BY id`) as any[];
   return c.json({ ...ligneListe(r, journal), devis: await devisDe(id), statuts: STATUTS });

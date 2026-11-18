@@ -1,0 +1,120 @@
+import { app } from "../app";
+import { sql } from "../db";
+// Doit passer après la protection /api/* (voir auth.ts).
+import "./auth";
+import { AppError, clean, signature } from "../util";
+
+const nettoyerQte = (n: any) => Math.max(1, Math.min(999, Math.round(Number(n) || 1)));
+
+// Tout l'espace Commandes : par fournisseur, le panier, ce qui est commandé et ce qui est reçu récemment.
+app.get("/api/achats", async (c) => {
+  const fournisseurs = (await sql`SELECT id, nom, email FROM fournisseurs WHERE actif = true ORDER BY nom`) as any[];
+  const lignes = (await sql`SELECT l.*, trim(cl.prenom || ' ' || cl.nom) AS client FROM commande_lignes l LEFT JOIN reparations r ON r.id = l.reparation_id LEFT JOIN clients cl ON cl.id = r.client_id
+    WHERE l.statut <> 'recue' OR l.recue_le > now() - interval '7 days' ORDER BY l.id`) as any[];
+  const vers = (l: any) => ({ id: l.id, libelle: l.libelle, sku: l.sku ?? "", variantId: l.variant_id ?? "", quantite: l.quantite, reparationId: l.reparation_id, client: l.client || "", statut: l.statut, commandeLe: l.commandee_le, recueLe: l.recue_le });
+  return c.json({
+    fournisseurs: fournisseurs.map((f) => ({
+      id: f.id, nom: f.nom, email: f.email,
+      panier: lignes.filter((l) => l.fournisseur_id === f.id && l.statut === "panier").map(vers),
+      commandees: lignes.filter((l) => l.fournisseur_id === f.id && l.statut === "commandee").map(vers),
+      recues: lignes.filter((l) => l.fournisseur_id === f.id && l.statut === "recue").map(vers),
+    })),
+  });
+});
+
+app.post("/api/achats/fournisseur", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const nom = clean(b.nom, 80);
+  if (!nom) throw new AppError(400, "Le nom du fournisseur est obligatoire.");
+  await sql`INSERT INTO fournisseurs (nom, email) VALUES (${nom}, ${clean(b.email, 120)})`;
+  return c.json({ message: "Fournisseur ajouté." });
+});
+
+app.post("/api/achats/fournisseur/modifier", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  await sql`UPDATE fournisseurs SET email = ${clean(b.email, 120)} WHERE id = ${Number(b.id)}`;
+  return c.json({ message: "Email du fournisseur enregistré." });
+});
+
+// Ajouter une ligne au panier d'un fournisseur (produit du catalogue Shopify ou saisie libre).
+app.post("/api/achats/ligne", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const libelle = clean(b.libelle, 200);
+  if (!libelle) throw new AppError(400, "Le libellé est obligatoire.");
+  const [f] = await sql`SELECT id FROM fournisseurs WHERE id = ${Number(b.fournisseurId)} AND actif = true`;
+  if (!f) throw new AppError(400, "Choisis un fournisseur.");
+  await sql`INSERT INTO commande_lignes (fournisseur_id, libelle, sku, variant_id, quantite) VALUES (${f.id}, ${libelle}, ${clean(b.sku, 80) || null}, ${clean(b.variantId, 80) || null}, ${nettoyerQte(b.quantite)})`;
+  return c.json({ message: "Ajouté au panier." });
+});
+
+// Depuis un devis : « À commander ». La prise en charge passe en « en attente de pièce » (vue En commande).
+app.post("/api/achats/depuis-devis", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const [d] = (await sql`SELECT * FROM devis_lignes WHERE id = ${Number(b.devisLigneId)} AND type = 'piece'`) as any[];
+  if (!d) throw new AppError(404, "Ligne de pièce introuvable.");
+  const [f] = await sql`SELECT id, nom FROM fournisseurs WHERE id = ${Number(b.fournisseurId)} AND actif = true`;
+  if (!f) throw new AppError(400, "Choisis un fournisseur (à créer dans l'onglet Commandes).");
+  const [deja] = await sql`SELECT id FROM commande_lignes WHERE devis_ligne_id = ${d.id} AND statut <> 'recue'`;
+  if (deja) throw new AppError(400, "Cette pièce est déjà dans un panier ou commandée.");
+  await sql`INSERT INTO commande_lignes (fournisseur_id, libelle, sku, variant_id, quantite, reparation_id, devis_ligne_id) VALUES (${f.id}, ${d.libelle}, ${d.sku}, ${d.shopify_variant_id}, ${d.quantite}, ${d.reparation_id}, ${d.id})`;
+  const [r] = (await sql`SELECT statut FROM reparations WHERE id = ${d.reparation_id}`) as any[];
+  if (r && r.statut !== "en attente de pièce") {
+    await sql`UPDATE reparations SET statut = 'en attente de pièce', piece_arrivee = false, maj_le = now() WHERE id = ${d.reparation_id}`;
+    await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${d.reparation_id}, 'statut', ${`Statut : ${r.statut} → en attente de pièce${signature(c)}`})`;
+  }
+  await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${d.reparation_id}, 'note', ${`Pièce à commander chez ${f.nom} : ${d.quantite} × ${d.libelle}${signature(c)}`})`;
+  return c.json({ message: `Ajouté au panier ${f.nom}.` });
+});
+
+app.post("/api/achats/ligne/maj", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  await sql`UPDATE commande_lignes SET quantite = ${nettoyerQte(b.quantite)} WHERE id = ${Number(b.id)} AND statut = 'panier'`;
+  return c.json({ ok: true });
+});
+app.post("/api/achats/ligne/supprimer", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  await sql`DELETE FROM commande_lignes WHERE id = ${Number(b.id)} AND statut = 'panier'`;
+  return c.json({ ok: true });
+});
+
+// Marquer le panier d'un fournisseur comme commandé.
+app.post("/api/achats/commander", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const id = Number(b.fournisseurId);
+  const [f] = await sql`SELECT nom FROM fournisseurs WHERE id = ${id}`;
+  if (!f) throw new AppError(404, "Fournisseur introuvable.");
+  const rows = (await sql`UPDATE commande_lignes SET statut = 'commandee', commandee_le = now() WHERE fournisseur_id = ${id} AND statut = 'panier' RETURNING id, reparation_id, libelle`) as any[];
+  if (!rows.length) throw new AppError(400, "Le panier est vide.");
+  for (const r of rows) {
+    if (r.reparation_id) await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${r.reparation_id}, 'note', ${`Pièce commandée chez ${f.nom} : ${r.libelle}${signature(c)}`})`;
+  }
+  return c.json({ message: `Commande ${f.nom} enregistrée (${rows.length} ligne(s)).` });
+});
+
+// Réception : quand toutes les pièces d'une prise en charge sont là, elle repasse « en réparation » (À faire)
+// et la fiche signale « pièce arrivée : prévenir le client ».
+app.post("/api/achats/recevoir", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const ids: number[] = (Array.isArray(b.ids) ? b.ids : [b.id]).map(Number).filter((n: number) => n > 0);
+  if (!ids.length) throw new AppError(400, "Rien à réceptionner.");
+  const rows = (await sql`UPDATE commande_lignes SET statut = 'recue', recue_le = now() WHERE id = ANY(${ids}) AND statut = 'commandee' RETURNING reparation_id`) as any[];
+  const reps = [...new Set(rows.map((r) => r.reparation_id).filter((x) => x))] as number[];
+  let prets = 0;
+  for (const rid of reps) {
+    const [reste] = (await sql`SELECT count(*)::int AS n FROM commande_lignes WHERE reparation_id = ${rid} AND statut <> 'recue'`) as any[];
+    if (reste.n > 0) continue;
+    const [r] = (await sql`SELECT statut FROM reparations WHERE id = ${rid}`) as any[];
+    await sql`UPDATE reparations SET statut = 'en réparation', piece_arrivee = true, maj_le = now() WHERE id = ${rid}`;
+    await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${rid}, 'statut', ${`Pièce(s) reçue(s) : ${r?.statut ?? ""} → en réparation. Client à prévenir${signature(c)}`})`;
+    prets++;
+  }
+  return c.json({ message: prets ? `${prets} réparation(s) repassent à faire : pense à prévenir le client.` : "Réception enregistrée." });
+});
+
+app.post("/api/reparations/client-prevenu", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const id = Number(b.repairId);
+  await sql`UPDATE reparations SET piece_arrivee = false WHERE id = ${id}`;
+  await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${id}, 'note', ${`Client prévenu (pièce arrivée)${signature(c)}`})`;
+  return c.json({ ok: true });
+});
