@@ -1,4 +1,6 @@
 import { app } from "../app";
+// Doit passer après la protection /api/* (auth.ts attend la base : sans cet import, cette route serait ouverte à tous).
+import "./auth";
 import { SHOP, SHOP_CLIENT_ID, SHOP_CLIENT_SECRET, SHOP_API } from "../shopify";
 import { exigeAdmin } from "../util";
 
