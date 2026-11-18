@@ -74,7 +74,7 @@ export const ACTIONS = `var ACTS={
       await recharger(FICHE.id);
       if(x.avecPiece){setTimeout(function(){var i=document.querySelector("input[data-ps=devis]");if(i){i.focus();i.scrollIntoView({block:"center"})}},50)}}catch(e){alert(e.message)}},
   brvSave:async function(){try{var d=await api("/brevo",{avis:v("bv-avis"),rdv:v("bv-rdv"),piece:v("bv-piece"),pret:v("bv-pret")});BRVMSG=d.message;BRV=null;render()}catch(e){BRVMSG=e.message;render()}},
-  brvTest:async function(){BRVMSG="Envoi…";render();try{var d=await api("/brevo/test",{email:v("bv-te"),tel:v("bv-tt")});BRVMSG=d.message}catch(e){BRVMSG=e.message}render()},
+  brvTest:async function(){BRVMSG="Envoi…";render();try{var d=await api("/brevo/test",{email:v("bv-te")});BRVMSG=d.message}catch(e){BRVMSG=e.message}render()},
   tTab:function(b){TTAB=b.dataset.v;TACH=null;TREC=null;render()},
   rcSave:async function(){try{var f=v("rc-f"),b={id:RCEDIT,texte:v("rc-txt"),priorite:!!document.getElementById("rc-p").checked};
       if(f.charAt(0)==="j"){b.unite="jours";b.intervalle=+f.slice(1)}

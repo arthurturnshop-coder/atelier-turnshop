@@ -26,7 +26,7 @@ app.post("/api/brevo/test", async (c) => {
   if (!brevoConfigure()) throw new AppError(400, "BREVO_API_KEY n'est pas renseignée dans Railway.");
   const b = await c.req.json().catch(() => ({}));
   const mail = clean(b.email, 120), tel = numeroSms(clean(b.tel, 40));
-  if (!mail && !tel) throw new AppError(400, "Tape un email ou un numéro de mobile pour le test.");
+  if (!mail && !tel) throw new AppError(400, "Tape ton email pour le test.");
   try {
     if (mail) await envoiEmail(mail, "Test TURN Shop", "Ceci est un test d'envoi depuis l'Atelier TURN.");
     if (tel) await envoiSms(tel, "Test TURN Shop : l'envoi de SMS fonctionne.");
