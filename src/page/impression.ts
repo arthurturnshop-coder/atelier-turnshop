@@ -104,6 +104,55 @@ ACTS.cEmail=function(b){
   go("")};
 ACTS.docPrint=function(b){imprimerDoc(+b.dataset.id,b.dataset.mode)};
 
+
+// ----- Clôture de caisse (ticket Z) -----
+var CLO={open:false,d:null,msg:""};
+function cloLigne(l,v){return"<tr><td>"+l+"</td><td class='n'>"+eur(v)+"</td></tr>"}
+function cloAttendu(){var d=CLO.d,f=document.getElementById("clo-fond"),fond=Math.round((Number(String((f&&f.value)||"0").split(",").join("."))||0)*100);return fond+d.especesNettes}
+function cloHtml(){
+  if(!CLO.open)return"<div class='actions' style='margin-top:12px'><button class='sec' data-act='cloOuvre'>Clôture de caisse</button></div>";
+  var d=CLO.d;if(!d)return"<div class='card'>Chargement...</div>";
+  var e=d.encaisse,r=d.rembourse||{},cl=d.cloture;
+  var h="<div class='card'><div class='step'>Clôture de caisse · "+esc(d.magasin)+" · "+esc(d.jour.split("-").reverse().join("/"))+"</div>"
+    +"<table class='devis' style='width:100%'>"+cloLigne("Carte",e.carte)+cloLigne("Espèces encaissées",e.especes)+cloLigne("Virement",e.virement)+cloLigne("En ligne (Shopify)",e.en_ligne);
+  Object.keys(r).forEach(function(k){h+=cloLigne("Remboursé ("+esc(k)+")",-r[k])});
+  h+="</table><div class='muted'>"+d.nbVentes+" vente(s) · "+d.nbAcomptes+" acompte(s) · CA ventes "+eur(d.caCents)+"</div>";
+  if(cl){
+    h+="<div style='margin-top:8px'><span class='tag ok'>Clôturée</span> par "+esc(cl.par)+" · fond "+eur(cl.fondCents)+" · attendu "+eur(cl.attenduCents)+" · compté "+eur(cl.compteCents)+" · <b>écart "+(cl.ecartCents>0?"+":"")+eur(cl.ecartCents)+"</b>"+(cl.note?" · "+esc(cl.note):"")+"</div>"
+      +"<div class='actions'><button data-act='cloPrint'>Imprimer le ticket Z</button><button class='sec' data-act='cloFerme'>Fermer</button></div>"}
+  else{
+    h+="<div class='dl' style='margin-top:8px'><label class='muted'>Fond de caisse du matin (€)</label><input id='clo-fond' placeholder='0' value='0'></div>"
+      +"<div class='muted'>Espèces attendues dans le tiroir : <b id='clo-att'>"+eur(d.especesNettes)+"</b></div>"
+      +"<div class='dl'><label class='muted'>Espèces comptées (€)</label><input id='clo-compte' placeholder='Compte le tiroir'></div>"
+      +"<div class='muted'>Écart : <b id='clo-ecart'>-</b></div>"
+      +"<div class='dl'><input id='clo-note' placeholder='Note (facultatif)'></div>"
+      +"<div class='actions'><button data-act='cloValide'>Clôturer la caisse</button><button class='sec' data-act='cloFerme'>Fermer</button></div>"}
+  if(CLO.msg)h+="<div class='muted'>"+esc(CLO.msg)+"</div>";
+  return h+"</div>"}
+function cloCharge(){return api("/caisse/cloture").then(function(d){CLO.d=d;render()}).catch(function(e){CLO.msg=e.message;render()})}
+ACTS.cloOuvre=function(){CLO={open:true,d:null,msg:""};render();cloCharge()};
+ACTS.cloFerme=function(){CLO={open:false,d:null,msg:""};render()};
+ACTS.cloValide=function(){
+  var cp=document.getElementById("clo-compte");if(!cp||!cp.value.trim()){CLO.msg="Saisis les espèces comptées.";render();return}
+  var att=cloAttendu(),cpt=Math.round((Number(cp.value.split(",").join("."))||0)*100);
+  if(!confirm("Clôturer la caisse ? Attendu "+eur(att)+", compté "+eur(cpt)+", écart "+eur(cpt-att)+"."))return;
+  api("/caisse/cloture",{fond:document.getElementById("clo-fond").value,compte:cp.value,note:document.getElementById("clo-note").value}).then(function(){CLO.msg="";return cloCharge()}).catch(function(e){CLO.msg=e.message;render()})};
+ACTS.cloPrint=function(){
+  var d=CLO.d,cl=d&&d.cloture;if(!cl)return;var e=d.encaisse,nl=String.fromCharCode(10);
+  var h="<div class='rc'><b>CLÔTURE DE CAISSE</b><br>TURN SOCIETY · "+esc(d.magasin)+"<br>"+esc(d.jour.split("-").reverse().join("/"))+"</div><hr>"
+    +"<div class='rl'><span>Carte</span><span>"+eur(e.carte)+"</span></div><div class='rl'><span>Espèces</span><span>"+eur(e.especes)+"</span></div><div class='rl'><span>Virement</span><span>"+eur(e.virement)+"</span></div><div class='rl'><span>En ligne</span><span>"+eur(e.en_ligne)+"</span></div>";
+  Object.keys(d.rembourse||{}).forEach(function(k){h+="<div class='rl'><span>Remboursé "+esc(k)+"</span><span>-"+eur(d.rembourse[k])+"</span></div>"});
+  h+="<hr><div class='rl'><span>Ventes</span><span>"+d.nbVentes+"</span></div><div class='rl'><span>CA ventes</span><span>"+eur(d.caCents)+"</span></div><hr>"
+    +"<div class='rl'><span>Fond de caisse</span><span>"+eur(cl.fondCents)+"</span></div><div class='rl'><span>Espèces attendues</span><span>"+eur(cl.attenduCents)+"</span></div><div class='rl'><span>Espèces comptées</span><span>"+eur(cl.compteCents)+"</span></div><div class='rl rt'><span>ÉCART</span><span>"+(cl.ecartCents>0?"+":"")+eur(cl.ecartCents)+"</span></div>"
+    +(cl.note?"<div class='rm'>"+esc(cl.note)+"</div>":"")+"<div class='rc rm'>Clôturé par "+esc(cl.par)+"</div>";
+  impImprimer(h,"recu",pecCss())};
+document.addEventListener("input",function(e){
+  var t=e.target;if(!t||!CLO.d||CLO.d.cloture)return;
+  if(t.id==="clo-fond"||t.id==="clo-compte"){
+    var a=document.getElementById("clo-att"),ec=document.getElementById("clo-ecart"),cp=document.getElementById("clo-compte");
+    var att=cloAttendu();if(a)a.textContent=eur(att);
+    if(ec)ec.textContent=cp&&cp.value.trim()?eur(Math.round((Number(cp.value.split(",").join("."))||0)*100)-att):"-"}});
+
 // ----- Étiquettes produits : nom, prix, code-barres -----
 var ETQ=[],ETQF=null,ETQSKIP=0;
 var ETQFORMATS={"50x30":{l:"Rouleau 50 × 30 mm",w:50,h:30},"40x25":{l:"Rouleau 40 × 25 mm",w:40,h:25},"62x29":{l:"Rouleau 62 × 29 mm (Brother)",w:62,h:29},"a4":{l:"Planche A4 3 × 8 (70 × 37 mm)",w:70,h:37,page:"A4",cols:3,rows:8}};

@@ -18,6 +18,7 @@ import "./routes/achats";
 import "./routes/stock";
 import "./routes/compta";
 import "./routes/devisenvoi";
+import "./routes/cloture";
 import "./routes/commandes";
 import "./routes/acomptes";
 import "./routes/rdv";

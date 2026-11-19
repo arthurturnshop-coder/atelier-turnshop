@@ -107,7 +107,7 @@ function caisseHtml(){
     +"<div class='pay'><span>Carte</span><input id='pc' placeholder='0,00' value='"+esc(CPAY.carte)+"'></div><div class='pay'><span>Espèces</span><input id='pe' placeholder='0,00' value='"+esc(CPAY.especes)+"'></div><div class='pay'><span>Virement</span><input id='pv' placeholder='0,00' value='"+esc(CPAY.virement)+"'></div>"
     +"<div class='actions'><button class='sec' data-act='cTout' data-m='carte'>Tout en carte</button><button class='sec' data-act='cTout' data-m='especes'>Tout en espèces</button><button class='sec' data-act='cTout' data-m='virement'>Tout en virement</button></div>"
     +"<button data-act='cEncaisser'>Encaisser</button><div class='muted'>"+esc(CMSG)+"</div></div>";
-  h+=histoHtml()+"</div>";
+  h+=histoHtml()+cloHtml()+"</div>";
   return h}
 async function ajouterProduit(p,ctx){
   if(ctx==="etq"){ETQ.push({titre:p.libelle,prix:String(p.prix),barcode:p.barcode||"",sku:p.sku||"",qte:1});render();return}
