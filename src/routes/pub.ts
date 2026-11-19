@@ -240,10 +240,12 @@ export async function activeRdvPayes(forceRepId = 0) {
 export async function enregistrePaiementWeb(pid: number, orderId: string) {
   const [p] = (await sql`SELECT * FROM paiements_web WHERE id = ${pid} AND statut = 'attente'`) as any[];
   if (!p) return;
-  const [v] = (await sql`INSERT INTO ventes (client_id, reparation_id, magasin, vendeur, total_cents, points_gagnes, type) VALUES (${p.client_id}, ${p.reparation_id}, NULL, 'En ligne', ${p.montant_cents}, 0, 'acompte') RETURNING id`) as any[];
-  await sql`INSERT INTO vente_lignes (vente_id, libelle, quantite, prix_unitaire_cents, type) VALUES (${v.id}, ${"Paiement en ligne " + pcn(p.reparation_id)}, 1, ${p.montant_cents}, 'article')`;
-  await sql`INSERT INTO vente_paiements (vente_id, moyen, montant_cents) VALUES (${v.id}, 'en_ligne', ${p.montant_cents})`;
-  await sql`UPDATE paiements_web SET statut = 'paye', order_id = ${orderId}, vente_id = ${v.id} WHERE id = ${pid}`;
+  await sql.begin(async (tx: any) => {
+    const [v] = (await tx`INSERT INTO ventes (client_id, reparation_id, magasin, vendeur, total_cents, points_gagnes, type) VALUES (${p.client_id}, ${p.reparation_id}, NULL, 'En ligne', ${p.montant_cents}, 0, 'acompte') RETURNING id`) as any[];
+    await tx`INSERT INTO vente_lignes (vente_id, libelle, quantite, prix_unitaire_cents, type) VALUES (${v.id}, ${"Paiement en ligne " + pcn(p.reparation_id)}, 1, ${p.montant_cents}, 'article')`;
+    await tx`INSERT INTO vente_paiements (vente_id, moyen, montant_cents) VALUES (${v.id}, 'en_ligne', ${p.montant_cents})`;
+    await tx`UPDATE paiements_web SET statut = 'paye', order_id = ${orderId}, vente_id = ${v.id} WHERE id = ${pid}`;
+  });
   try { await activeRdvPayes(); } catch (e) { console.error("activeRdvPayes", e); }
   await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${p.reparation_id}, 'caisse', ${`Paiement en ligne reçu : ${(p.montant_cents / 100).toFixed(2)} € (Shopify)`})`;
   await sql`INSERT INTO taches (texte, echeance, priorite, cree_par, reparation_id) VALUES (${`Paiement en ligne reçu ${pcn(p.reparation_id)} : ${(p.montant_cents / 100).toFixed(2)} €`}, (now() AT TIME ZONE 'Europe/Paris')::date, false, 'Espace client', ${p.reparation_id})`;
