@@ -2,6 +2,7 @@ import { sql } from "./db";
 import { GARDE, infosGarde } from "./garde";
 import { verifierPaiementsWeb } from "./routes/pub";
 import { lireAuto, notifier } from "./brevo";
+import { relancesDevis } from "./routes/devisenvoi";
 import { infosTicket } from "./routes/ticket";
 
 // Textes des messages envoyés aux clients.
@@ -53,6 +54,7 @@ async function cycle() {
       }
     }
     try { await verifierPaiementsWeb(); } catch { /* réessai au prochain cycle */ }
+    try { await relancesDevis(); } catch (e) { console.error("relancesDevis", e); }
     // Demandes de RDV jamais payées : abandonnées après 48 h (elles n'ont jamais été visibles de l'atelier).
     try { await sql`UPDATE reparations SET rdv_statut = 'annule' WHERE rdv_statut = 'a_payer' AND cree_le < now() - interval '48 hours'`; } catch { /* sans gravité */ }
     // Gardiennage : trottinette prête mais pas récupérée.

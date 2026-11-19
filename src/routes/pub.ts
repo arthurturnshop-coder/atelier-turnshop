@@ -20,7 +20,7 @@ await sql`CREATE TABLE IF NOT EXISTS paiements_web (id SERIAL PRIMARY KEY, repar
 
 // Limite simple : 30 appels par minute et par IP.
 const hits = new Map<string, number[]>();
-function limite(c: any) {
+export function limite(c: any) {
   const ip = (c.req.header("x-forwarded-for") ?? "?").split(",")[0].trim();
   const now = Date.now();
   const l = (hits.get(ip) ?? []).filter((t) => now - t < 60_000);
@@ -271,7 +271,9 @@ app.post("/pub/moi", async (c) => {
     const dv = await devisDe(r.id);
     const ac = await acomptesDe(r.id);
     const g = infosGarde(r.pret_le, r.statut, r.abandonnee_le);
+    const [dvl] = (await sql`SELECT token FROM devis_envois WHERE reparation_id = ${r.id} AND statut = 'envoye' AND expire_le > now() ORDER BY id DESC LIMIT 1`.catch(() => [])) as any[];
     reparations.push({
+      devisLien: dvl ? `${(Bun.env.PUBLIC_URL || "https://atelier-turnshop-production.up.railway.app").replace(/\/$/, "")}/pub/devis/${dvl.token}` : "",
       id: r.id, numero: pcn(r.id), trottinette: `${r.marque} ${r.modele}`, panne: r.panne, groupe: e.groupe, etat: e.libelle, etape: e.etape, etapes: e.etapes, rdvStatut: r.rdv_statut ?? "",
       depot: r.date_depot, rdv: r.debut, rdvSouhaite: r.rdv_souhaite, magasin: r.magasin,
       devis: dv.lignes.map((l) => ({ libelle: l.libelle, quantite: l.quantite, prixCents: l.prixCents })), remiseCents: dv.remiseMultiCents, totalCents: dv.netCents,
@@ -391,33 +393,27 @@ async function varianteAtelier(sku: string): Promise<string | null> {
 app.get("/pub/img/atelier-reparation.png", () => new Response(Bun.file(new URL("../../public/atelier-reparation.png", import.meta.url)), { headers: { "content-type": "image/png", "cache-control": "public, max-age=86400" } }));
 
 // ---- Paiement en ligne (commande brouillon Shopify + lien de paiement) ----
-app.post("/pub/payer", async (c) => {
-  limite(c);
-  const b = await c.req.json().catch(() => ({}));
-  const q = await verifie(b);
-  const cid = await clientDe(q);
-  const repId = Number(b.repairId);
-  const [r] = (await sql`SELECT id FROM reparations WHERE id = ${repId} AND client_id = ${cid} AND (supprime_le IS NULL OR rdv_statut = 'a_payer')`) as any[];
-  if (!r) throw new AppError(404, "Réparation introuvable.");
+// Crée (ou réutilise) le lien de paiement Shopify d'une réparation : blocage, acompte ou solde.
+export async function creerPaiementWeb(repId: number, cid: number, gid: string, email: string, mode: string): Promise<{ url: string; montantCents: number }> {
   const dv = await devisDe(repId), ac = await acomptesDe(repId);
-  const blocageMode = b.mode === "blocage";
+  const blocageMode = mode === "blocage";
   const reste = dv.netCents - ac.verseCents;
   if (blocageMode) {
     if (dv.netCents > 0 || ac.verseCents > 0) throw new AppError(400, "Le blocage de rendez-vous n'est pas nécessaire ici.");
   } else if (dv.netCents <= 0 || reste <= 0) throw new AppError(400, "Rien à payer pour le moment.");
   const [lim] = (await sql`SELECT valeur FROM reglages WHERE cle = 'acompte_web_cents'`) as any[];
   const acompte = Math.min(reste, Math.max(100, Number(lim?.valeur ?? 2000) || 2000));
-  const montant = blocageMode ? await blocageCents() : b.mode === "acompte" ? acompte : reste;
-  const nomPaiement = blocageMode ? "Blocage de rendez-vous" : b.mode === "acompte" ? "Acompte" : "Paiement";
+  const montant = blocageMode ? await blocageCents() : mode === "acompte" ? acompte : reste;
+  const nomPaiement = blocageMode ? "Blocage de rendez-vous" : mode === "acompte" ? "Acompte" : "Paiement";
   // On réutilise un lien déjà créé pour le même montant.
   const [dej] = (await sql`SELECT url FROM paiements_web WHERE reparation_id = ${repId} AND statut = 'attente' AND montant_cents = ${montant} AND url <> '' AND cree_le > now() - interval '2 days' ORDER BY id DESC LIMIT 1`) as any[];
-  if (dej) return c.json({ url: dej.url, montantCents: montant });
+  if (dej) return { url: dej.url, montantCents: montant };
   // Ligne avec l'image et le nom professionnels du produit « atelier » (variante par SKU) ; sinon ligne libre sans image.
-  const skuPaiement = blocageMode ? "ATELIER-BLOCAGE" : b.mode === "acompte" ? "ATELIER-ACOMPTE" : "ATELIER-PAIEMENT";
+  const skuPaiement = blocageMode ? "ATELIER-BLOCAGE" : mode === "acompte" ? "ATELIER-ACOMPTE" : "ATELIER-PAIEMENT";
   const variante = await varianteAtelier(skuPaiement);
   const base: any = {
-    purchasingEntity: { customerId: `gid://shopify/Customer/${q.cid}` },
-    email: q.email || undefined,
+    ...(gid ? { purchasingEntity: { customerId: gid } } : {}),
+    email: email || undefined,
     tags: ["atelier", "paiement-en-ligne", pcn(repId)],
     note: `${nomPaiement} réparation ${pcn(repId)} (espace client)`,
   };
@@ -437,7 +433,18 @@ app.post("/pub/payer", async (c) => {
   if (er || !d.draftOrderCreate?.draftOrder?.invoiceUrl) throw new AppError(502, "Paiement indisponible pour le moment" + (er ? " : " + er.message : "."));
   const dr = d.draftOrderCreate.draftOrder;
   await sql`INSERT INTO paiements_web (reparation_id, client_id, montant_cents, draft_id, url) VALUES (${repId}, ${cid}, ${montant}, ${dr.id}, ${dr.invoiceUrl})`;
-  return c.json({ url: dr.invoiceUrl, montantCents: montant });
+  return { url: dr.invoiceUrl, montantCents: montant };
+}
+
+app.post("/pub/payer", async (c) => {
+  limite(c);
+  const b = await c.req.json().catch(() => ({}));
+  const q = await verifie(b);
+  const cid = await clientDe(q);
+  const repId = Number(b.repairId);
+  const [r] = (await sql`SELECT id FROM reparations WHERE id = ${repId} AND client_id = ${cid} AND (supprime_le IS NULL OR rdv_statut = 'a_payer')`) as any[];
+  if (!r) throw new AppError(404, "Réparation introuvable.");
+  return c.json(await creerPaiementWeb(repId, cid, `gid://shopify/Customer/${q.cid}`, q.email, String(b.mode)));
 });
 
 // ---- Remboursement d'un paiement en ligne (appelé depuis le logiciel) ----

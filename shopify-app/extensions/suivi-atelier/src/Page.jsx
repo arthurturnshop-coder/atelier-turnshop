@@ -125,6 +125,12 @@ function Carte({r, payer, repondre}) {
         {r.totalCents > 0 && <s-text type="strong">{'Total du devis : ' + eur(r.totalCents)}</s-text>}
         {r.verseCents > 0 && <s-text>{'Déjà versé : ' + eur(r.verseCents)}</s-text>}
         {r.verseCents > 0 && r.resteAPayerCents > 0 && <s-text>{'Reste à régler : ' + eur(r.resteAPayerCents)}</s-text>}
+        {r.devisLien && (
+          <s-stack gap="small-200">
+            <s-banner tone="info">Ton devis est prêt : consulte-le, accepte-le ou refuse-le.</s-banner>
+            <s-button variant="primary" href={r.devisLien} target="_blank">Voir et accepter mon devis</s-button>
+          </s-stack>
+        )}
         {r.aFinaliser && (
           <s-stack gap="small-200">
             <s-banner tone="warning">

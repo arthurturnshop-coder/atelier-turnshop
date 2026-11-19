@@ -110,6 +110,9 @@ function renderPlan(){
   document.getElementById("pft").addEventListener("change",function(e){PTECH=e.target.value;PPEND=null;renderPlan()});
 }
 ACTS.fichePlanif=function(b){var id=+b.dataset.id,f=FICHE;ATSUB="planning";FICHE=null;PSEL=id;PPEND=null;PMSG="";PTECH="";var md=f&&String(f.rdvSouhaite||"").match(/\d{4}-\d{2}-\d{2}/);if(md)PJOUR=md[0];if(f&&f.magasin&&(f.magasin==="Amiens"||f.magasin==="Rouen"))PMAG=f.magasin;render()};
+ACTS.dvEnvoyer=function(b){var id=+b.dataset.id;if(!confirm("Envoyer le devis actuel au client (email avec lien pour accepter ou refuser) ?"))return;DVENV.msg="Envoi en cours...";render();
+  api("/devis/envoyer",{repairId:id}).then(function(d){DVENV={id:0,list:null,msg:d.message};return recharger(id)}).catch(function(e){DVENV.msg=e.message;render()})};
+ACTS.dvCopier=function(b){var u=b.dataset.url;if(navigator.clipboard)navigator.clipboard.writeText(u).then(function(){DVENV.msg="Lien copié.";render()},function(){prompt("Lien du devis :",u)});else prompt("Lien du devis :",u)};
 ACTS.subEnc=function(b){ATSUB=b.dataset.sub;FICHE=null;PSEL=null;PPEND=null;PMSG="";render()};
 ACTS.pDay=function(b){PJOUR=decaleJour(PJOUR,(+b.dataset.d)*(PVIEW==="semaine"?7:1));PSEL=null;PPEND=null;loadPlan()};
 ACTS.pToday=function(){PJOUR=aujourdhui();PSEL=null;PPEND=null;loadPlan()};

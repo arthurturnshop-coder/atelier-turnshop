@@ -28,9 +28,11 @@ await sql`CREATE TABLE IF NOT EXISTS vente_paiements (id SERIAL PRIMARY KEY, ven
 await sql`ALTER TABLE vente_paiements DROP CONSTRAINT IF EXISTS vente_paiements_moyen_check`;
 await sql`ALTER TABLE vente_paiements ADD CONSTRAINT vente_paiements_moyen_check CHECK (moyen IN ('carte','especes','virement','en_ligne'))`;
 // Ventes "En ligne" qui ne correspondent à aucun paiement web enregistré (doublons créés par les essais ratés avant correction) : supprimées.
+try {
 await sql`DELETE FROM vente_paiements WHERE vente_id IN (SELECT v.id FROM ventes v WHERE v.vendeur = 'En ligne' AND v.id NOT IN (SELECT vente_id FROM paiements_web WHERE vente_id IS NOT NULL))`;
 await sql`DELETE FROM vente_lignes WHERE vente_id IN (SELECT v.id FROM ventes v WHERE v.vendeur = 'En ligne' AND v.id NOT IN (SELECT vente_id FROM paiements_web WHERE vente_id IS NOT NULL))`;
 await sql`DELETE FROM ventes v WHERE v.vendeur = 'En ligne' AND v.id NOT IN (SELECT vente_id FROM paiements_web WHERE vente_id IS NOT NULL)`;
+} catch { /* première installation : la table paiements_web n'existe pas encore */ }
 await sql`ALTER TABLE ventes ADD COLUMN IF NOT EXISTS shopify_order_id TEXT`;
 await sql`ALTER TABLE ventes ADD COLUMN IF NOT EXISTS shopify_order_name TEXT`;
 await sql`ALTER TABLE ventes ADD COLUMN IF NOT EXISTS shopify_erreur TEXT`;

@@ -31,6 +31,17 @@ async function loadEnc(){
 async function ouvrirFiche(id){
   try{FICHE=await api("/reparation?id="+id)}catch(e){alert(e.message);return}
   TAB="enc";ATSUB="liste";CUR=null;render()}
+var DVENV={id:0,list:null,msg:""};
+function dvEnvHtml(f){
+  if(DVENV.id!==f.id){DVENV={id:f.id,list:null,msg:DVENV.msg};api("/devis/envois?repairId="+f.id).then(function(l){DVENV.list=l;render()}).catch(function(){})}
+  var h=DVENV.msg?"<div class='muted'><b>"+esc(DVENV.msg)+"</b></div>":"";
+  var L=DVENV.id===f.id&&DVENV.list||[];
+  var libs={envoye:"Envoyé, en attente de réponse",accepte:"Accepté par le client",refuse:"Refusé par le client",expire:"Lien expiré",remplace:"Remplacé par un devis plus récent"};
+  L.slice(0,3).forEach(function(e,i){
+    var d=new Date(e.envoyeLe).toLocaleDateString("fr-FR");
+    h+="<div class='muted'>Devis du "+d+" ("+eur(e.totalCents)+") : <b>"+(libs[e.statut]||esc(e.statut))+"</b>"+(e.commentaire?" · « "+esc(e.commentaire)+" »":"")+(e.relanceLe?" · relancé":"")
+      +(i===0&&(e.statut==="envoye"||e.statut==="accepte")?" <a href='"+esc(e.url)+"' target='_blank'>Voir la page client</a> <button class='sec' data-act='dvCopier' data-url='"+esc(e.url)+"'>Copier le lien</button>":"")+"</div>"});
+  return h}
 function devisHtml(f){
   var d=f.devis,mo=d.lignes.filter(function(l){return l.type==="main_oeuvre"}),pi=d.lignes.filter(function(l){return l.type==="piece"});
   function table(titre,lignes){
@@ -40,7 +51,8 @@ function devisHtml(f){
   return"<div class='devis'>"+table("Forfaits main-d'œuvre",mo)+table("Pièces détachées",pi)
     +(d.remiseMultiCents?"<div class='muted'>Remise plusieurs prestations : -"+eur(d.remiseMultiCents)+" (non cumulable avec une offre)</div>":"")
     +"<div class='tot'>Total du devis : "+eur(d.netCents==null?d.totalCents:d.netCents)+"</div>"
-    +(d.lignes.length?"<button data-act='facturer' data-id='"+f.id+"'>Facturer ce devis (passer en caisse)</button>":"")
+    +(d.lignes.length?"<button data-act='facturer' data-id='"+f.id+"'>Facturer ce devis (passer en caisse)</button> <button class='sec' data-act='dvEnvoyer' data-id='"+f.id+"'>📧 Envoyer le devis au client</button>":"")
+    +dvEnvHtml(f)
     +prestaBox(f)+"<div class='step' style='margin-top:10px'>Ajouter une ligne</div><div class='muted'>Une pièce du catalogue turnshop.fr ? Cherche-la ici :</div>"+prodBox("devis")+"<div class='dl'>"
     +"<select id='lt' class='t'><option value='main_oeuvre'>Main-d'œuvre</option><option value='piece'>Pièce détachée</option></select>"
     +"<input id='ll' class='lb' placeholder='Ex : changement de pneu / pneu 10x3 CST'>"
