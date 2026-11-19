@@ -67,6 +67,29 @@ async function imprimerPEC(id){
   try{var f=await api("/reparation?id="+id);impImprimer(pecHtml(f),"recu",pecCss())}catch(e){alert(e.message)}}
 ACTS.pecPrint=function(b){imprimerPEC(+b.dataset.id)};
 
+// ----- Devis / facture en ticket 80 mm -----
+function docTicketHtml(f,mode){
+  var nl=String.fromCharCode(10),fac=mode==="facture";
+  var ent=(f.ticketEntete||"TURN SOCIETY").split(nl).map(function(x,i){return i===0?"<b>"+esc(x)+"</b>":esc(x)}).join("<br>");
+  var d=f.devis||{lignes:[]},a=f.acompte||{},net=d.netCents==null?d.totalCents:d.netCents;
+  var ttc=net,ht=Math.round(ttc/1.2),tva=ttc-ht,ver=a.verseCents||0;
+  var h="<div class='rc'>"+ent+(MAG?"<br>Boutique "+esc(MAG):"")+"</div><hr>"
+    +"<div class='rc'><b>"+(fac?"FACTURE":"DEVIS")+"</b></div>"
+    +"<div class='rc' style='font-size:18px'><b>"+pcn(f.id)+"</b></div>"
+    +"<div class='rl'><span>Date</span><span>"+new Date().toLocaleDateString("fr-FR")+"</span></div><hr>"
+    +"<div class='rm'>Client</div><div><b>"+esc(f.client||"")+"</b></div>"+(f.phone?"<div>"+esc(f.phone)+"</div>":"")
+    +"<div class='rm' style='margin-top:4px'>Trottinette</div><div><b>"+esc(f.trottinette||"")+"</b></div><hr>";
+  d.lignes.forEach(function(l){h+="<div class='rl'><span>"+l.quantite+" × "+esc(l.libelle)+"</span><span>"+(l.prixCents>0?eur(l.quantite*l.prixCents):"à définir")+"</span></div>"});
+  if(d.remiseMultiCents)h+="<div class='rl'><span>Remise</span><span>-"+eur(d.remiseMultiCents)+"</span></div>";
+  h+="<hr><div class='rl rt'><span>TOTAL TTC</span><span>"+eur(ttc)+"</span></div>"
+    +"<div class='rl rm'><span>Total HT</span><span>"+eur(ht)+"</span></div><div class='rl rm'><span>TVA 20 %</span><span>"+eur(tva)+"</span></div>";
+  if(ver>0)h+="<hr><div class='rl'><span>Acompte versé</span><span>-"+eur(ver)+"</span></div><div class='rl rt'><span>Reste à payer</span><span>"+eur(Math.max(0,ttc-ver))+"</span></div>";
+  if(!fac)h+="<hr><div class='rc rm'>Devis valable 30 jours. Document non contractuel tant qu'il n'est pas validé par le client.</div>";
+  return h+"<div class='rc rm' style='margin-top:6px'>Merci de votre confiance !</div>"}
+async function imprimerDoc(id,mode){
+  try{var f=await api("/reparation?id="+id);impImprimer(docTicketHtml(f,mode),"recu",pecCss())}catch(e){alert(e.message)}}
+ACTS.docPrint=function(b){imprimerDoc(+b.dataset.id,b.dataset.mode)};
+
 // ----- Étiquettes produits : nom, prix, code-barres -----
 var ETQ=[],ETQF=null,ETQSKIP=0;
 var ETQFORMATS={"50x30":{l:"Rouleau 50 × 30 mm",w:50,h:30},"40x25":{l:"Rouleau 40 × 25 mm",w:40,h:25},"62x29":{l:"Rouleau 62 × 29 mm (Brother)",w:62,h:29},"a4":{l:"Planche A4 3 × 8 (70 × 37 mm)",w:70,h:37,page:"A4",cols:3,rows:8}};

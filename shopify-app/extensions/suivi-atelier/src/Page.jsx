@@ -232,7 +232,7 @@ function Nouvelle({onFait, payer, setMsg, profil}) {
 
   // Après l'envoi : explications + confirmation (paiement) du rendez-vous
   if (fait) {
-    const adresse = magasin === 'Rouen' ? "l'atelier TURN SHOP de Rouen (adresse sur turnshop.fr)" : '6 rue de la 2e DB, Amiens';
+    const adresse = magasin === 'Rouen' ? "5 bis rue d'Harcourt, 76000 Rouen" : '6 rue de la 2e DB, Amiens';
     return (
       <s-section heading={'Ta demande est enregistrée (' + fait.j.numero + ')'}>
         <s-stack gap="base">
