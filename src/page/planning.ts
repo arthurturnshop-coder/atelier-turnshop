@@ -109,6 +109,7 @@ function renderPlan(){
   document.getElementById("pm").addEventListener("change",function(e){PMAG=e.target.value;PSEL=null;PPEND=null;PTECH="";loadPlan()});
   document.getElementById("pft").addEventListener("change",function(e){PTECH=e.target.value;PPEND=null;renderPlan()});
 }
+ACTS.fichePlanif=function(b){var id=+b.dataset.id,f=FICHE;ATSUB="planning";FICHE=null;PSEL=id;PPEND=null;PMSG="";PTECH="";var md=f&&String(f.rdvSouhaite||"").match(/\d{4}-\d{2}-\d{2}/);if(md)PJOUR=md[0];if(f&&f.magasin&&(f.magasin==="Amiens"||f.magasin==="Rouen"))PMAG=f.magasin;render()};
 ACTS.subEnc=function(b){ATSUB=b.dataset.sub;FICHE=null;PSEL=null;PPEND=null;PMSG="";render()};
 ACTS.pDay=function(b){PJOUR=decaleJour(PJOUR,(+b.dataset.d)*(PVIEW==="semaine"?7:1));PSEL=null;PPEND=null;loadPlan()};
 ACTS.pToday=function(){PJOUR=aujourdhui();PSEL=null;PPEND=null;loadPlan()};
