@@ -9,7 +9,7 @@ function vStock(){
   if(!STK){app.innerHTML=h+"<div class='card'>Chargement…</div>";api("/stock?magasin="+encodeURIComponent(MAG||"")).then(function(d){STK=d;render()}).catch(function(e){STMSG=e.message;STK={produits:[],lieux:[],nb:0,valeurAchatHtCents:0};render()});return}
   h+="<div class='card'><div class='step'>Ajout rapide</div><div class='muted'>Scanne l'EAN-13 (ou laisse vide : un EAN-13 interne commençant par 200 est créé, à étiqueter), tape le nom et le prix, Entrée. Si le code existe déjà, la quantité s'ajoute.</div>"
     +"<div class='dl' style='margin-top:6px'><input id='sk' class='lb' placeholder='EAN-13 (scan) - vide = généré'><input id='sn' class='lb' placeholder='Nom du produit'><input id='sp' class='p' placeholder='Prix vente TTC'><input id='sa' class='p' placeholder='Achat HT'><input id='sq' class='q' type='number' min='1' value='1' title='Quantité'><input id='sm' class='q' type='number' min='0' placeholder='Min' title='Stock minimum : en dessous, une commande est suggérée'><input id='sl' class='q' placeholder='Empl.' value='"+esc(STLIEU)+"' title='Emplacement (A11…)'></div>"
-    +"<div class='actions'><button data-act='stAdd'>Ajouter au stock</button></div></div>";
+    +"<div class='actions'><button data-act='stAdd'>Ajouter au stock</button><button class='sec' data-act='stCodesShopify'>Créer les codes-barres manquants des produits Shopify</button></div></div>";
   h+="<div class='card'><div class='head'><div class='step'>Stock "+esc(STK.magasin||"")+" : "+STK.nb+" produit"+(STK.nb>1?"s":"")+" en stock"+(STK.valeurAchatHtCents?" · valeur d'achat HT "+eur(STK.valeurAchatHtCents):"")+"</div><input id='stq' class='lb' placeholder='Chercher (nom, code, emplacement)' value='"+esc(STQ)+"'></div>";
   if(!STK.produits.length)h+="<div class='muted'>Aucun produit.</div>";
   else h+="<table class='devis' style='width:100%'><tr><th>Produit</th><th>Empl.</th><th class='n'>Achat HT</th><th class='n'>Vente</th><th class='n'>Qté</th><th class='n'>Min</th><th></th></tr>"+STK.produits.map(function(p){
@@ -89,4 +89,8 @@ document.addEventListener("keydown",function(e){
   if(t.id==="sk"){e.preventDefault();ACTS.stCode();return}
   if(t.id==="sn"||t.id==="sp"||t.id==="sa"||t.id==="sq"||t.id==="sm"||t.id==="sl"){e.preventDefault();ACTS.stAdd()}});
 document.addEventListener("input",function(e){var t=e.target;if(t&&t.id==="stq"&&TAB==="stock"){clearTimeout(window.__stt);window.__stt=setTimeout(ACTS.stSearch,250)}});
+ACTS.stCodesShopify=function(){
+  if(!confirm("Donner un code-barres EAN-13 a tous les produits Shopify qui n en ont pas ? (ecrit dans Shopify, 100 produits a la fois)"))return;
+  STMSG="Creation des codes-barres Shopify...";render();
+  api("/stock/codes-shopify",{}).then(function(d){STMSG=d.faits+" produit(s) Shopify codes. "+(d.restant?"Il en reste "+d.restant+" : clique encore.":"Tout est fait.");render()}).catch(function(e){STMSG=e.message;render()})};
 `;

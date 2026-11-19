@@ -41,7 +41,8 @@ function vCmd(){
     if(f.panier.length)h+="<div class='actions'><button data-act='cmdPasser' data-id='"+f.id+"'>Marquer comme commandé</button><button class='sec' data-act='cmdCopy' data-id='"+f.id+"'>Copier la commande</button><button class='sec' data-act='cmdCsv' data-id='"+f.id+"'>Télécharger (CSV)</button>"
       +(f.email?"<a class='btn' href='mailto:"+esc(f.email)+"?subject="+encodeURIComponent("Commande TURN SOCIETY")+"&body="+encodeURIComponent(texteCommande(f))+"'>Envoyer par email</a>":"")+"</div><div class='muted'>L'envoi direct par l'API du fournisseur s'ajoute fournisseur par fournisseur.</div>";
     if(f.commandees.length){h+="<div class='step' style='margin-top:12px'>Commandé, en attente de réception ("+f.commandees.length+")</div><table class='devis' style='width:100%'><tr><th>Produit</th><th class='n'>Qté</th><th></th></tr>"+f.commandees.map(function(l){return ligneCmd(l,"commandee")}).join("")+"</table><div class='actions'><button data-act='recOpen' data-id='"+f.id+"'>Réceptionner (scan)</button><button class='sec' data-act='cmdRecevoirTout' data-id='"+f.id+"'>Tout réceptionner</button></div>"}
-    if(f.recues.length)h+="<div class='step' style='margin-top:12px'>Reçu cette semaine</div><table class='devis' style='width:100%'>"+f.recues.map(function(l){return ligneCmd(l,"recue")}).join("")+"</table>";
+    if(f.recues.length)h+="<div class='step' style='margin-top:12px'>Reçu cette semaine</div><table class='devis' style='width:100%'>"+f.recues.map(function(l){return ligneCmd(l,"recue")}).join("")+"</table>"
+    if(f.recues.length)h+=ecHtml(f);
     h+="</div>"});
   app.innerHTML=h}
 function cmdRun(p,msg){return p.then(function(d){HISTC=null;CMDMSG=(d&&d.message)||msg||"";CMD=null;render()}).catch(function(e){CMDMSG=e.message;render()})}
@@ -100,6 +101,41 @@ async function recepScan(code){
   if(ligne){REC.scans[ligne.id]=(REC.scans[ligne.id]||0)+1;REC.msg="✓ "+ligne.libelle}
   else{REC.bad.push(code);REC.msg="✗ Code "+code+" : pas dans cette commande"}
   render();setTimeout(function(){var i=document.getElementById("rc");if(i)i.focus()},50)}
+var ECMD={fid:0,sel:null,msg:""};
+function ecHtml(f){
+  var h="<div class='card' style='margin-top:10px;background:#fafafa'><div class='step'>Étiquettes des produits reçus</div><div class='actions'>"
+    +"<button data-act='ecUn' data-id='"+f.id+"'>Tout en 1 exemplaire</button>"
+    +"<button data-act='ecQte' data-id='"+f.id+"'>Tout selon les quantités</button>"
+    +"<button class='sec' data-act='ecChoix' data-id='"+f.id+"'>Choisir les étiquettes</button></div>";
+  if(ECMD.fid===f.id&&ECMD.sel){
+    h+="<table class='devis' style='width:100%;margin-top:8px'><tr><th></th><th>Produit</th><th class='n'>Étiquettes</th></tr>"+f.recues.map(function(l){
+      var on=ECMD.sel[l.id]!==undefined;
+      return"<tr><td><input type='checkbox' data-act='ecChk' data-id='"+l.id+"'"+(on?" checked":"")+"></td><td>"+esc(l.libelle)+"</td><td class='n'><input type='number' min='1' max='200' style='width:70px' data-act='ecNb' data-id='"+l.id+"' value='"+(on?ECMD.sel[l.id]:l.quantite)+"'></td></tr>"}).join("")+"</table>"
+      +"<div class='actions'><button data-act='ecSel' data-id='"+f.id+"'>Créer les étiquettes cochées</button></div>"}
+  if(ECMD.msg&&ECMD.fid===f.id)h+="<div class='muted'>"+esc(ECMD.msg)+"</div>";
+  return h+"</div>"}
+async function ecCreer(f,mode){
+  var L=f.recues.filter(function(l){return mode!=="sel"||ECMD.sel[l.id]!==undefined});
+  if(!L.length){ECMD.msg="Coche au moins un produit.";render();return}
+  ECMD.fid=f.id;ECMD.msg="Préparation des étiquettes...";render();
+  for(var i=0;i<L.length;i++){
+    var l=L[i],code=l.barcode||l.sku||"",prix="0",titre=l.libelle;
+    var nb=mode==="un"?1:mode==="qte"?l.quantite:ECMD.sel[l.id];
+    try{
+      if(code){var r=await api("/code?q="+encodeURIComponent(code));
+        if(r.produit&&r.produit.prix!==undefined)prix=String(r.produit.prix);
+        else{var lc=await api("/stock/scan",{magasin:MAG||"",code:code,local:true});if(lc.produit)prix=(lc.produit.prixCents/100).toFixed(2)}}
+    }catch(e){}
+    ETQ.push({titre:titre,prix:prix,barcode:l.barcode||"",sku:l.sku||"",qte:Math.max(1,Math.min(200,nb||1))})}
+  ECMD.msg="";ECMD.sel=null;TAB="etq";render()}
+ACTS.ecUn=function(b){var f=trouveF(+b.dataset.id);if(f)ecCreer(f,"un")};
+ACTS.ecQte=function(b){var f=trouveF(+b.dataset.id);if(f)ecCreer(f,"qte")};
+ACTS.ecChoix=function(b){var id=+b.dataset.id,f=trouveF(id);if(!f)return;ECMD.fid=id;ECMD.sel={};f.recues.forEach(function(l){ECMD.sel[l.id]=l.quantite});render()};
+ACTS.ecSel=function(b){var f=trouveF(+b.dataset.id);if(f)ecCreer(f,"sel")};
+document.addEventListener("change",function(e){var t=e.target;if(!t||!t.dataset||!ECMD.sel)return;
+  if(t.dataset.act==="ecChk"){var id=+t.dataset.id;if(t.checked){var n=document.querySelector("input[data-act=ecNb][data-id='"+id+"']");ECMD.sel[id]=Math.max(1,Number(n&&n.value)||1)}else delete ECMD.sel[id]}
+  if(t.dataset.act==="ecNb"&&ECMD.sel[+t.dataset.id]!==undefined)ECMD.sel[+t.dataset.id]=Math.max(1,Math.min(200,Number(t.value)||1))});
+
 function recepHtml(f){
   var ok=0,manque=[],trop=[];
   var rows=f.commandees.map(function(l){

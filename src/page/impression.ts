@@ -119,7 +119,7 @@ function etqImprimer(){
 function vEtq(){
   var F=ETQFORMATS[etqFormat()],nb=etqToutes().length;
   var h=subHtml()+"<div class='card'><div class='step'>Étiquettes produits</div><div class='muted'>Cherche un produit, ajoute-le, choisis le nombre d'étiquettes puis imprime. Chaque étiquette : nom, prix et code-barres.</div>"+prodBox("etq")+"</div>";
-  h+="<div class='card'><div class='step'>Format</div><select id='etqf' data-act='etqFormat'>"+Object.keys(ETQFORMATS).map(function(k){return"<option value='"+k+"'"+(k===etqFormat()?" selected":"")+">"+esc(ETQFORMATS[k].l)+"</option>"}).join("")+"</select>"
+  h+="<div class='card'><div class='step'>Imprimer sur</div><div class='actions'><button class='"+(F.page?"":"sec")+"' data-act='etqMode' data-f='a4'>🖨 Imprimante A4 (feuille à découper)</button><button class='"+(F.page?"sec":"")+"' data-act='etqMode' data-f='62x29'>🏷 Brother (rouleau)</button></div><div class='muted' style='margin-top:6px'>Autres formats :</div><select id='etqf' data-act='etqFormat'>"+Object.keys(ETQFORMATS).map(function(k){return"<option value='"+k+"'"+(k===etqFormat()?" selected":"")+">"+esc(ETQFORMATS[k].l)+"</option>"}).join("")+"</select>"
     +(F.page?"<div class='muted' style='margin-top:6px'>Étiquettes déjà utilisées sur la planche (à sauter)</div><input id='etqskip' type='number' min='0' max='"+(F.cols*F.rows-1)+"' value='"+ETQSKIP+"' data-act='etqSkip'>":"")
     +"<div class='muted' style='margin-top:6px'>Dans la fenêtre d'impression : choisis ton imprimante d'étiquettes, mets les marges sur « Aucune » et l'échelle à 100 %.</div></div>";
   h+="<div class='card'><div class='step'>À imprimer ("+nb+" étiquette"+(nb>1?"s":"")+")</div>";
@@ -130,6 +130,7 @@ function vEtq(){
   if(ETQ.length)h+="<div class='actions'><button data-act='etqPrint'>Imprimer</button><button class='sec' data-act='etqVider'>Tout vider</button></div>"
     +"<div class='step' style='margin-top:10px'>Aperçu</div><div style='overflow:auto;background:#eee;padding:8px'>"+etqLabel(ETQ[0],F)+"</div>";
   app.innerHTML=h+"</div>"}
+ACTS.etqMode=function(b){ETQF=b.dataset.f;try{localStorage.setItem("etqf",ETQF)}catch(e){}render()};
 ACTS.etqFormat=function(b){ETQF=b.value;try{localStorage.setItem("etqf",ETQF)}catch(e){}render()};
 ACTS.etqSkip=function(b){ETQSKIP=Math.max(0,Number(b.value)||0)};
 ACTS.etqQte=function(b){var it=ETQ[+b.dataset.i];if(it){it.qte=Math.max(1,Math.min(200,Number(b.value)||1))}};

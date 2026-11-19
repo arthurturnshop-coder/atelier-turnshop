@@ -3,7 +3,7 @@ import { sql } from "../db";
 // Doit passer après la protection /api/* (voir auth.ts).
 import "./auth";
 import { AppError, clean } from "../util";
-import { shopifyRead } from "../shopify";
+import { shopifyRead, shopifyMutate } from "../shopify";
 
 // Stock maison : pièces et produits qui ne sont pas (ou pas encore) dans le catalogue Shopify.
 await sql`CREATE TABLE IF NOT EXISTS stock_produits (id SERIAL PRIMARY KEY, code TEXT NOT NULL UNIQUE, nom TEXT NOT NULL, prix_cents INT NOT NULL DEFAULT 0, achat_ht_cents INT, qte INT NOT NULL DEFAULT 0, emplacement TEXT NOT NULL DEFAULT '', archive_le TIMESTAMPTZ, cree_le TIMESTAMPTZ NOT NULL DEFAULT now(), maj_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
@@ -211,4 +211,39 @@ app.post("/api/stock/reappro/ajouter", async (c) => {
   const q = Math.max(1, Math.min(999, Math.round(Number(b.quantite) || 1)));
   await sql`INSERT INTO commande_lignes (fournisseur_id, libelle, sku, barcode, quantite) VALUES (${f.id}, ${p.nom}, ${p.code}, ${p.code}, ${q})`;
   return c.json({ message: `${q} x ${p.nom} ajouté au panier.` });
+});
+
+// Donne un EAN-13 interne (préfixe 201) aux variantes Shopify qui n'ont pas de code-barres, et l'écrit dans Shopify.
+// Traite 100 variantes par appel ; on relance jusqu'à "restant: 0".
+app.post("/api/stock/codes-shopify", async (c) => {
+  const user = c.get("user") as any;
+  if (user?.role !== "admin" && user?.role !== "responsable") throw new AppError(403, "Réservé au responsable.");
+  const pris = new Set<string>();
+  const sans: { id: string; productId: string }[] = [];
+  let after: string | null = null;
+  for (let i = 0; i < 60; i++) {
+    const d: any = await shopifyRead(`query($after:String){productVariants(first:250,after:$after){pageInfo{hasNextPage endCursor} nodes{id barcode product{id}}}}`, { after });
+    const pv = d.productVariants;
+    for (const v of pv.nodes) { if (v.barcode) pris.add(String(v.barcode)); else sans.push({ id: v.id, productId: v.product.id }); }
+    if (!pv.pageInfo.hasNextPage) break;
+    after = pv.pageInfo.endCursor;
+  }
+  const lot = sans.slice(0, 100);
+  const parProduit = new Map<string, { id: string; barcode: string }[]>();
+  for (const v of lot) {
+    let n = Number(String(v.id).replace(/\D/g, "").slice(-9));
+    let code = "";
+    for (;;) { const dd = "201" + String(n % 1e9).padStart(9, "0"); code = dd + cleEan(dd); if (!pris.has(code)) break; n++; }
+    pris.add(code);
+    if (!parProduit.has(v.productId)) parProduit.set(v.productId, []);
+    parProduit.get(v.productId)!.push({ id: v.id, barcode: code });
+  }
+  let faits = 0;
+  for (const [productId, variants] of parProduit) {
+    const r: any = await shopifyMutate(`mutation($productId:ID!,$variants:[ProductVariantsBulkInput!]!){productVariantsBulkUpdate(productId:$productId,variants:$variants){productVariants{id} userErrors{message}}}`, { productId, variants });
+    const errs = r?.productVariantsBulkUpdate?.userErrors || [];
+    if (errs.length) throw new AppError(502, "Shopify : " + errs[0].message);
+    faits += variants.length;
+  }
+  return c.json({ faits, restant: sans.length - faits });
 });
