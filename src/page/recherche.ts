@@ -5,7 +5,7 @@ function stockTxt(x){
   if(!l.length)return"stock "+(x.stock==null?"—":x.stock)+emplTxt(x);
   var ordre={Amiens:0,Rouen:1,Fournisseur:2};
   l=l.slice().sort(function(a,b){return(ordre[a.lieu]==null?9:ordre[a.lieu])-(ordre[b.lieu]==null?9:ordre[b.lieu])});
-  return l.map(function(e){return esc(e.lieu)+" "+e.qte}).join(" · ")+emplTxt(x)}
+  var ab={Amiens:"A",Rouen:"R",Fournisseur:"F"};return l.map(function(e){return esc(ab[e.lieu]||e.lieu)+" "+e.qte}).join(" · ")+emplTxt(x)}
 function stockLocalHtml(d){
   var sl=d.stockLocal||[];if(!sl.length)return"";
   return"<div class='rp-sec'>Stock atelier (rayon)</div>"+sl.map(function(p){return"<div class='rp-static'><b>"+esc(p.nom)+"</b><div class='rp-muted'>"+esc(p.code)+" · "+eur(p.prixCents)+" · "+p.qte+" en stock · <b>Empl. "+esc(p.emplacement||"non rangé")+"</b></div></div>"}).join("")}
