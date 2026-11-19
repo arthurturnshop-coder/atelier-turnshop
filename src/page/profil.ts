@@ -21,6 +21,17 @@ function fidHtml(){
   if(FID===null)return"Points fidélité : chargement…";
   if(!FID.trouve)return"Points fidélité : non disponible";
   return"Points fidélité : "+esc(FID.points)+" points (réduction disponible : "+esc(FID.euros)+" €)"}
+var CACLI=null,CALOAD=null;
+function caHtml(){
+  if(CACLI===null||CACLI.id!==(CUR&&CUR.id))return"Chiffre d'affaires : chargement…";
+  var d=CACLI.d,t="Chiffre d'affaires atelier : <b>"+eur(d.atelierCents)+"</b> ("+d.nb+" facture"+(d.nb>1?"s":"")+(d.derniere?", dernière le "+esc(day(d.derniere)):"")+")";
+  if(d.shopifyCents!=null)t+=" · Total dépensé sur Shopify (boutique + web) : <b>"+eur(d.shopifyCents)+"</b>";
+  return t}
+async function loadCa(){
+  var c=CUR;if(!c)return;CALOAD=c.id;var d;
+  try{d=await api("/clients/ca?id="+c.id)}catch(e){d={atelierCents:0,nb:0}}
+  CALOAD=null;if(!CUR||CUR.id!==c.id)return;
+  CACLI={id:c.id,d:d};var el=document.getElementById("cacli");if(el)el.innerHTML=caHtml()}
 function vProfil(){
   var c=CUR;
   var h="<button class='sec' data-act='back' style='max-width:260px'>← Retour au dashboard</button>"
@@ -33,7 +44,7 @@ function vProfil(){
       +"<div class='muted'>"+esc(c.phone||"Pas de téléphone")+" · "+esc(c.email||"Pas d'email")+"</div><div class='muted'>Client depuis le "+esc(day(c.creeLe))+"</div>"
       +"<button class='sec' data-act='editCli'>Modifier</button>"+(estResp()?" <button class='sec' data-act='cliFusion'>Fusionner dans une autre fiche</button> <button class='danger' data-act='cliSuppr'>Supprimer la fiche</button>":"");
   }
-  h+="<div class='muted' id='fid'>"+fidHtml()+"</div></div></div></div>";
+  h+="<div class='muted' id='fid'>"+fidHtml()+"</div><div class='muted' id='cacli'>"+caHtml()+"</div></div></div></div>";
   if(ADDT)h+="<div class='card'><b>Ajouter une trottinette</b><input id='m' placeholder='Marque'><input id='mo' placeholder='Modèle'><input id='s' placeholder='Numéro de série'><button data-act='addT'>Associer</button><button class='sec' data-act='cancelAddT'>Annuler</button></div>";
   else h+="<button class='sec' data-act='showAddT'>+ Ajouter une trottinette</button>";
   h+="<div class='step' style='margin-top:14px'>Trottinettes</div>";
@@ -48,7 +59,8 @@ function vProfil(){
     t.reparations.forEach(function(r){h+=repHtml(r)});
     h+="</div>"});
   app.innerHTML=h;
-  if(FID===null&&FIDLOAD!==c.id)loadFid()}
+  if(FID===null&&FIDLOAD!==c.id)loadFid();
+  if((CACLI===null||CACLI.id!==c.id)&&CALOAD!==c.id)loadCa()}
 async function loadFid(){
   var c=CUR;if(!c)return;FIDLOAD=c.id;var d;
   try{d=await api("/fidelite?id="+c.id)}catch(e){d={trouve:false}}

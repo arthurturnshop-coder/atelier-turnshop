@@ -43,6 +43,24 @@ app.get("/api/chiffres", async (c) => {
   });
 });
 
+// Chiffre d'affaires d'un client : ventes/factures de l'atelier (acompte déduit réintégré) + total dépensé côté Shopify (boutique et web).
+app.get("/api/clients/ca", async (c) => {
+  const id = Number(c.req.query("id"));
+  if (!(id > 0)) return c.json({ atelierCents: 0, nb: 0 });
+  const [a] = (await sql`SELECT COALESCE(sum(total_cents + acompte_deduit_cents), 0)::int AS ca, count(*)::int AS nb, max(cree_le) AS derniere FROM ventes WHERE client_id = ${id} AND type = 'vente'`) as any[];
+  let shopifyCents: number | null = null;
+  try {
+    const [cl] = (await sql`SELECT email, telephone, shopify_id FROM clients WHERE id = ${id}`) as any[];
+    const q = cl?.shopify_id ? `id:${String(cl.shopify_id).split("/").pop()}` : cl?.email ? `email:${clean(cl.email, 120)}` : "";
+    if (q) {
+      const d = await shopifyRead(`query($q: String!) { customers(first: 1, query: $q) { nodes { amountSpent { amount } } } }`, { q });
+      const n = d?.customers?.nodes?.[0];
+      if (n) shopifyCents = Math.round(Number(n.amountSpent?.amount ?? 0) * 100);
+    }
+  } catch { /* Shopify indisponible : on affiche seulement l'atelier */ }
+  return c.json({ atelierCents: a.ca, nb: a.nb, derniere: a.derniere, shopifyCents });
+});
+
 app.get("/api/fidelite", async (c) => {
   try {
     const id = Number(c.req.query("id"));
