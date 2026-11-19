@@ -125,11 +125,27 @@ ACTS.pSaveSel=function(b){
 ACTS.pRetirer=function(b){var id=+b.dataset.id;api("/planning/retirer",{repairId:id}).then(function(){PSEL=null;PPEND=null;return loadPlan("Réparation retirée du planning.")}).catch(function(e){setMsg(e.message)})};
 ACTS.pOpenCli=function(b){api("/customer?id="+b.dataset.cid).then(function(c){CUR=c;TAB="accueil";FICHE=null;ADDT=false;RECEP=null;EDITCLI=false;FID=null;PSEL=null;render()}).catch(function(e){setMsg(e.message)})};
 
+function dropCible(e,d){
+  var cols=document.querySelectorAll(".pcol"),col=null,i;
+  for(i=0;i<cols.length;i++){var cr=cols[i].getBoundingClientRect();if(e.clientX>=cr.left&&e.clientX<cr.right){col=cols[i];break}}
+  if(!col)return null;
+  var body=col.querySelector(".pbody").getBoundingClientRect();
+  var off=d.pl?Math.min(d.oy,40):8;
+  var slot=Math.round((e.clientY-off-body.top)/PSLOT);slot=Math.max(0,Math.min(PNSLOT-1,slot));
+  return{col:col,slot:slot,body:col.querySelector(".pbody")}}
+function dropMontre(e,d){
+  var old=document.getElementById("pdrop");if(old)old.remove();
+  var c=dropCible(e,d);if(!c)return;
+  var rep=findRep(d.id),dur=(rep&&+rep.dureeMin)||PDEF;
+  var z=document.createElement("div");z.id="pdrop";
+  z.style.cssText="position:absolute;left:2px;right:2px;top:"+(c.slot*PSLOT)+"px;height:"+(dur/15*PSLOT-2)+"px;background:rgba(47,111,208,.25);border:2px dashed #2f6fd0;border-radius:6px;pointer-events:none;z-index:5;font-size:11px;padding:1px 4px";
+  z.textContent=hm(PH0+c.slot*15);
+  c.body.appendChild(z)}
 document.addEventListener("mousedown",function(e){var pl=document.getElementById("pl");if(pl&&e.target.closest&&e.target.closest(".pcard")&&pl.contains(e.target))e.preventDefault()});
 document.addEventListener("pointerdown",function(e){
   var pl=document.getElementById("pl");if(!pl||e.button>0)return;
   var c=e.target.closest?e.target.closest(".pcard"):null;if(!c||!pl.contains(c))return;
-  DRAG={el:c,id:+c.dataset.id,pl:c.dataset.pl==="1",sx:e.clientX,sy:e.clientY,moved:false,pid:e.pointerId};
+  DRAG={el:c,id:+c.dataset.id,pl:c.dataset.pl==="1",oy:e.clientY-c.getBoundingClientRect().top,sx:e.clientX,sy:e.clientY,moved:false,pid:e.pointerId};
   try{c.setPointerCapture(e.pointerId)}catch(x){}
 });
 document.addEventListener("pointermove",function(e){
@@ -146,25 +162,24 @@ document.addEventListener("pointermove",function(e){
     }
   }
   DRAG.el.style.transform="translate("+dx+"px,"+dy+"px)";
+  dropMontre(e,DRAG);
   e.preventDefault();
 });
 document.addEventListener("pointerup",pointerFin);
 function dragNettoie(d){
   d.el.style.transform="";d.el.classList.remove("drag");
   if(d.ph){d.el.style.position="";d.el.style.left="";d.el.style.top="";d.el.style.width="";d.el.style.height="";d.el.style.margin="";d.el.style.zIndex="";if(d.ph.parentNode)d.ph.parentNode.removeChild(d.ph)}}
-document.addEventListener("pointercancel",function(e){if(DRAG&&e.pointerId===DRAG.pid){dragNettoie(DRAG);DRAG=null}});
+document.addEventListener("pointercancel",function(e){if(DRAG&&e.pointerId===DRAG.pid){dragNettoie(DRAG);var oz=document.getElementById("pdrop");if(oz)oz.remove();DRAG=null}});
 function pointerFin(e){
   if(!DRAG||e.pointerId!==DRAG.pid)return;
   var d=DRAG;DRAG=null;
   if(!d.moved){d.el.style.transform="";PSEL=d.id;PPEND=null;renderPlan();var pp=document.getElementById("ppanel");if(pp)pp.scrollIntoView({block:"nearest"});return}
-  var r=d.el.getBoundingClientRect();
   dragNettoie(d);
-  var cols=document.querySelectorAll(".pcol"),col=null,i;
-  for(i=0;i<cols.length;i++){var cr=cols[i].getBoundingClientRect();if(e.clientX>=cr.left&&e.clientX<cr.right&&e.clientY>=cr.top&&e.clientY<=cr.bottom){col=cols[i];break}}
-  if(!col){setMsg("Dépose la carte sur une colonne du planning.");return}
-  var body=col.querySelector(".pbody").getBoundingClientRect();
-  var slot=Math.round((r.top-body.top)/PSLOT);slot=Math.max(0,Math.min(PNSLOT-1,slot));
-  var min=PH0+slot*15,jour=col.dataset.jour,rep=findRep(d.id);
+  var oldz=document.getElementById("pdrop");if(oldz)oldz.remove();
+  var cb=dropCible(e,d);
+  if(!cb){setMsg("Dépose la carte sur une colonne du planning.");return}
+  var col=cb.col,slot=cb.slot;
+    var min=PH0+slot*15,jour=col.dataset.jour,rep=findRep(d.id);
   if(!rep)return;
   var tech=col.dataset.tech||rep.technicien||"";
   var dur=+rep.dureeMin||PDEF;
