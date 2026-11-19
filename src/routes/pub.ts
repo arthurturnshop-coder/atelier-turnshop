@@ -14,7 +14,7 @@ import { infosGarde } from "../garde";
 const SECRET = () => Bun.env.ESPACE_SECRET ?? "";
 app.use("/pub/*", cors({ origin: ["https://turnshop.fr", "https://www.turnshop.fr", "https://extensions.shopifycdn.com"], allowMethods: ["GET", "POST", "OPTIONS"], allowHeaders: ["content-type"], maxAge: 600 }));
 
-await sql`ALTER TABLE reparations ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT '', ADD COLUMN IF NOT EXISTS rdv_souhaite TEXT NOT NULL DEFAULT '', ADD COLUMN IF NOT EXISTS rdv_statut TEXT NOT NULL DEFAULT ''`;
+await sql`ALTER TABLE reparations ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT '', ADD COLUMN IF NOT EXISTS rdv_souhaite TEXT NOT NULL DEFAULT '', ADD COLUMN IF NOT EXISTS rdv_statut TEXT NOT NULL DEFAULT '', ADD COLUMN IF NOT EXISTS rdv_info TEXT NOT NULL DEFAULT ''`;
 await sql`UPDATE reparations SET rdv_statut = 'confirme' WHERE source = 'web' AND rdv_statut = ''`;
 await sql`CREATE TABLE IF NOT EXISTS paiements_web (id SERIAL PRIMARY KEY, reparation_id INT NOT NULL REFERENCES reparations(id), client_id INT NOT NULL REFERENCES clients(id), montant_cents INT NOT NULL, draft_id TEXT NOT NULL, order_id TEXT, url TEXT NOT NULL DEFAULT '', statut TEXT NOT NULL DEFAULT 'attente', vente_id INT, rembourse_le TIMESTAMPTZ, cree_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
 
@@ -113,7 +113,8 @@ export function etatClient(r: any) {
   else if (r.statut === "prêt") { etape = "termine"; groupe = "termine"; libelle = "Terminée : ta trottinette est prête à récupérer"; }
   else if (web && rs === "refuse") { etape = "demande"; groupe = "termine"; libelle = "Demande refusée : contacte notre support pour plus d'infos"; }
   else if (web && rs === "annule") { etape = "demande"; groupe = "termine"; libelle = "Demande annulée"; }
-  else if (web && rs === "attente") { etape = "demande"; libelle = "Demande reçue : l'atelier doit confirmer ton rendez-vous"; }
+  else if (web && rs === "a_payer") { etape = "demande"; libelle = "À finaliser : règle ton paiement pour envoyer ta demande à l'atelier"; }
+  else if (web && rs === "attente") { etape = "demande"; libelle = "Ton rendez-vous a bien été pris en compte : notre équipe va revenir vers toi pour finaliser l'horaire"; }
   else if (web && rs === "propose") { etape = "demande"; libelle = "L'atelier te propose un autre créneau : à toi de répondre"; }
   else if (r.statut === "devis envoyé") { etape = "validation"; libelle = "Devis à valider : on attend ta réponse"; }
   else if (r.statut === "en attente de pièce") { etape = "commande"; libelle = "Pièce en commande"; }
@@ -133,7 +134,7 @@ export function etatClient(r: any) {
 
 // ---- Prix du catalogue (cache 5 min) ----
 const cachePrix = new Map<string, { t: number; v: any }>();
-async function prixVariantes(ids: string[]): Promise<Record<string, { prix: number; titre: string; stock: number | null }>> {
+async function prixVariantes(ids: string[]): Promise<Record<string, { prix: number; titre: string; stock: number | null; image: string; marque: string }>> {
   const out: Record<string, any> = {};
   const aLire = ids.filter((i) => {
     const c = cachePrix.get(i);
@@ -142,10 +143,10 @@ async function prixVariantes(ids: string[]): Promise<Record<string, { prix: numb
   });
   if (aLire.length) {
     try {
-      const d = await shopifyRead(`query($ids: [ID!]!) { nodes(ids: $ids) { ... on ProductVariant { id title price inventoryQuantity product { title } } } }`, { ids: aLire.slice(0, 50) });
+      const d = await shopifyRead(`query($ids: [ID!]!) { nodes(ids: $ids) { ... on ProductVariant { id title price inventoryQuantity image { url } product { title vendor featuredImage { url } } } } }`, { ids: aLire.slice(0, 50) });
       for (const n of d.nodes ?? []) {
         if (!n) continue;
-        const v = { prix: Math.round(Number(n.price) * 100), titre: n.title && n.title !== "Default Title" ? `${n.product.title} - ${n.title}` : n.product.title, stock: n.inventoryQuantity ?? null };
+        const v = { prix: Math.round(Number(n.price) * 100), titre: n.title && n.title !== "Default Title" ? `${n.product.title} - ${n.title}` : n.product.title, stock: n.inventoryQuantity ?? null, image: n.image?.url || n.product.featuredImage?.url || "", marque: n.product.vendor || "" };
         out[n.id] = v;
         cachePrix.set(n.id, { t: Date.now(), v });
       }
@@ -195,7 +196,7 @@ app.get("/pub/modeles/:id", async (c) => {
   const opts = (await sql`SELECT id, prestation_id, nom, prix_cents FROM prestation_options ORDER BY id`) as any[];
   return c.json({
     modele: { id: m.id, nom: `${m.marque} ${m.modele}` },
-    pieces: ps.map((p) => ({ id: p.id, libelle: p.libelle, categorie: p.categorie, prixCents: prix[p.variant_id]?.prix ?? null, enStock: prix[p.variant_id]?.stock == null ? null : prix[p.variant_id].stock > 0 })),
+    pieces: ps.map((p) => ({ id: p.id, libelle: p.libelle, categorie: p.categorie, prixCents: prix[p.variant_id]?.prix ?? null, image: prix[p.variant_id]?.image ?? "", marque: prix[p.variant_id]?.marque ?? "", titre: prix[p.variant_id]?.titre ?? p.libelle, enStock: prix[p.variant_id]?.stock == null ? null : prix[p.variant_id].stock > 0 })),
     prestations: prestas.map((p) => ({ id: p.id, nom: p.nom, prixCents: p.prix_cents, avecPiece: p.avec_piece === true, aide: p.piece_aide, options: opts.filter((o) => o.prestation_id === p.id).map((o) => ({ id: o.id, nom: o.nom, prixCents: o.prix_cents })) })),
   });
 });
@@ -226,6 +227,12 @@ export async function enregistrePaiementWeb(pid: number, orderId: string) {
   await sql`INSERT INTO vente_lignes (vente_id, libelle, quantite, prix_unitaire_cents, type) VALUES (${v.id}, ${"Paiement en ligne " + pcn(p.reparation_id)}, 1, ${p.montant_cents}, 'article')`;
   await sql`INSERT INTO vente_paiements (vente_id, moyen, montant_cents) VALUES (${v.id}, 'en_ligne', ${p.montant_cents})`;
   await sql`UPDATE paiements_web SET statut = 'paye', order_id = ${orderId}, vente_id = ${v.id} WHERE id = ${pid}`;
+  // Demande en brouillon : elle arrive à l'atelier seulement maintenant.
+  const [br] = (await sql`UPDATE reparations SET rdv_statut = 'attente', supprime_le = NULL, maj_le = now() WHERE id = ${p.reparation_id} AND rdv_statut = 'a_payer' RETURNING id, rdv_souhaite, rdv_info, magasin`) as any[];
+  if (br) {
+    await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${br.id}, 'statut', ${`Demande de rendez-vous en ligne (payée) : ${br.magasin}, ${br.rdv_souhaite}`})`;
+    await sql`INSERT INTO taches (texte, echeance, priorite, cree_par, reparation_id) VALUES (${`Demande RDV en ligne ${pcn(br.id)} : ${br.rdv_info || br.magasin + ", " + br.rdv_souhaite}`}, (now() AT TIME ZONE 'Europe/Paris')::date, true, 'Espace client', ${br.id})`;
+  }
   await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${p.reparation_id}, 'caisse', ${`Paiement en ligne reçu : ${(p.montant_cents / 100).toFixed(2)} € (Shopify)`})`;
   await sql`INSERT INTO taches (texte, echeance, priorite, cree_par, reparation_id) VALUES (${`Paiement en ligne reçu ${pcn(p.reparation_id)} : ${(p.montant_cents / 100).toFixed(2)} €`}, (now() AT TIME ZONE 'Europe/Paris')::date, false, 'Espace client', ${p.reparation_id})`;
 }
@@ -241,7 +248,7 @@ app.post("/pub/moi", async (c) => {
   const q = await verifie(b);
   const cid = await clientDe(q);
   const blocage = await blocageCents();
-  const rows = (await sql`SELECT r.*, t.marque, t.modele FROM reparations r JOIN trottinettes t ON t.id = r.trottinette_id WHERE r.client_id = ${cid} AND (r.supprime_le IS NULL OR r.rdv_statut = 'refuse') ORDER BY r.id DESC LIMIT 30`) as any[];
+  const rows = (await sql`SELECT r.*, t.marque, t.modele FROM reparations r JOIN trottinettes t ON t.id = r.trottinette_id WHERE r.client_id = ${cid} AND (r.supprime_le IS NULL OR r.rdv_statut IN ('refuse','a_payer')) ORDER BY r.id DESC LIMIT 30`) as any[];
   const reparations = [];
   for (const r of rows) {
     if (r.statut !== "récupéré") await paiementsEnAttente(r.id);
@@ -257,6 +264,7 @@ app.post("/pub/moi", async (c) => {
       gardiennage: g && g.fraisCents > 0 ? { jours: g.joursFrais, fraisCents: g.fraisCents } : null, abandonnee: !!r.abandonnee_le,
       peutPayer: r.statut !== "récupéré" && r.rdv_statut !== "refuse" && r.rdv_statut !== "annule" && dv.netCents - ac.verseCents > 0,
       // Panne non chiffrable : un blocage de rendez-vous est demandé (déduit de la facture, gardé si le client ne vient pas).
+      aFinaliser: r.rdv_statut === "a_payer",
       besoinBlocage: r.source === "web" && r.rdv_statut !== "refuse" && r.rdv_statut !== "annule" && r.statut !== "récupéré" && dv.netCents === 0 && ac.verseCents === 0 && r.en_magasin === false,
       blocageCents: blocage,
     });
@@ -300,7 +308,7 @@ app.post("/pub/rdv", async (c) => {
 
   const sujet = panne || "Demande en ligne (voir le devis)";
   const quand = `${date} ${creneau}`;
-  const [r] = (await sql`INSERT INTO reparations (client_id, trottinette_id, panne, en_magasin, magasin, source, rdv_souhaite, rdv_statut, statut) VALUES (${cid}, ${t.id}, ${sujet}, false, ${magasin}, 'web', ${quand}, 'attente', 'reçu') RETURNING id`) as any[];
+  const [r] = (await sql`INSERT INTO reparations (client_id, trottinette_id, panne, en_magasin, magasin, source, rdv_souhaite, rdv_statut, statut) VALUES (${cid}, ${t.id}, ${sujet}, false, ${magasin}, 'web', ${quand}, 'a_payer', 'reçu') RETURNING id`) as any[];
 
   // Devis pré-rempli : prestations (main-d'œuvre) puis pièces compatibles avec leur prix du catalogue.
   for (const pid of prestaIds) {
@@ -319,9 +327,10 @@ app.post("/pub/rdv", async (c) => {
     const prix = await prixVariantes(ps.map((p) => p.variant_id).filter(Boolean));
     for (const p of ps) await sql`INSERT INTO devis_lignes (reparation_id, type, libelle, quantite, prix_unitaire_cents, shopify_variant_id, sku) VALUES (${r.id}, 'piece', ${p.libelle}, 1, ${prix[p.variant_id]?.prix ?? 0}, ${p.variant_id || null}, ${p.sku || null})`;
   }
-  await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${r.id}, 'statut', ${`Demande de rendez-vous en ligne : ${magasin}, ${quand}`})`;
-  await sql`INSERT INTO taches (texte, echeance, priorite, cree_par, reparation_id) VALUES (${`Demande RDV en ligne ${pcn(r.id)} : ${q.prenom} ${q.nom} - ${tMarque} ${tModele} - ${magasin}, ${quand}`}, (now() AT TIME ZONE 'Europe/Paris')::date, true, 'Espace client', ${r.id})`;
-  return c.json({ message: "Demande envoyée : nous confirmons ton créneau très vite.", repairId: r.id, numero: pcn(r.id) });
+  // Brouillon : invisible pour l'atelier (soft-delete) tant que le paiement n'est pas reçu (voir enregistrePaiementWeb).
+  await sql`UPDATE reparations SET supprime_le = now() WHERE id = ${r.id}`;
+  await sql`UPDATE reparations SET rdv_info = ${`${q.prenom} ${q.nom} - ${tMarque} ${tModele} - ${magasin}, ${quand}`} WHERE id = ${r.id}`;
+  return c.json({ message: "Dernière étape : règle ton paiement pour envoyer ta demande à l'atelier.", repairId: r.id, numero: pcn(r.id) });
 });
 
 // ---- Réponse du client à une proposition de créneau ----
@@ -356,7 +365,7 @@ app.post("/pub/payer", async (c) => {
   const q = await verifie(b);
   const cid = await clientDe(q);
   const repId = Number(b.repairId);
-  const [r] = (await sql`SELECT id FROM reparations WHERE id = ${repId} AND client_id = ${cid} AND supprime_le IS NULL`) as any[];
+  const [r] = (await sql`SELECT id FROM reparations WHERE id = ${repId} AND client_id = ${cid} AND (supprime_le IS NULL OR rdv_statut = 'a_payer')`) as any[];
   if (!r) throw new AppError(404, "Réparation introuvable.");
   const dv = await devisDe(repId), ac = await acomptesDe(repId);
   const blocageMode = b.mode === "blocage";

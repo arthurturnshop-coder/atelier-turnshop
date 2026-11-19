@@ -80,7 +80,7 @@ function Page() {
         </s-stack>
         {vue === 'suivi'
           ? <Suivi data={data} payer={payer} repondre={repondre} nouveau={() => setVue('nouveau')} />
-          : <Nouvelle profil={data ? data.profil : null} onFait={async (j, paye) => { setVue('suivi'); if (!paye) setMsg({err: false, texte: j.message + ' (' + j.numero + '). Ton rendez-vous n\'est engagé qu\'après paiement : utilise le bouton de paiement ci-dessous.'}); await charge(); }} payer={payer} setMsg={setMsg} />}
+          : <Nouvelle profil={data ? data.profil : null} onFait={async (j, paye) => { setVue('suivi'); if (!paye) setMsg({err: false, texte: 'Ton rendez-vous (' + j.numero + ') n\'est pas encore envoyé à l\'atelier : clique sur "Finaliser mon rdv" ci-dessous pour le régler.'}); await charge(); }} payer={payer} setMsg={setMsg} />}
       </s-stack>
     </s-page>
   );
@@ -125,13 +125,24 @@ function Carte({r, payer, repondre}) {
         {r.totalCents > 0 && <s-text type="strong">{'Total du devis : ' + eur(r.totalCents)}</s-text>}
         {r.verseCents > 0 && <s-text>{'Déjà versé : ' + eur(r.verseCents)}</s-text>}
         {r.verseCents > 0 && r.resteAPayerCents > 0 && <s-text>{'Reste à régler : ' + eur(r.resteAPayerCents)}</s-text>}
-        {r.besoinBlocage && (
+        {r.aFinaliser && (
+          <s-stack gap="small-200">
+            <s-banner tone="warning">
+              <s-stack gap="small-200">
+                <s-text type="strong">Ton rendez-vous n'est pas encore envoyé à l'atelier</s-text>
+                <s-text>{'Règle ' + (r.totalCents > 0 ? 'l\'acompte' : 'le blocage de ' + eur(r.blocageCents)) + ' pour finaliser ta demande. Tant que ce n\'est pas payé, l\'atelier ne voit rien. Remboursé si l\'atelier refuse ou ne peut pas te recevoir.'}</s-text>
+              </s-stack>
+            </s-banner>
+            <s-button variant="primary" onClick={() => payer(r.id, r.totalCents > 0 ? 'acompte' : 'blocage')}>Finaliser mon rdv</s-button>
+          </s-stack>
+        )}
+        {r.besoinBlocage && !r.aFinaliser && (
           <s-stack gap="small-200">
             <s-banner tone="info">{'Pour confirmer ton rendez-vous, un blocage de ' + eur(r.blocageCents) + ' est demandé. Le diagnostic est gratuit : ce montant est déduit de ta facture si tu fais réparer, gardé si tu ne viens pas, et remboursé si le devis ne te convient pas.'}</s-banner>
             <s-button variant="primary" onClick={() => payer(r.id, 'blocage')}>{'Bloquer mon rendez-vous (' + eur(r.blocageCents) + ')'}</s-button>
           </s-stack>
         )}
-        {r.peutPayer && !r.abandonnee && (
+        {r.peutPayer && !r.aFinaliser && !r.abandonnee && (
           <s-stack gap="small-200">
             {r.verseCents === 0 && <s-text>Verse un acompte pour engager ton rendez-vous : il est déduit de ta facture.</s-text>}
             <s-stack direction="inline" gap="base">
@@ -234,14 +245,15 @@ function Nouvelle({onFait, payer, setMsg, profil}) {
   if (fait) {
     const adresse = magasin === 'Rouen' ? "5 bis rue d'Harcourt, 76000 Rouen" : '6 rue de la 2e DB, Amiens';
     return (
-      <s-section heading={'Ta demande est enregistrée (' + fait.j.numero + ')'}>
+      <s-section heading={'Dernière étape : finalise ton rendez-vous (' + fait.j.numero + ')'}>
         <s-stack gap="base">
-          <s-text>{'Ton rendez-vous du ' + (jours.find((x) => x.iso === date) || {label: date}).label + ' (' + (creneau === 'matin' ? 'matin' : 'après-midi') + ') va être validé, modifié ou refusé par l\'atelier. Reste actif sur ton compte (Suivi atelier) pour être tenu informé.'}</s-text>
-          <s-text>Une fois ton rendez-vous validé, tu déposes ta trottinette en présentant le QR code de ta carte de fidélité. On s'occupe du reste !</s-text>
+          <s-text>{'Rendez-vous souhaité : ' + (jours.find((x) => x.iso === date) || {label: date}).label + ' (' + (creneau === 'matin' ? 'matin' : 'après-midi') + ').'}</s-text>
+          <s-text>Ton rendez-vous a bien été pris en compte, notre équipe va revenir vers toi pour finaliser l'horaire. Regarde régulièrement sur ton profil pour te tenir informé.</s-text>
+          <s-text>Une fois ton rendez-vous finalisé, tu déposes ta trottinette en présentant le QR code de ta carte de fidélité. On s'occupe du reste !</s-text>
           <s-text type="strong">{'Atelier : ' + adresse}</s-text>
           <s-banner tone="info">
             <s-stack gap="small-200">
-              <s-text type="strong">Pour valider ta prise de rendez-vous</s-text>
+              <s-text type="strong">Ta demande n'est envoyée à l'atelier qu'après paiement</s-text>
               <s-text>{fait.sansDevis
                 ? 'Un blocage de ' + eur(2000) + ' est demandé en ligne. Le diagnostic est gratuit : ce montant est déduit de ta facture si tu fais réparer, gardé si tu ne viens pas au rendez-vous.'
                 : 'Un acompte est demandé en ligne. Il est déduit de ta facture finale et gardé si tu ne viens pas au rendez-vous.'}</s-text>
@@ -318,11 +330,23 @@ function Nouvelle({onFait, payer, setMsg, profil}) {
       )}
 
       {detail && detail.pieces.length > 0 && (
-        <s-section heading="Pièces compatibles avec ton modèle">
-          <s-stack gap="small-200">
-            {detail.pieces.map((p) => (
-              <s-checkbox key={p.id} label={p.libelle + ' : ' + (p.prixCents ? eur(p.prixCents) : 'prix à confirmer') + (p.enStock === false ? ' · sur commande' : '')} checked={!!pieces[p.id]} onChange={(e) => setPieces({...pieces, [p.id]: e.currentTarget.checked})} />
-            ))}
+        <s-section heading="Choisis ta pièce">
+          <s-stack gap="base">
+            <s-text color="subdued">Touche un produit pour l'ajouter à ta demande. Le prix est celui de la boutique.</s-text>
+            <s-grid gridTemplateColumns="1fr 1fr" gap="base">
+              {detail.pieces.map((p) => (
+                <s-box key={p.id} border={pieces[p.id] ? 'large' : 'base'} padding="base">
+                  <s-stack gap="small-200">
+                    {p.image ? <s-image src={p.image} alt={p.titre} aspectRatio="1/1" objectFit="contain" /> : null}
+                    {p.marque ? <s-text color="subdued">{p.marque}</s-text> : null}
+                    <s-text type="strong">{p.titre}</s-text>
+                    <s-text>{p.prixCents ? eur(p.prixCents) : 'Prix à confirmer'}</s-text>
+                    {p.enStock === false ? <s-badge>Sur commande</s-badge> : null}
+                    <s-button variant={pieces[p.id] ? 'primary' : 'secondary'} onClick={() => setPieces({...pieces, [p.id]: !pieces[p.id]})}>{pieces[p.id] ? 'Choisi ✓' : 'Choisir'}</s-button>
+                  </s-stack>
+                </s-box>
+              ))}
+            </s-grid>
           </s-stack>
         </s-section>
       )}

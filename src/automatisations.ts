@@ -53,6 +53,8 @@ async function cycle() {
       }
     }
     try { await verifierPaiementsWeb(); } catch { /* réessai au prochain cycle */ }
+    // Demandes de RDV jamais payées : abandonnées après 48 h (elles n'ont jamais été visibles de l'atelier).
+    try { await sql`UPDATE reparations SET rdv_statut = 'annule' WHERE rdv_statut = 'a_payer' AND cree_le < now() - interval '48 hours'`; } catch { /* sans gravité */ }
     // Gardiennage : trottinette prête mais pas récupérée.
     if (auto.garde !== "off" && h.h >= 9 && h.h < 19) {
       const prets = (await sql`SELECT r.id, r.client_id, r.pret_le, r.abandonnee_le, r.statut, c.prenom, t.marque, t.modele FROM reparations r JOIN clients c ON c.id = r.client_id JOIN trottinettes t ON t.id = r.trottinette_id WHERE r.statut = 'prêt' AND r.pret_le IS NOT NULL AND r.abandonnee_le IS NULL AND r.supprime_le IS NULL`) as any[];
