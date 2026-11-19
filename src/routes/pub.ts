@@ -214,12 +214,29 @@ async function paiementsEnAttente(repId: number) {
     try {
       const d = await shopifyRead(`query($id: ID!) { draftOrder(id: $id) { status order { id } } }`, { id: p.draft_id });
       const dr = d.draftOrder;
-      if (dr?.status === "COMPLETED" && dr.order?.id) await enregistrePaiementWeb(p.id, dr.order.id);
-    } catch { /* on réessaiera au prochain passage */ }
+      if (dr?.status === "COMPLETED" && dr.order?.id) {
+        try { await enregistrePaiementWeb(p.id, dr.order.id); }
+        catch (e) { console.error("enregistrePaiementWeb", e); await activeRdvPayes(repId); }
+      }
+    } catch (e) { console.error("paiementsEnAttente", e); }
   }
+  try { await activeRdvPayes(); } catch (e) { console.error("activeRdvPayes", e); }
 }
 
 // Un paiement en ligne devient un acompte dans la caisse (le solde se déduit à la facturation).
+// Une demande de RDV payée (paiement 'paye') quitte l'état brouillon et arrive à l'atelier. Rejouable sans risque.
+export async function activeRdvPayes(forceRepId = 0) {
+  const rows = (await sql`UPDATE reparations r SET rdv_statut = 'attente', supprime_le = NULL, maj_le = now()
+    WHERE r.rdv_statut = 'a_payer' AND (r.id = ${forceRepId} OR EXISTS (SELECT 1 FROM paiements_web p WHERE p.reparation_id = r.id AND p.statut = 'paye'))
+    RETURNING r.id, r.rdv_souhaite, r.rdv_info, r.magasin`) as any[];
+  for (const br of rows) {
+    try {
+      await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${br.id}, 'statut', ${`Demande de rendez-vous en ligne (payée) : ${br.magasin}, ${br.rdv_souhaite}`})`;
+      await sql`INSERT INTO taches (texte, echeance, priorite, cree_par, reparation_id) VALUES (${`Demande RDV en ligne ${pcn(br.id)} : ${br.rdv_info || br.magasin + ", " + br.rdv_souhaite}`}, (now() AT TIME ZONE 'Europe/Paris')::date, true, 'Espace client', ${br.id})`;
+    } catch (e) { console.error("activeRdvPayes journal", e); }
+  }
+}
+
 export async function enregistrePaiementWeb(pid: number, orderId: string) {
   const [p] = (await sql`SELECT * FROM paiements_web WHERE id = ${pid} AND statut = 'attente'`) as any[];
   if (!p) return;
@@ -227,17 +244,13 @@ export async function enregistrePaiementWeb(pid: number, orderId: string) {
   await sql`INSERT INTO vente_lignes (vente_id, libelle, quantite, prix_unitaire_cents, type) VALUES (${v.id}, ${"Paiement en ligne " + pcn(p.reparation_id)}, 1, ${p.montant_cents}, 'article')`;
   await sql`INSERT INTO vente_paiements (vente_id, moyen, montant_cents) VALUES (${v.id}, 'en_ligne', ${p.montant_cents})`;
   await sql`UPDATE paiements_web SET statut = 'paye', order_id = ${orderId}, vente_id = ${v.id} WHERE id = ${pid}`;
-  // Demande en brouillon : elle arrive à l'atelier seulement maintenant.
-  const [br] = (await sql`UPDATE reparations SET rdv_statut = 'attente', supprime_le = NULL, maj_le = now() WHERE id = ${p.reparation_id} AND rdv_statut = 'a_payer' RETURNING id, rdv_souhaite, rdv_info, magasin`) as any[];
-  if (br) {
-    await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${br.id}, 'statut', ${`Demande de rendez-vous en ligne (payée) : ${br.magasin}, ${br.rdv_souhaite}`})`;
-    await sql`INSERT INTO taches (texte, echeance, priorite, cree_par, reparation_id) VALUES (${`Demande RDV en ligne ${pcn(br.id)} : ${br.rdv_info || br.magasin + ", " + br.rdv_souhaite}`}, (now() AT TIME ZONE 'Europe/Paris')::date, true, 'Espace client', ${br.id})`;
-  }
+  try { await activeRdvPayes(); } catch (e) { console.error("activeRdvPayes", e); }
   await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${p.reparation_id}, 'caisse', ${`Paiement en ligne reçu : ${(p.montant_cents / 100).toFixed(2)} € (Shopify)`})`;
   await sql`INSERT INTO taches (texte, echeance, priorite, cree_par, reparation_id) VALUES (${`Paiement en ligne reçu ${pcn(p.reparation_id)} : ${(p.montant_cents / 100).toFixed(2)} €`}, (now() AT TIME ZONE 'Europe/Paris')::date, false, 'Espace client', ${p.reparation_id})`;
 }
 
 export async function verifierPaiementsWeb() {
+  try { await activeRdvPayes(); } catch (e) { console.error("activeRdvPayes", e); }
   const reps = (await sql`SELECT DISTINCT reparation_id FROM paiements_web WHERE statut = 'attente' AND cree_le > now() - interval '3 days'`) as any[];
   for (const r of reps) await paiementsEnAttente(r.reparation_id);
 }
