@@ -39,7 +39,7 @@ function rechHtml(d){
     h+="<div class='rp-static'><b>"+esc(p.titre)+"</b> <span class='rp-muted'>"+esc(p.marque)+"</span>";
     (p.variantes||[]).forEach(function(x,vi){
       var vt=x.titre&&x.titre!=="Default Title"?" · "+esc(x.titre):"";
-      h+="<div class='rp-var'><div class='rp-muted'>"+vt.replace(/^ · /,"")+(vt?" · ":"")+"sku "+esc(x.sku||"—")+" · <b>"+esc(x.prix)+" €</b> · "+stockTxt(x)+"</div>"
+      h+="<div class='rp-var'><div class='rp-muted'>"+vt.replace(/^ · /,"")+(vt?" · ":"")+"code-barres "+esc(x.barcode||"—")+" · sku "+esc(x.sku||"—")+" · <b>"+esc(x.prix)+" €</b> · "+stockTxt(x)+"</div>"
         +"<div class='rp-btns'>"+(FICHE?"<button data-act='rAddDevis' data-pi='"+pi+"' data-vi='"+vi+"'>+ Devis</button>":"")+"<button class='sec' data-act='rAddPanier' data-pi='"+pi+"' data-vi='"+vi+"'>+ Panier caisse</button></div></div>"});
     h+="</div>"})}
   return h}
@@ -66,7 +66,7 @@ function psHtml(ctx,d){
   var h=sl;
   ps.forEach(function(p,pi){(p.variantes||[]).forEach(function(x,vi){
     var vt=x.titre&&x.titre!=="Default Title"?" - "+esc(x.titre):"";
-    h+="<button class='sec hrow' data-act='psAdd' data-ctx='"+ctx+"' data-pi='"+pi+"' data-vi='"+vi+"'><b>"+esc(p.titre)+vt+"</b><br><span class='muted'>"+esc(x.prix)+" € · "+stockTxt(x)+" · code-barres "+esc(x.barcode||"—")+" · sku "+esc(x.sku||"—")+"</span></button>"})});
+    h+="<button class='sec hrow' data-act='psAdd' data-ctx='"+ctx+"' data-pi='"+pi+"' data-vi='"+vi+"'><b>"+esc(p.titre)+vt+"</b><br><span class='muted'>"+"code-barres "+esc(x.barcode||"—")+" · sku "+esc(x.sku||"—")+" · "+esc(x.prix)+" € · "+stockTxt(x)+"</span></button>"})});
   return h}
 document.addEventListener("keydown",function(e){
   var t=e.target;if(e.key!=="Enter"||!t||!t.dataset||!t.dataset.ps)return;
