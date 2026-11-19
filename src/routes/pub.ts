@@ -358,6 +358,23 @@ app.post("/pub/rdv/reponse", async (c) => {
   throw new AppError(400, "Réponse inconnue.");
 });
 
+// Produits « atelier » (image pro dans le mail de commande) : variante retrouvée par SKU, mise en cache.
+const cacheVariantes = new Map<string, { t: number; id: string | null }>();
+async function varianteAtelier(sku: string): Promise<string | null> {
+  const c = cacheVariantes.get(sku);
+  if (c && Date.now() - c.t < 600_000) return c.id;
+  let id: string | null = null;
+  try {
+    const d = await shopifyRead(`query($q: String!) { productVariants(first: 1, query: $q) { nodes { id } } }`, { q: "sku:" + sku });
+    id = d.productVariants?.nodes?.[0]?.id ?? null;
+  } catch { /* on retombe sur la ligne libre */ }
+  cacheVariantes.set(sku, { t: Date.now(), id });
+  return id;
+}
+
+// Image des produits « atelier » (récupérée par Shopify pour les commandes et les mails).
+app.get("/pub/img/atelier-reparation.png", () => new Response(Bun.file(new URL("../../public/atelier-reparation.png", import.meta.url)), { headers: { "content-type": "image/png", "cache-control": "public, max-age=86400" } }));
+
 // ---- Paiement en ligne (commande brouillon Shopify + lien de paiement) ----
 app.post("/pub/payer", async (c) => {
   limite(c);
@@ -380,16 +397,27 @@ app.post("/pub/payer", async (c) => {
   // On réutilise un lien déjà créé pour le même montant.
   const [dej] = (await sql`SELECT url FROM paiements_web WHERE reparation_id = ${repId} AND statut = 'attente' AND montant_cents = ${montant} AND url <> '' AND cree_le > now() - interval '2 days' ORDER BY id DESC LIMIT 1`) as any[];
   if (dej) return c.json({ url: dej.url, montantCents: montant });
+  // Ligne avec l'image et le nom professionnels du produit « atelier » (variante par SKU) ; sinon ligne libre sans image.
+  const skuPaiement = blocageMode ? "ATELIER-BLOCAGE" : b.mode === "acompte" ? "ATELIER-ACOMPTE" : "ATELIER-PAIEMENT";
+  const variante = await varianteAtelier(skuPaiement);
+  const base: any = {
+    purchasingEntity: { customerId: `gid://shopify/Customer/${q.cid}` },
+    email: q.email || undefined,
+    tags: ["atelier", "paiement-en-ligne", pcn(repId)],
+    note: `${nomPaiement} réparation ${pcn(repId)} (espace client)`,
+  };
+  const libre = { ...base, lineItems: [{ title: `${nomPaiement} ${pcn(repId)}`, quantity: 1, originalUnitPrice: (montant / 100).toFixed(2), requiresShipping: false, taxable: true }] };
+  const mutation = `mutation($input: DraftOrderInput!) { draftOrderCreate(input: $input) { draftOrder { id invoiceUrl } userErrors { field message } } }`;
   let d: any;
-  try { d = await shopifyMutate(`mutation($input: DraftOrderInput!) { draftOrderCreate(input: $input) { draftOrder { id invoiceUrl } userErrors { field message } } }`, {
-    input: {
-      purchasingEntity: { customerId: `gid://shopify/Customer/${q.cid}` },
-      email: q.email || undefined,
-      tags: ["atelier", "paiement-en-ligne", pcn(repId)],
-      note: `${nomPaiement} réparation ${pcn(repId)} (espace client)`,
-      lineItems: [{ title: `${nomPaiement} ${pcn(repId)}`, quantity: 1, originalUnitPrice: (montant / 100).toFixed(2), requiresShipping: false, taxable: true }],
-    },
-  }); } catch { throw new AppError(502, "Paiement indisponible pour le moment, réessaie dans quelques minutes."); }
+  try {
+    if (variante) {
+      try {
+        d = await shopifyMutate(mutation, { input: { ...base, lineItems: [{ variantId: variante, quantity: 1, priceOverride: { amount: (montant / 100).toFixed(2), currencyCode: "EUR" }, customAttributes: [{ key: "Réparation", value: pcn(repId) }] }] } }, "2026-10");
+        if (d.draftOrderCreate?.userErrors?.length) d = null;
+      } catch { d = null; }
+    }
+    if (!d) d = await shopifyMutate(mutation, { input: libre });
+  } catch { throw new AppError(502, "Paiement indisponible pour le moment, réessaie dans quelques minutes."); }
   const er = d.draftOrderCreate?.userErrors?.[0];
   if (er || !d.draftOrderCreate?.draftOrder?.invoiceUrl) throw new AppError(502, "Paiement indisponible pour le moment" + (er ? " : " + er.message : "."));
   const dr = d.draftOrderCreate.draftOrder;

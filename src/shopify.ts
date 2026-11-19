@@ -35,9 +35,9 @@ export const FIDELITE_QUERY = `query($q: String!) { customers(first: 1, query: $
 export const PRODUITS_QUERY = `query($q: String!) { products(first: 8, query: $q) { nodes { id title vendor variants(first: 5) { nodes { id title sku barcode price inventoryQuantity } } } } }`;
 
 // Écriture (mutations) : renvoie les données ou lève une erreur lisible.
-export async function shopifyMutate(query: string, variables: Record<string, unknown>): Promise<any> {
+export async function shopifyMutate(query: string, variables: Record<string, unknown>, version: string = SHOP_API): Promise<any> {
   const token = await shopifyToken();
-  const res = await fetch(`https://${SHOP}/admin/api/${SHOP_API}/graphql.json`, {
+  const res = await fetch(`https://${SHOP}/admin/api/${version}/graphql.json`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Shopify-Access-Token": token },
     body: JSON.stringify({ query, variables }),
