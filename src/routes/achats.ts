@@ -132,7 +132,7 @@ app.post("/api/achats/recevoir", async (c) => {
   if (!ids.length) throw new AppError(400, "Rien à réceptionner.");
   const rows = (await sql`UPDATE commande_lignes SET statut = 'recue', recue_le = now() WHERE id = ANY(${ids}) AND statut = 'commandee' RETURNING reparation_id, variant_id, sku, libelle, quantite`) as any[];
   // Produit hors catalogue (saisie libre, AliExpress…) commandé pour le stock : il entre dans le stock maison à la réception.
-  for (const l of rows) if (!l.reparation_id && !l.variant_id) await entreeStock({ code: l.sku, nom: l.libelle, qte: l.quantite }, "Réception commande");
+  for (const l of rows) if (!l.reparation_id && !l.variant_id) await entreeStock({ code: l.sku, nom: l.libelle, qte: l.quantite }, "Réception commande", c.get("user")?.magasin === "Rouen" ? "Rouen" : "Amiens");
   const reps = [...new Set(rows.map((r) => r.reparation_id).filter((x) => x))] as number[];
   let prets = 0;
   for (const rid of reps) {

@@ -4,11 +4,11 @@ function stFocus(id){setTimeout(function(){var e=document.getElementById(id);if(
 function vStock(){
   var h="<div class='pmsg'>"+esc(STMSG)+"</div><div class='actions'><button class='"+(STSUB==="liste"?"":"sec")+"' data-act='stSub' data-s='liste'>Stock</button><button class='"+(STSUB==="inv"?"":"sec")+"' data-act='stSub' data-s='inv'>Inventaire d'un emplacement</button></div>";
   if(STSUB==="inv"){app.innerHTML=h+vInv();stFocus(STINV.lieu?"iscan":"ilieu");return}
-  if(!STK){app.innerHTML=h+"<div class='card'>Chargement…</div>";api("/stock").then(function(d){STK=d;render()}).catch(function(e){STMSG=e.message;STK={produits:[],lieux:[],nb:0,valeurAchatHtCents:0};render()});return}
+  if(!STK){app.innerHTML=h+"<div class='card'>Chargement…</div>";api("/stock?magasin="+encodeURIComponent(MAG||"")).then(function(d){STK=d;render()}).catch(function(e){STMSG=e.message;STK={produits:[],lieux:[],nb:0,valeurAchatHtCents:0};render()});return}
   h+="<div class='card'><div class='step'>Ajout rapide</div><div class='muted'>Scanne le code-barres (ou laisse vide : un code interne est créé), tape le nom et le prix, Entrée. Si le code existe déjà, la quantité s'ajoute.</div>"
     +"<div class='dl' style='margin-top:6px'><input id='sk' class='lb' placeholder='Code-barres (scan)'><input id='sn' class='lb' placeholder='Nom du produit'><input id='sp' class='p' placeholder='Prix vente TTC'><input id='sa' class='p' placeholder='Achat HT'><input id='sq' class='q' type='number' min='1' value='1' title='Quantité'><input id='sl' class='q' placeholder='Empl.' value='"+esc(STLIEU)+"' title='Emplacement (A11…)'></div>"
     +"<div class='actions'><button data-act='stAdd'>Ajouter au stock</button></div></div>";
-  h+="<div class='card'><div class='head'><div class='step'>"+STK.nb+" produit"+(STK.nb>1?"s":"")+" en stock"+(STK.valeurAchatHtCents?" · valeur d'achat HT "+eur(STK.valeurAchatHtCents):"")+"</div><input id='stq' class='lb' placeholder='Chercher (nom, code, emplacement)' value='"+esc(STQ)+"'></div>";
+  h+="<div class='card'><div class='head'><div class='step'>Stock "+esc(STK.magasin||"")+" : "+STK.nb+" produit"+(STK.nb>1?"s":"")+" en stock"+(STK.valeurAchatHtCents?" · valeur d'achat HT "+eur(STK.valeurAchatHtCents):"")+"</div><input id='stq' class='lb' placeholder='Chercher (nom, code, emplacement)' value='"+esc(STQ)+"'></div>";
   if(!STK.produits.length)h+="<div class='muted'>Aucun produit.</div>";
   else h+="<table class='devis' style='width:100%'><tr><th>Produit</th><th>Empl.</th><th class='n'>Achat HT</th><th class='n'>Vente</th><th class='n'>Qté</th><th></th></tr>"+STK.produits.map(function(p){
     return"<tr><td>"+esc(p.nom)+"<div class='muted'>"+esc(p.code)+"</div></td><td>"+esc(p.emplacement||"-")+"</td><td class='n'>"+(p.achatHtCents==null?"-":eur(p.achatHtCents))+"</td><td class='n'>"+eur(p.prixCents)+"</td>"
@@ -20,12 +20,12 @@ function stProd(id){return(STK&&STK.produits||[]).filter(function(p){return p.id
 function stRun(p,msg){return p.then(function(d){STMSG=(d&&d.message)||msg||"";STK=null;render()}).catch(function(e){STMSG=e.message;render()})}
 ACTS.stSub=function(b){STSUB=b.dataset.s;STMSG="";STAP=null;render()};
 ACTS.stAdd=function(){
-  stRun(api("/stock/rapide",{code:v("sk"),nom:v("sn"),prix:v("sp"),achat:v("sa"),qte:v("sq")||1,emplacement:v("sl")}).then(function(d){STLIEU=v("sl")||STLIEU;return d}));
+  stRun(api("/stock/rapide",{magasin:MAG||"",code:v("sk"),nom:v("sn"),prix:v("sp"),achat:v("sa"),qte:v("sq")||1,emplacement:v("sl")}).then(function(d){STLIEU=v("sl")||STLIEU;return d}));
   };
 ACTS.stCode=function(){
   var c=v("sk");if(!c)return;
-  api("/stock/scan",{code:c}).then(function(d){var p=d.produit;if(p){document.getElementById("sn").value=p.nom;document.getElementById("sp").value=p.prixCents?(p.prixCents/100).toFixed(2):"";document.getElementById("sa").value=p.achatHtCents==null?"":(p.achatHtCents/100).toFixed(2);if(p.emplacement)document.getElementById("sl").value=p.emplacement;STMSG="Déjà en stock : "+p.nom+" ("+p.qte+"). La quantité saisie s'ajoutera.";var m=document.querySelector(".pmsg");if(m)m.textContent=STMSG;stFocus("sq")}else stFocus("sn")}).catch(function(){})};
-ACTS.stSearch=function(){STQ=v("stq");api("/stock?q="+encodeURIComponent(STQ)).then(function(d){STK=d;var p=STQ;render();var e=document.getElementById("stq");if(e){e.focus();e.setSelectionRange(p.length,p.length)}}).catch(function(){})};
+  api("/stock/scan",{magasin:MAG||"",code:c}).then(function(d){var p=d.produit,sh=d.shopify;if(!p&&sh){document.getElementById("sn").value=sh.nom;document.getElementById("sp").value=sh.prixCents?(sh.prixCents/100).toFixed(2):"";document.getElementById("sa").value=sh.achatHtCents==null?"":(sh.achatHtCents/100).toFixed(2);STMSG="Trouvé dans le catalogue Shopify : "+sh.nom+". Indique la quantité et l'emplacement.";var m2=document.querySelector(".pmsg");if(m2)m2.textContent=STMSG;stFocus("sq");return}if(p){document.getElementById("sn").value=p.nom;document.getElementById("sp").value=p.prixCents?(p.prixCents/100).toFixed(2):"";document.getElementById("sa").value=p.achatHtCents==null?"":(p.achatHtCents/100).toFixed(2);if(p.emplacement)document.getElementById("sl").value=p.emplacement;STMSG="Déjà en stock : "+p.nom+" ("+p.qte+"). La quantité saisie s'ajoutera.";var m=document.querySelector(".pmsg");if(m)m.textContent=STMSG;stFocus("sq")}else stFocus("sn")}).catch(function(){})};
+ACTS.stSearch=function(){STQ=v("stq");api("/stock?magasin="+encodeURIComponent(MAG||"")+"&q="+encodeURIComponent(STQ)).then(function(d){STK=d;var p=STQ;render();var e=document.getElementById("stq");if(e){e.focus();e.setSelectionRange(p.length,p.length)}}).catch(function(){})};
 ACTS.stDelta=function(b){stRun(api("/stock/maj",{id:+b.dataset.id,delta:+b.dataset.d}),"")};
 ACTS.stDel=function(b){var p=stProd(+b.dataset.id);if(p&&confirm("Retirer "+p.nom+" du stock ? (récupérable en le rescannant)"))stRun(api("/stock/archiver",{id:p.id}))};
 ACTS.stEtq=function(b){var p=stProd(+b.dataset.id);if(!p)return;ETQ.push({titre:p.nom,prix:(p.prixCents/100).toFixed(2),barcode:p.code,sku:"",qte:Math.max(1,p.qte)});TAB="etq";render()};
@@ -47,7 +47,7 @@ function vInv(){
       +(a.deplaces.length?"<div class='step' style='margin-top:8px'>Déplacés vers "+esc(a.emplacement)+" ("+a.deplaces.length+")</div>"+a.deplaces.map(function(p){return"<div>"+esc(p.nom)+" <span class='muted'>(était en "+esc(p.emplacement||"-")+")</span></div>"}).join(""):"")
       +(a.ecarts.length?"<div class='step' style='margin-top:8px'>Quantités corrigées ("+a.ecarts.length+")</div>"+a.ecarts.map(function(p){return"<div>"+esc(p.nom)+" <span class='muted'>"+p.qte+" → "+p.compte+"</span></div>"}).join(""):"")
       +(a.revenus.length?"<div class='step' style='margin-top:8px'>Remis en stock ("+a.revenus.length+")</div>"+a.revenus.map(function(p){return"<div>"+esc(p.nom)+"</div>"}).join(""):"")
-      +(a.inconnus.length?"<div class='step' style='margin-top:8px'>Codes inconnus ("+a.inconnus.length+") : à créer dans Stock après</div>"+a.inconnus.map(function(p){return"<div>"+esc(p.code)+" x"+p.qte+"</div>"}).join(""):"")
+      +(a.inconnus.length?"<div class='step' style='margin-top:8px'>Nouveaux produits ("+a.inconnus.length+")</div>"+a.inconnus.map(function(p){return"<div>"+(p.shopify?esc(p.nom)+" <span class='muted'>"+esc(p.code)+" x"+p.qte+" · sera créé depuis Shopify</span>":esc(p.code)+" x"+p.qte+" <span class='muted'>inconnu : à créer à la main dans Stock</span>")+"</div>"}).join(""):"")
       +"<div class='actions'><button data-act='iOk'>Valider l'inventaire</button><button class='sec' data-act='iBack'>Continuer à scanner</button></div></div>";
     return h}
   var codes=STINV.scans.reduce(function(m,s){m[s.code]=(m[s.code]||0)+1;return m},{}),ks=Object.keys(codes);
@@ -61,13 +61,13 @@ ACTS.iScan=function(){
   var c=v("iscan").replace(/ /g,"");if(!c)return;
   if(!STINV.lieu){STINV.lieu=v("ilieu").toUpperCase().replace(/ /g,"");if(!STINV.lieu){STMSG="Indique d'abord l'emplacement.";render();return}}
   STINV.scans.push({code:c,qte:1});
-  if(STINV.noms[c]===undefined){STINV.noms[c]="";api("/stock/scan",{code:c}).then(function(d){STINV.noms[c]=d.produit?d.produit.nom:"";if(STSUB==="inv"&&!STAP)render()}).catch(function(){})}
+  if(STINV.noms[c]===undefined){STINV.noms[c]="";api("/stock/scan",{magasin:MAG||"",code:c}).then(function(d){STINV.noms[c]=d.produit?d.produit.nom:(d.shopify?d.shopify.nom+" (Shopify)":"");if(STSUB==="inv"&&!STAP)render()}).catch(function(){})}
   STMSG="";render()};
 ACTS.iMoins=function(b){var c=b.dataset.c;for(var i=STINV.scans.length-1;i>=0;i--)if(STINV.scans[i].code===c){STINV.scans.splice(i,1);break}render()};
 ACTS.iReset=function(){STINV={lieu:STINV.lieu,scans:[],noms:{}};STAP=null;render()};
 ACTS.iBack=function(){STAP=null;render()};
-ACTS.iFin=function(){STINV.lieu=v("ilieu").toUpperCase().replace(/ /g,"")||STINV.lieu;api("/stock/inventaire",{emplacement:STINV.lieu,scans:STINV.scans}).then(function(d){STAP=d.apercu;render()}).catch(function(e){STMSG=e.message;render()})};
-ACTS.iOk=function(){api("/stock/inventaire",{emplacement:STINV.lieu,scans:STINV.scans,appliquer:true}).then(function(d){STMSG=d.message;STINV={lieu:"",scans:[],noms:{}};STAP=null;STK=null;render()}).catch(function(e){STMSG=e.message;render()})};
+ACTS.iFin=function(){STINV.lieu=v("ilieu").toUpperCase().replace(/ /g,"")||STINV.lieu;api("/stock/inventaire",{magasin:MAG||"",emplacement:STINV.lieu,scans:STINV.scans}).then(function(d){STAP=d.apercu;render()}).catch(function(e){STMSG=e.message;render()})};
+ACTS.iOk=function(){api("/stock/inventaire",{magasin:MAG||"",emplacement:STINV.lieu,scans:STINV.scans,appliquer:true}).then(function(d){STMSG=d.message;STINV={lieu:"",scans:[],noms:{}};STAP=null;STK=null;render()}).catch(function(e){STMSG=e.message;render()})};
 // Entrée = valider le champ (scanner ou clavier)
 document.addEventListener("keydown",function(e){
   if(e.key!=="Enter")return;var t=e.target;if(!t||TAB!=="stock")return;
