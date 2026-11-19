@@ -97,14 +97,16 @@ function etqFormat(){
   if(!ETQF){try{ETQF=localStorage.getItem("etqf")||""}catch(e){ETQF=""}}
   if(!ETQFORMATS[ETQF])ETQF="50x30";return ETQF}
 function etqLabel(it,F){
-  var small=F.h<=25,nameCls=small?"font-size:7pt":"font-size:9pt";
-  var code=it.barcode||it.sku||"";
-  var bh=Math.max(6,Math.round(F.h*(small?0.34:0.3)));
-  return"<div class='etq' style='width:"+F.w+"mm;height:"+F.h+"mm;box-sizing:border-box;padding:1.5mm 2mm;overflow:hidden;font-family:Arial,Helvetica,sans-serif;color:#000;background:#fff'>"
-    +"<div style='"+nameCls+";font-weight:700;line-height:1.1;max-height:"+(small?"7.5":"10")+"mm;overflow:hidden'>"+esc(it.titre)+"</div>"
-    +"<div style='font-size:"+(small?"13":"17")+"pt;font-weight:800;line-height:1.15'>"+esc(it.prix)+" €</div>"
-    +(code?code128Svg(code,bh)+"<div style='font-size:6pt;text-align:center;letter-spacing:.5px'>"+esc(code)+"</div>":"<div style='font-size:6pt'>Pas de code-barres</div>")
-    +"</div>"}
+  var small=F.h<=25,code=it.barcode||it.sku||"";
+  var tf=Math.round(F.h*(small?0.3:0.27)),pf=Math.round(F.h*(small?0.55:0.6));
+  var lines=small?2:3;
+  return"<div class='etq' style='width:"+F.w+"mm;height:"+F.h+"mm;box-sizing:border-box;padding:1.5mm 2mm;overflow:hidden;font-family:Arial,Helvetica,sans-serif;color:#000;background:#fff;display:flex;gap:1.5mm;align-items:stretch'>"
+    +"<div style='flex:1;min-width:0;display:flex;flex-direction:column;justify-content:space-between'>"
+    +"<div style='font-size:"+tf+"pt;font-weight:800;line-height:1.08;max-height:"+(lines*tf*0.4)+"mm;overflow:hidden'>"+esc(it.titre)+"</div>"
+    +"<div style='font-size:"+pf+"pt;font-weight:900;line-height:1;white-space:nowrap'>"+esc(it.prix)+" €</div></div>"
+    +"<div style='width:34%;flex:none;display:flex;flex-direction:column;justify-content:flex-end'>"
+    +(code?code128Svg(code,Math.round(F.h*0.38))+"<div style='font-size:5pt;text-align:center;letter-spacing:.3px;overflow:hidden'>"+esc(code)+"</div>":"<div style='font-size:5pt;text-align:center'>Pas de code</div>")
+    +"</div></div>"}
 function etqToutes(){var out=[];ETQ.forEach(function(it){for(var i=0;i<(it.qte||1);i++)out.push(it)});return out}
 function etqCss(F){
   if(F.page)return"@page{size:A4;margin:0}@media print{body *{visibility:hidden}#impzone,#impzone *{visibility:visible}#impzone{position:absolute;left:0;top:0;width:210mm}.etqgrid{display:grid;grid-template-columns:repeat("+F.cols+","+F.w+"mm);grid-auto-rows:"+F.h+"mm;margin-left:0;margin-top:5mm}.etqempty{width:"+F.w+"mm;height:"+F.h+"mm}}";
