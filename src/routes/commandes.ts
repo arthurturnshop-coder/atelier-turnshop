@@ -8,7 +8,7 @@ import { AppError, exigeAdmin } from "../util";
 // Réglage : créer ou non une commande Shopify quand on facture une réparation.
 export async function commandesActives(): Promise<boolean> {
   const [r] = (await sql`SELECT valeur FROM reglages WHERE cle = 'shopify_commandes'`) as any[];
-  return r?.valeur === "1";
+  return r?.valeur !== "0"; // actif par défaut : toute facturation de réparation crée la commande Shopify
 }
 
 app.get("/api/reglages/commandes", async (c) => c.json({ actif: await commandesActives() }));
@@ -73,7 +73,7 @@ export async function creerCommandeShopify(venteId: number): Promise<{ ok: boole
     const order = construireCommande(v, client, rep, lignes, paiements);
     const data = await shopifyMutate(
       `mutation($order: OrderCreateOrderInput!, $options: OrderCreateOptionsInput) { orderCreate(order: $order, options: $options) { order { id name customer { id } } userErrors { field message } } }`,
-      { order, options: { inventoryBehaviour: "DECREMENT_IGNORING_POLICY", sendReceipt: false, sendFulfillmentReceipt: false } },
+      { order, options: { inventoryBehaviour: "DECREMENT_IGNORING_POLICY", sendReceipt: !!String(client.email ?? "").trim(), sendFulfillmentReceipt: false } },
     );
     const res = data?.orderCreate;
     if (res?.userErrors?.length) throw new Error(res.userErrors.map((e: any) => e.message).join(" · "));
