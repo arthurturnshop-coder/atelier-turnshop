@@ -247,3 +247,21 @@ app.post("/api/stock/codes-shopify", async (c) => {
   }
   return c.json({ faits, restant: sans.length - faits });
 });
+
+// Associe le code-barres du fournisseur (EAN lu sur le carton) à une variante Shopify : il est écrit dans Shopify.
+app.post("/api/stock/associer-code", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const code = codeNet(b.code);
+  const variantId = clean(b.variantId, 80);
+  if (!/^\d{8,14}$/.test(code)) throw new AppError(400, "Scanne le code-barres (8 à 14 chiffres).");
+  if (!/^gid:\/\/shopify\/ProductVariant\/\d+$/.test(variantId)) throw new AppError(400, "Choisis un produit.");
+  const dej: any = await shopifyRead(`query($q:String!){productVariants(first:3,query:$q){nodes{id displayName}}}`, { q: `barcode:${code}` });
+  const autre = (dej?.productVariants?.nodes ?? []).find((v: any) => v.id !== variantId);
+  if (autre && !b.force) return c.json({ conflit: true, message: `Ce code est déjà sur « ${autre.displayName} ». Remplacer quand même ?` });
+  const v: any = await shopifyRead(`query($id:ID!){productVariant(id:$id){displayName barcode product{id}}}`, { id: variantId });
+  if (!v?.productVariant) throw new AppError(404, "Variante introuvable.");
+  const r: any = await shopifyMutate(`mutation($productId:ID!,$variants:[ProductVariantsBulkInput!]!){productVariantsBulkUpdate(productId:$productId,variants:$variants){productVariants{id} userErrors{message}}}`, { productId: v.productVariant.product.id, variants: [{ id: variantId, barcode: code }] });
+  const errs = r?.productVariantsBulkUpdate?.userErrors || [];
+  if (errs.length) throw new AppError(502, "Shopify : " + errs[0].message);
+  return c.json({ message: `Code ${code} enregistré sur « ${v.productVariant.displayName} ».` });
+});

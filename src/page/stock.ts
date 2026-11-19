@@ -1,5 +1,5 @@
 export const STOCK = `// ---------- Stock maison + inventaire par emplacement ----------
-var STK=null,STMSG="",STSUB="liste",STQ="",STLIEU="",STINV={lieu:"",cur:"",scans:[],noms:{}},STAP=null;
+var STAS="",STK=null,STMSG="",STSUB="liste",STQ="",STLIEU="",STINV={lieu:"",cur:"",scans:[],noms:{}},STAP=null;
 function stPanneau(){return/^[A-Z]+$/.test(STINV.lieu)}
 function stSuiv(c,d){var m=String(c).match(/^([A-Z]+)([0-9]+)$/);if(!m)return c;var n=Math.max(1,Number(m[2])+d);return m[1]+n}
 function stFocus(id){setTimeout(function(){var e=document.getElementById(id);if(e)e.focus()},30)}
@@ -10,6 +10,8 @@ function vStock(){
   h+="<div class='card'><div class='step'>Ajout rapide</div><div class='muted'>Scanne l'EAN-13 (ou laisse vide : un EAN-13 interne commençant par 200 est créé, à étiqueter), tape le nom et le prix, Entrée. Si le code existe déjà, la quantité s'ajoute.</div>"
     +"<div class='dl' style='margin-top:6px'><input id='sk' class='lb' placeholder='EAN-13 (scan) - vide = généré'><input id='sn' class='lb' placeholder='Nom du produit'><input id='sp' class='p' placeholder='Prix vente TTC'><input id='sa' class='p' placeholder='Achat HT'><input id='sq' class='q' type='number' min='1' value='1' title='Quantité'><input id='sm' class='q' type='number' min='0' placeholder='Min' title='Stock minimum : en dessous, une commande est suggérée'><input id='sl' class='q' placeholder='Empl.' value='"+esc(STLIEU)+"' title='Emplacement (A11…)'></div>"
     +"<div class='actions'><button data-act='stAdd'>Ajouter au stock</button><button class='sec' data-act='stCodesShopify'>Créer les codes-barres manquants des produits Shopify</button></div></div>";
+  h+="<div class='card'><div class='step'>Associer un code-barres fournisseur à un produit Shopify</div><div class='muted'>1) Scanne le code-barres du carton. 2) Cherche le produit (ex : pneu plein Xiaomi) et clique la bonne variante : le code est écrit dans Shopify.</div>"
+    +"<div class='dl' style='margin-top:6px'><input id='asc' class='lb' placeholder='Scanne le code-barres du fournisseur' value='"+esc(STAS)+"'></div>"+prodBox("assoc")+"</div>";
   h+="<div class='card'><div class='head'><div class='step'>Stock "+esc(STK.magasin||"")+" : "+STK.nb+" produit"+(STK.nb>1?"s":"")+" en stock"+(STK.valeurAchatHtCents?" · valeur d'achat HT "+eur(STK.valeurAchatHtCents):"")+"</div><input id='stq' class='lb' placeholder='Chercher (nom, code, emplacement)' value='"+esc(STQ)+"'></div>";
   if(!STK.produits.length)h+="<div class='muted'>Aucun produit.</div>";
   else h+="<table class='devis' style='width:100%'><tr><th>Produit</th><th>Empl.</th><th class='n'>Achat HT</th><th class='n'>Vente</th><th class='n'>Qté</th><th class='n'>Min</th><th></th></tr>"+STK.produits.map(function(p){
@@ -89,6 +91,13 @@ document.addEventListener("keydown",function(e){
   if(t.id==="sk"){e.preventDefault();ACTS.stCode();return}
   if(t.id==="sn"||t.id==="sp"||t.id==="sa"||t.id==="sq"||t.id==="sm"||t.id==="sl"){e.preventDefault();ACTS.stAdd()}});
 document.addEventListener("input",function(e){var t=e.target;if(t&&t.id==="stq"&&TAB==="stock"){clearTimeout(window.__stt);window.__stt=setTimeout(ACTS.stSearch,250)}});
+document.addEventListener("input",function(e){if(e.target&&e.target.id==="asc")STAS=e.target.value.trim()});
+document.addEventListener("keydown",function(e){if(e.target&&e.target.id==="asc"&&e.key==="Enter"){e.preventDefault();var b=document.querySelector("[data-ps=assoc]");if(b)b.focus()}});
+ACTS.stAssocie=async function(x,force){
+  var code=STAS;if(!code){alert("Scanne d abord le code-barres du fournisseur.");return}
+  try{var d=await api("/stock/associer-code",{code:code,variantId:x.id,force:!!force});
+    if(d.conflit){if(confirm(d.message))return ACTS.stAssocie(x,true);return}
+    STMSG=d.message;STAS="";render()}catch(err){alert(err.message)}};
 ACTS.stCodesShopify=function(){
   if(!confirm("Donner un code-barres EAN-13 a tous les produits Shopify qui n en ont pas ? (ecrit dans Shopify, 100 produits a la fois)"))return;
   STMSG="Creation des codes-barres Shopify...";render();
