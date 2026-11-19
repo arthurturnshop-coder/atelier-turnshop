@@ -55,11 +55,12 @@ ACTS.rAddDevis=async function(b){var l=rechLigne(b);if(!l||!FICHE)return;
 ACTS.rAddPanier=function(b){var l=rechLigne(b);if(!l)return;
   PAN.push({libelle:l.libelle,quantite:1,prix:l.prix,type:"piece",variantId:l.variantId,sku:l.sku,barcode:l.barcode,marque:l.marque});rechHide();var q=document.getElementById("rq");if(q)q.value="";
   CUR=null;FICHE=null;TAB="accueil";CREC=null;render()};
-var PSRES={},PST={};
+var PSRES={},PST={},PSLOC={};
 function prodBox(ctx){return"<input data-ps='"+ctx+"' placeholder='Chercher un produit Shopify (nom, référence, code-barres)...' autocomplete='off'><div class='psres' id='pr-"+ctx+"'></div>"}
 function psHtml(ctx,d){
   var ps=d.produits||[];PSRES[ctx]=ps;
-  var sl=(d.stockLocal||[]).map(function(p){return"<div class='muted'>Stock atelier : <b>"+esc(p.nom)+"</b> · "+eur(p.prixCents)+" · "+p.qte+" en stock · <b>Empl. "+esc(p.emplacement||"non rangé")+"</b></div>"}).join("");
+  PSLOC[ctx]=d.stockLocal||[];
+  var sl=PSLOC[ctx].map(function(p,i){var t="Stock atelier : <b>"+esc(p.nom)+"</b> · "+eur(p.prixCents)+" · "+p.qte+" en stock · <b>Empl. "+esc(p.emplacement||"non rangé")+"</b>";return ctx==="etq"?"<button class='sec hrow' data-act='psLoc' data-ctx='"+ctx+"' data-i='"+i+"'>"+t+"</button>":"<div class='muted'>"+t+"</div>"}).join("");
   if(d.produitsIndisponibles)return sl+"<div class='muted'>Catalogue indisponible pour le moment.</div>";
   if(!ps.length)return sl+"<div class='muted'>Aucun produit trouvé.</div>";
   var h=sl;
@@ -79,10 +80,12 @@ document.addEventListener("input",function(e){
   PST[ctx]=setTimeout(function(){
     box.innerHTML="<div class='muted'>Recherche…</div>";
     api("/recherche?q="+encodeURIComponent(q)).then(function(d){if(t.value.trim()!==q)return;box.innerHTML=psHtml(ctx,d)}).catch(function(err){box.innerHTML="<div class='muted'>"+esc(err.message)+"</div>"})},300)});
+ACTS.psLoc=function(b){var p=(PSLOC[b.dataset.ctx]||[])[+b.dataset.i];if(!p)return;ETQ.push({titre:p.nom,prix:(p.prixCents/100).toFixed(2),barcode:p.code,sku:"",qte:Math.max(1,p.qte)});render()};
 ACTS.psAdd=async function(b){
   var ctx=b.dataset.ctx,p=(PSRES[ctx]||[])[+b.dataset.pi],x=p&&p.variantes[+b.dataset.vi];if(!x)return;
   var vt=x.titre&&x.titre!=="Default Title"?" - "+x.titre:"";
   var l={libelle:(p.titre+vt).slice(0,200),prix:String(x.prix||"0").replace(".",","),variantId:x.id,sku:x.sku||"",barcode:x.barcode||"",marque:p.marque||""};
+  if(ctx==="etq"){ETQ.push({titre:l.libelle,prix:String(x.prix||"0"),barcode:l.barcode,sku:l.sku,qte:1});render();return}
   if(ctx.indexOf("mod")===0){try{await api("/modeles/piece",{modeleId:+ctx.slice(3),libelle:l.libelle,sku:l.sku,variantId:l.variantId,categorie:"pneu"});MODS=null;render()}catch(err){alert(err.message)}return}
   if(ctx==="caisse"){lirePay();PAN.push({libelle:l.libelle,quantite:1,prix:l.prix,type:"piece",variantId:l.variantId,sku:l.sku});CREC=null;render();return}
   if(ctx.indexOf("cmd")===0){try{var d=await api("/achats/ligne",{fournisseurId:+ctx.slice(3),libelle:l.libelle,sku:l.sku,barcode:l.barcode,variantId:l.variantId,quantite:1});CMDMSG=d.message;CMD=null;render()}catch(err){alert(err.message)}return}
