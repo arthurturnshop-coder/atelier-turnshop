@@ -125,6 +125,7 @@ ACTS.pSaveSel=function(b){
 ACTS.pRetirer=function(b){var id=+b.dataset.id;api("/planning/retirer",{repairId:id}).then(function(){PSEL=null;PPEND=null;return loadPlan("Réparation retirée du planning.")}).catch(function(e){setMsg(e.message)})};
 ACTS.pOpenCli=function(b){api("/customer?id="+b.dataset.cid).then(function(c){CUR=c;TAB="accueil";FICHE=null;ADDT=false;RECEP=null;EDITCLI=false;FID=null;PSEL=null;render()}).catch(function(e){setMsg(e.message)})};
 
+document.addEventListener("mousedown",function(e){var pl=document.getElementById("pl");if(pl&&e.target.closest&&e.target.closest(".pcard")&&pl.contains(e.target))e.preventDefault()});
 document.addEventListener("pointerdown",function(e){
   var pl=document.getElementById("pl");if(!pl||e.button>0)return;
   var c=e.target.closest?e.target.closest(".pcard"):null;if(!c||!pl.contains(c))return;
