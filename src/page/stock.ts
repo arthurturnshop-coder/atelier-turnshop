@@ -1,6 +1,7 @@
 export const STOCK = `// ---------- Stock maison + inventaire par emplacement ----------
 var STK=null,STMSG="",STSUB="liste",STQ="",STLIEU="",STINV={lieu:"",cur:"",scans:[],noms:{}},STAP=null;
 function stPanneau(){return/^[A-Z]+$/.test(STINV.lieu)}
+function stSuiv(c,d){var m=String(c).match(/^([A-Z]+)([0-9]+)$/);if(!m)return c;var n=Math.max(1,Number(m[2])+d);return m[1]+n}
 function stFocus(id){setTimeout(function(){var e=document.getElementById(id);if(e)e.focus()},30)}
 function vStock(){
   var h="<div class='pmsg'>"+esc(STMSG)+"</div><div class='actions'><button class='"+(STSUB==="liste"?"":"sec")+"' data-act='stSub' data-s='liste'>Stock</button><button class='"+(STSUB==="inv"?"":"sec")+"' data-act='stSub' data-s='inv'>Inventaire d'un emplacement</button></div>";
@@ -53,17 +54,25 @@ function vInv(){
       +"<div class='actions'><button data-act='iOk'>Valider l'inventaire</button><button class='sec' data-act='iBack'>Continuer à scanner</button></div></div>";
     return h}
   var codes=STINV.scans.reduce(function(m,s){m[s.code]=(m[s.code]||0)+1;return m},{}),ks=Object.keys(codes);
-  if(stPanneau())h+="<div class='card'><div class='step'>Rayon en cours : "+(STINV.cur?"<b>"+esc(STINV.cur)+"</b>":"<span class='tag warn'>aucun : tape ou scanne le rayon (ex : "+esc(STINV.lieu)+"11)</span>")+"</div></div>";
+  if(stPanneau()){
+    if(!STINV.cur)STINV.cur=STINV.lieu+"1";
+    var nbc=STINV.scans.filter(function(x){return x.emplacement===STINV.cur}).length;
+    h+="<div class='card'><div class='step'>Rayon en cours</div><div class='dl' style='align-items:center'><button class='sec' data-act='iPrec'>← Précédent</button><input id='icur' class='q' value='"+esc(STINV.cur)+"' style='font-weight:700;text-align:center'><button data-act='iSuiv'>Suivant →</button><span class='muted'>"+nbc+" pièce"+(nbc>1?"s":"")+" scannée"+(nbc>1?"s":"")+" ici</span></div><div class='muted'>Scanne les produits du rayon, puis clique Suivant : le rayon passe à "+esc(stSuiv(STINV.cur,1))+". Tu peux aussi taper un autre rayon dans la case.</div></div>"}
   h+="<div class='card'><div class='step'>Scannés ("+STINV.scans.length+" pièce"+(STINV.scans.length>1?"s":"")+", "+ks.length+" référence"+(ks.length>1?"s":"")+")</div>";
   if(!ks.length)h+="<div class='muted'>Rien de scanné pour l'instant.</div>";
   else h+=ks.map(function(k){return"<div>"+esc(STINV.noms[k]||"Code inconnu")+" <span class='muted'>"+esc(k)+"</span> <b>x"+codes[k]+"</b> <button class='link' data-act='iMoins' data-c='"+esc(k)+"'>-1</button></div>"}).join("");
   h+="<div class='actions'><button data-act='iFin'"+(STINV.scans.length&&STINV.lieu?"":" disabled")+">Terminer et contrôler</button><button class='sec' data-act='iReset'>Tout effacer</button></div></div>";
   return h}
-ACTS.iLieu=function(){STINV.lieu=v("ilieu").toUpperCase().replace(/ /g,"");STINV.cur=""};
+ACTS.iLieu=function(){STINV.lieu=v("ilieu").toUpperCase().replace(/ /g,"");STINV.cur=stPanneau()?STINV.lieu+"1":"";render()};
+function iCurLire(){var e=document.getElementById("icur");if(e&&e.value.trim())STINV.cur=e.value.toUpperCase().replace(/ /g,"")}
+ACTS.iSuiv=function(){iCurLire();STINV.cur=stSuiv(STINV.cur,1);render()};
+ACTS.iPrec=function(){iCurLire();STINV.cur=stSuiv(STINV.cur,-1);render()};
 ACTS.iScan=function(){
   var c=v("iscan").replace(/ /g,"");if(!c)return;
   if(!STINV.lieu){STINV.lieu=v("ilieu").toUpperCase().replace(/ /g,"");if(!STINV.lieu){STMSG="Indique d'abord l'emplacement.";render();return}}
   if(stPanneau()&&/^[A-Za-z]{1,3}[0-9]{1,3}$/.test(c)&&c.toUpperCase().indexOf(STINV.lieu)===0){STINV.cur=c.toUpperCase();STMSG="";render();return}
+  if(stPanneau()&&!STINV.cur)STINV.cur=STINV.lieu+"1";
+  if(stPanneau())iCurLire();
   STINV.scans.push({code:c,qte:1,emplacement:stPanneau()?STINV.cur:STINV.lieu});
   if(STINV.noms[c]===undefined){STINV.noms[c]="";api("/stock/scan",{magasin:MAG||"",code:c}).then(function(d){STINV.noms[c]=d.produit?d.produit.nom:(d.shopify?d.shopify.nom+" (Shopify)":"");if(STSUB==="inv"&&!STAP)render()}).catch(function(){})}
   STMSG="";render()};

@@ -1,5 +1,7 @@
 export const COMPTA = `// ---------- Comptabilité (admins, dans Paramètres) ----------
 var CPT=null,CPTBUSY=false,CPTMSG="";
+ACTS.parSec=function(b){PSEC=b.dataset.s;render()};
+ACTS.parBack=function(){PSEC="";render()};
 var CPTLAB={piece:"Pièce vendue",article:"Article / produit vendu",main_oeuvre:"Main d'œuvre",consommable:"Consommables",port:"Port facturé",remise:"Remises accordées",piece_achetee:"Pièce achetée",tva_collectee:"TVA collectée",tva_deductible:"TVA déductible",acompte:"Acomptes clients",carte:"Encaissement carte",especes:"Encaissement espèces",virement:"Encaissement virement",en_ligne:"Encaissement en ligne (Shopify)"};
 function cptLoad(){if(CPT===null&&!CPTBUSY){CPTBUSY=true;api("/compta/config").then(function(d){CPT=d;CPTBUSY=false;render()}).catch(function(e){CPT={comptes:[],defauts:[],analytiques:[]};CPTMSG=e.message;CPTBUSY=false;render()})}}
 function cptCard(){
