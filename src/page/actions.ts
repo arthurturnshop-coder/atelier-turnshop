@@ -5,7 +5,7 @@ export const ACTIONS = `var ACTS={
   loginBackProf:function(){loadProfils(LG.magasin)},
   secoursOpen:function(){LG={step:"secours",magasin:LG.magasin};MSG="";render()},
   connect:connect,secoursConnect:secoursConnect,logout:logout,
-  tab:function(b){TAB=b.dataset.tab;if(TAB==="cmd")CMD=null;if(TAB==="stock"){STK=null;STSUB="liste"}if(TAB==="param")PSEC="";FICHE=null;if(TAB==="accueil"){CUR=null;CONS=null;CHIF=null;EDITCONS=false;NEWCLI=false;RES=[];SEARCHED=false}render()},
+  tab:function(b){TAB=b.dataset.tab;if(TAB==="cmd")CMD=null;if(TAB==="stock"){STK=null;STSUB="liste"}if(TAB==="param")PSEC="";if(TAB==="stats"){ST.d=null}FICHE=null;if(TAB==="accueil"){CUR=null;CONS=null;CHIF=null;EDITCONS=false;NEWCLI=false;RES=[];SEARCHED=false}render()},
   search:search,
   open:function(b){CUR=RES[+b.dataset.i];RES=[];SEARCHED=false;ADDT=false;RECEP=null;EDITCLI=false;FID=null;FICHE=null;TAB="accueil";render()},
   priseEnCharge:function(b){var c=RES[+b.dataset.i];CUR=c;RES=[];SEARCHED=false;TAB="accueil";ADDT=false;RECEP=null;EDITCLI=false;FID=null;FICHE=null;if(!c.trottinettes.length)ADDT=true;render()},
