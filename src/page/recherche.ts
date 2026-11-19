@@ -1,10 +1,14 @@
 export const RECHERCHE = `// ---------- Recherche rapide (bandeau) ----------
+function emplTxt(x){return x.emplacement?" · <b>Empl. "+esc(x.emplacement)+"</b>":""}
 function stockTxt(x){
   var l=x.lieux||[];
-  if(!l.length)return"stock "+(x.stock==null?"—":x.stock);
+  if(!l.length)return"stock "+(x.stock==null?"—":x.stock)+emplTxt(x);
   var ordre={Amiens:0,Rouen:1,Fournisseur:2};
   l=l.slice().sort(function(a,b){return(ordre[a.lieu]==null?9:ordre[a.lieu])-(ordre[b.lieu]==null?9:ordre[b.lieu])});
-  return l.map(function(e){return esc(e.lieu)+" "+e.qte}).join(" · ")}
+  return l.map(function(e){return esc(e.lieu)+" "+e.qte}).join(" · ")+emplTxt(x)}
+function stockLocalHtml(d){
+  var sl=d.stockLocal||[];if(!sl.length)return"";
+  return"<div class='rp-sec'>Stock atelier (rayon)</div>"+sl.map(function(p){return"<div class='rp-static'><b>"+esc(p.nom)+"</b><div class='rp-muted'>"+esc(p.code)+" · "+eur(p.prixCents)+" · "+p.qte+" en stock · <b>Empl. "+esc(p.emplacement||"non rangé")+"</b></div></div>"}).join("")}
 var RT=null,RCTL=null,RSEQ=0,RPROD=[];
 function rechHide(){RSEQ++;if(RCTL){RCTL.abort();RCTL=null}var p=document.getElementById("rpanel");if(p)p.style.display="none"}
 function rechShow(html){var p=document.getElementById("rpanel");p.innerHTML=html;p.style.display="block"}
@@ -27,6 +31,7 @@ function rechHtml(d){
   h+="<div class='rp-sec'>Clients</div>";var cl=d.clients||[];
   if(!cl.length)h+="<div class='rp-muted'>Aucun client.</div>";
   else cl.forEach(function(c){h+="<button class='rp-item' data-cid='"+esc(c.id)+"'><b>"+esc(c.name||"Sans nom")+"</b><div class='rp-muted'>"+esc([c.phone,c.email].filter(Boolean).join(" · "))+"</div></button>"});
+  h+=stockLocalHtml(d);
   h+="<div class='rp-sec'>Produits</div>";
   if(d.produitsIndisponibles)h+="<div class='rp-muted'>Produits : indisponible pour le moment</div>";
   else if(!(d.produits||[]).length)h+="<div class='rp-muted'>Aucun produit.</div>";
@@ -54,9 +59,10 @@ var PSRES={},PST={};
 function prodBox(ctx){return"<input data-ps='"+ctx+"' placeholder='Chercher un produit Shopify (nom, référence, code-barres)...' autocomplete='off'><div class='psres' id='pr-"+ctx+"'></div>"}
 function psHtml(ctx,d){
   var ps=d.produits||[];PSRES[ctx]=ps;
-  if(d.produitsIndisponibles)return"<div class='muted'>Catalogue indisponible pour le moment.</div>";
-  if(!ps.length)return"<div class='muted'>Aucun produit trouvé.</div>";
-  var h="";
+  var sl=(d.stockLocal||[]).map(function(p){return"<div class='muted'>Stock atelier : <b>"+esc(p.nom)+"</b> · "+eur(p.prixCents)+" · "+p.qte+" en stock · <b>Empl. "+esc(p.emplacement||"non rangé")+"</b></div>"}).join("");
+  if(d.produitsIndisponibles)return sl+"<div class='muted'>Catalogue indisponible pour le moment.</div>";
+  if(!ps.length)return sl+"<div class='muted'>Aucun produit trouvé.</div>";
+  var h=sl;
   ps.forEach(function(p,pi){(p.variantes||[]).forEach(function(x,vi){
     var vt=x.titre&&x.titre!=="Default Title"?" - "+esc(x.titre):"";
     h+="<button class='sec hrow' data-act='psAdd' data-ctx='"+ctx+"' data-pi='"+pi+"' data-vi='"+vi+"'><b>"+esc(p.titre)+vt+"</b><br><span class='muted'>"+esc(x.prix)+" € · "+stockTxt(x)+" · sku "+esc(x.sku||"—")+"</span></button>"})});

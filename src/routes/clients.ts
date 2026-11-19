@@ -79,7 +79,18 @@ app.get("/api/recherche", async (c) => {
     produitsIndisponibles = true;
     console.log(JSON.stringify({ event: "recherche-produits", message: String(e?.message ?? e).slice(0, 300) }));
   }
-  return c.json({ clients, reparations, produits, produitsIndisponibles });
+  // Emplacement en rayon (stock maison) : par nom/code/emplacement, et rattaché aux produits Shopify via SKU / code-barres.
+  let stockLocal: any[] = [];
+  try {
+    const like = "%" + q.replace(/[%_\\]/g, "") + "%";
+    stockLocal = ((await sql`SELECT nom, code, prix_cents, qte, emplacement FROM stock_produits WHERE archive_le IS NULL AND (nom ILIKE ${like} OR code ILIKE ${like} OR emplacement ILIKE ${like}) ORDER BY emplacement, nom LIMIT 8`) as any[]).map((p) => ({ nom: p.nom, code: p.code, prixCents: p.prix_cents, qte: p.qte, emplacement: p.emplacement }));
+    const codes = [...new Set(produits.flatMap((p: any) => p.variantes.flatMap((v: any) => [v.sku, v.barcode]).filter(Boolean)))] as string[];
+    if (codes.length) {
+      const m = new Map(((await sql`SELECT code, emplacement FROM stock_produits WHERE archive_le IS NULL AND emplacement <> '' AND code = ANY(${codes})`) as any[]).map((r) => [r.code, r.emplacement]));
+      for (const p of produits) for (const v of p.variantes) v.emplacement = m.get(v.sku) ?? m.get(v.barcode) ?? "";
+    }
+  } catch { /* stock maison indisponible : la recherche continue sans */ }
+  return c.json({ clients, reparations, produits, produitsIndisponibles, stockLocal });
 });
 
 // Doublons : même email (sans tenir compte des majuscules) ou même numéro (9 derniers chiffres) sur une autre fiche.
