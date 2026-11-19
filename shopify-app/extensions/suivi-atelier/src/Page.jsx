@@ -201,6 +201,7 @@ function Nouvelle({onFait, payer, setMsg, profil}) {
       + detail.pieces.reduce((t, p) => t + (pieces[p.id] && p.prixCents ? p.prixCents : 0), 0);
 
   const [erreurs, setErreurs] = useState({});
+  const [fait, setFait] = useState(null);
   const envoyer = async () => {
     const sansDevis = !prestaChoisie && !pieceChoisie;
     const er = {};
@@ -216,13 +217,42 @@ function Nouvelle({onFait, payer, setMsg, profil}) {
     setEnvoi(true);
     try {
       const j = await appel('/pub/rdv', {prenom, nom, tel, email, modeleId: modele ? modele.id : null, marque: marqueLibre, modele: modeleLibre, magasin, date, creneau, panne, prestationIds: ids(prestas), optionIds: ids(options), pieceIds: ids(pieces)});
-      // Paiement obligatoire pour engager le rendez-vous : acompte si devis, blocage sinon (remboursable si besoin).
-      let paye = await payer(j.repairId, sansDevis ? 'blocage' : 'acompte');
-      if (!paye) paye = await payer(j.repairId, sansDevis ? 'acompte' : 'blocage');
-      await onFait(j, paye);
+      setFait({j, sansDevis});
+      setEnvoi(false);
     } catch (e) { setMsg({err: true, texte: e.message}); setEnvoi(false); }
   };
+  // Paiement obligatoire pour engager le rendez-vous : acompte si devis, blocage sinon (remboursable si besoin).
+  const confirmer = async () => {
+    setEnvoi(true);
+    let paye = await payer(fait.j.repairId, fait.sansDevis ? 'blocage' : 'acompte');
+    if (!paye) paye = await payer(fait.j.repairId, fait.sansDevis ? 'acompte' : 'blocage');
+    setEnvoi(false);
+    await onFait(fait.j, paye);
+  };
 
+  // Après l'envoi : explications + confirmation (paiement) du rendez-vous
+  if (fait) {
+    const adresse = magasin === 'Rouen' ? "l'atelier TURN SHOP de Rouen (adresse sur turnshop.fr)" : '6 rue de la 2e DB, Amiens';
+    return (
+      <s-section heading={'Ta demande est enregistrée (' + fait.j.numero + ')'}>
+        <s-stack gap="base">
+          <s-text>{'Ton rendez-vous du ' + (jours.find((x) => x.iso === date) || {label: date}).label + ' (' + (creneau === 'matin' ? 'matin' : 'après-midi') + ') va être validé, modifié ou refusé par l\'atelier. Reste actif sur ton compte (Suivi atelier) pour être tenu informé.'}</s-text>
+          <s-text>Une fois ton rendez-vous validé, tu déposes ta trottinette en présentant le QR code de ta carte de fidélité. On s'occupe du reste !</s-text>
+          <s-text type="strong">{'Atelier : ' + adresse}</s-text>
+          <s-banner tone="info">
+            <s-stack gap="small-200">
+              <s-text type="strong">Pour valider ta prise de rendez-vous</s-text>
+              <s-text>{fait.sansDevis
+                ? 'Un blocage de ' + eur(2000) + ' est demandé en ligne. Le diagnostic est gratuit : ce montant est déduit de ta facture si tu fais réparer, gardé si tu ne viens pas au rendez-vous.'
+                : 'Un acompte est demandé en ligne. Il est déduit de ta facture finale et gardé si tu ne viens pas au rendez-vous.'}</s-text>
+              <s-text>Si l'atelier refuse ou ne peut pas te recevoir, tu es remboursé.</s-text>
+            </s-stack>
+          </s-banner>
+          <s-button variant="primary" loading={envoi} onClick={confirmer}>Je confirme ma prise de RDV</s-button>
+        </s-stack>
+      </s-section>
+    );
+  }
   // Étape 1 : marque
   if (!marque && !libre) {
     return (
