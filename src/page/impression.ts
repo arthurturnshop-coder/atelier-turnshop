@@ -88,6 +88,20 @@ function docTicketHtml(f,mode){
   return h+"<div class='rc rm' style='margin-top:6px'>Merci de votre confiance !</div>"}
 async function imprimerDoc(id,mode){
   try{var f=await api("/reparation?id="+id);impImprimer(docTicketHtml(f,mode),"recu",pecCss())}catch(e){alert(e.message)}}
+function recuTexte(el){
+  var nl=String.fromCharCode(10),out=[];
+  for(var i=0;i<el.children.length;i++){var n=el.children[i];
+    if(n.tagName==="HR"){out.push("------------------------------");continue}
+    if(n.classList.contains("qr"))continue;
+    if(n.classList.contains("rl")){var sp=n.querySelectorAll("span");out.push(sp.length>1?sp[0].textContent+" : "+sp[sp.length-1].textContent:n.textContent);continue}
+    var t=(n.innerText||n.textContent||"").split(nl).join(" ").split("  ").join(" ").trim();if(t)out.push(t)}
+  return out.join(nl)}
+ACTS.cEmail=function(b){
+  var id=+b.dataset.id,el=document.querySelector("[data-recu='"+id+"']");if(!el)return;
+  var texte=recuTexte(el);
+  function go(a){api("/caisse/email",{venteId:id,texte:texte,a:a||""}).then(function(d){alert(d.message)}).catch(function(e){
+    if(!a&&/^Pas d/.test(e.message)){var x=prompt("Email du client :");if(x)go(x)}else alert(e.message)})}
+  go("")};
 ACTS.docPrint=function(b){imprimerDoc(+b.dataset.id,b.dataset.mode)};
 
 // ----- Étiquettes produits : nom, prix, code-barres -----

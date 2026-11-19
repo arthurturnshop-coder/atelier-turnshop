@@ -8,6 +8,7 @@ import { envoyerAvis } from "../automatisations";
 import { remiseMulti } from "./prestations";
 import { avantagesActifs, contexteClient, estApplicable, remiseDe } from "./avantages";
 import { AppError, clean, signature } from "../util";
+import { brevoConfigure, envoiEmail } from "../brevo";
 
 // Les points Shopify (lecture seule) restent affichés à part dans le profil.
 export async function soldeFidelite(clientId: number) {
@@ -219,4 +220,21 @@ app.post("/api/caisse/encaisser", async (c) => {
   if (clientId) void envoyerAvis(v.id);
   const [vv] = (await sql`SELECT v.*, trim(cl.prenom || ' ' || cl.nom) AS client_nom FROM ventes v LEFT JOIN clients cl ON cl.id = v.client_id WHERE v.id = ${v.id}`) as any[];
   return c.json({ id: v.id, message: "Vente enregistrée.", totalCents, remiseCents, vente: await detailVente(vv) });
+});
+
+// Envoi du reçu / de la facture par email (texte du ticket fourni par l'écran, adresse = client de la vente ou saisie).
+app.post("/api/caisse/email", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const id = Number(b.venteId);
+  const texte = String(b.texte ?? "").slice(0, 8000);
+  const [v] = (await sql`SELECT v.id, v.reparation_id, cl.email FROM ventes v LEFT JOIN clients cl ON cl.id = v.client_id WHERE v.id = ${id}`) as any[];
+  if (!v) throw new AppError(404, "Vente introuvable.");
+  const a = String(b.a ?? "").trim() || String(v.email ?? "").trim();
+  if (!a) throw new AppError(422, "Pas d'email pour ce client : saisis une adresse.");
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(a)) throw new AppError(400, "Adresse email invalide.");
+  if (!texte) throw new AppError(400, "Reçu vide.");
+  if (!brevoConfigure()) throw new AppError(503, "Les emails ne sont pas encore branchés (Brevo) : rien n'a été envoyé.");
+  await envoiEmail(a, "Ton reçu TURN Shop", "Bonjour,\n\nVoici ton reçu / ta facture TURN Shop :\n\n" + texte + "\n\nMerci de ta visite !\nL'équipe TURN Shop");
+  if (v.reparation_id) await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${v.reparation_id}, 'note', ${`Reçu / facture envoyé par email à ${a}${signature(c)}`})`;
+  return c.json({ message: "Reçu envoyé à " + a + "." });
 });
