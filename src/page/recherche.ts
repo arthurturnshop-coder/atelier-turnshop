@@ -66,7 +66,7 @@ function psHtml(ctx,d){
   var h=sl;
   ps.forEach(function(p,pi){(p.variantes||[]).forEach(function(x,vi){
     var vt=x.titre&&x.titre!=="Default Title"?" - "+esc(x.titre):"";
-    h+="<button class='sec hrow' data-act='psAdd' data-ctx='"+ctx+"' data-pi='"+pi+"' data-vi='"+vi+"'><b>"+esc(p.titre)+vt+"</b><br><span class='muted'>"+esc(x.prix)+" € · "+stockTxt(x)+" · sku "+esc(x.sku||"—")+"</span></button>"})});
+    h+="<button class='sec hrow' data-act='psAdd' data-ctx='"+ctx+"' data-pi='"+pi+"' data-vi='"+vi+"'><b>"+esc(p.titre)+vt+"</b><br><span class='muted'>"+esc(x.prix)+" € · "+stockTxt(x)+" · code-barres "+esc(x.barcode||"—")+" · sku "+esc(x.sku||"—")+"</span></button>"})});
   return h}
 document.addEventListener("keydown",function(e){
   var t=e.target;if(e.key!=="Enter"||!t||!t.dataset||!t.dataset.ps)return;
