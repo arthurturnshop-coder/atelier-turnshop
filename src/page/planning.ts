@@ -191,4 +191,4 @@ function pointerFin(e){
   if(!tech){PPEND={id:rep.id,nom:rep.client,jour:jour,min:min,dur:dur};PSEL=null;setMsg("");renderPlan();var pe=document.getElementById("ppend");if(pe)pe.scrollIntoView({block:"nearest"});return}
   enregistrer(rep.id,tech,isoParis(jour,min),dur,d.pl?"Déplacée.":"Planifiée "+durLabel(dur)+" le "+jourCourt(jour)+" à "+hm(min)+" : touche la carte pour changer la durée.");
 }
-render();`;
+`;

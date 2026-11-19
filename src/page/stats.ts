@@ -1,11 +1,11 @@
 export const STATS = `// ---------- Statistiques ----------
-var ST={periode:"mois",magasin:"",d:null,msg:"",busy:false};
+var STA={periode:"mois",magasin:"",d:null,msg:"",busy:false};
 var STPER=[["jour","Aujourd hui"],["7j","7 jours"],["mois","Ce mois"],["mois-1","Mois dernier"],["annee","Cette année"]];
 var STMOY={carte:"Carte",especes:"Espèces",virement:"Virement",en_ligne:"En ligne"};
 var STTYPE={piece:"Pièces",main_oeuvre:"Main-d oeuvre",article:"Articles"};
 function stLoad(){
-  ST.busy=true;
-  api("/stats?periode="+ST.periode+"&magasin="+encodeURIComponent(ST.magasin)).then(function(d){ST.d=d;ST.busy=false;ST.msg="";if(TAB==="stats")render()}).catch(function(e){ST.busy=false;ST.msg=e.message;if(TAB==="stats")render()})}
+  STA.busy=true;
+  api("/stats?periode="+STA.periode+"&magasin="+encodeURIComponent(STA.magasin)).then(function(d){STA.d=d;STA.busy=false;STA.msg="";if(TAB==="stats")render()}).catch(function(e){STA.busy=false;STA.msg=e.message;if(TAB==="stats")render()})}
 function stBars(rows,fmt,color){
   var max=0;rows.forEach(function(r){if(r.v>max)max=r.v});
   if(!rows.length)return"<div class='muted'>Rien sur cette période.</div>";
@@ -20,12 +20,12 @@ function stJours(rows){
     return"<div style='flex:1;min-width:14px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center' title='"+j[2]+"/"+j[1]+" : "+eur(r.cents)+"'><div style='width:100%;height:"+h+"px;background:#285a38;border-radius:3px 3px 0 0'></div></div>"}).join("")+"</div>"
     +"<div style='display:flex;justify-content:space-between;font-size:11px;color:#666'><span>"+rows[0].jour.split("-").reverse().slice(0,2).join("/")+"</span><span>"+rows[rows.length-1].jour.split("-").reverse().slice(0,2).join("/")+"</span></div>"}
 function vStats(){
-  if(!ST.d&&!ST.busy)stLoad();
-  var d=ST.d,h="<div class='caisse'><h3>Statistiques</h3><div class='actions'>"
-    +STPER.map(function(p){return"<button class='"+(ST.periode===p[0]?"":"sec")+"' data-act='stPer' data-p='"+p[0]+"'>"+p[1]+"</button>"}).join("")+"</div>";
-  if(d&&d.peutChoisirMagasin)h+="<div class='actions'>"+[["","Toutes les boutiques"],["Amiens","Amiens"],["Rouen","Rouen"]].map(function(m){return"<button class='"+(ST.magasin===m[0]?"":"sec")+"' data-act='stMag' data-m='"+m[0]+"'>"+m[1]+"</button>"}).join("")+"</div>";
-  if(ST.msg)h+="<div class='card'>"+esc(ST.msg)+"</div>";
-  if(!d){app.innerHTML=h+(ST.busy?"<div class='muted'>Chargement...</div>":"")+"</div>";return}
+  if(!STA.d&&!STA.busy)stLoad();
+  var d=STA.d,h="<div class='caisse'><h3>Statistiques</h3><div class='actions'>"
+    +STPER.map(function(p){return"<button class='"+(STA.periode===p[0]?"":"sec")+"' data-act='stPer' data-p='"+p[0]+"'>"+p[1]+"</button>"}).join("")+"</div>";
+  if(d&&d.peutChoisirMagasin)h+="<div class='actions'>"+[["","Toutes les boutiques"],["Amiens","Amiens"],["Rouen","Rouen"]].map(function(m){return"<button class='"+(STA.magasin===m[0]?"":"sec")+"' data-act='stMag' data-m='"+m[0]+"'>"+m[1]+"</button>"}).join("")+"</div>";
+  if(STA.msg)h+="<div class='card'>"+esc(STA.msg)+"</div>";
+  if(!d){app.innerHTML=h+(STA.busy?"<div class='muted'>Chargement...</div>":"")+"</div>";return}
   var de=d.du.split("-").reverse().join("/"),a=d.au.split("-").reverse().join("/");
   var delta=d.ca.precedentCents>0?Math.round((d.ca.cents-d.ca.precedentCents)/d.ca.precedentCents*100):null;
   h+="<div class='muted'>Du "+de+" au "+a+(d.magasin?" · "+esc(d.magasin):" · toutes les boutiques")+"</div>";
@@ -44,6 +44,6 @@ function vStats(){
   h+="<div class='card'><div class='step'>Devis envoyés au client</div><div>"+d.devis.envoyes+" envoyé(s) · <b>"+d.devis.acceptes+" accepté(s)</b> · "+d.devis.refuses+" refusé(s)"+(d.devis.envoyes?" · taux d acceptation "+tx+" %":"")+"</div></div>";
   h+="<div class='card'><div class='step'>Stock atelier"+(d.magasin?" · "+esc(d.magasin):"")+"</div><div>"+d.stock.references+" références · valeur d achat HT <b>"+eur(d.stock.valeurCents)+"</b> · <b>"+d.stock.aRecommander+"</b> à recommander</div></div>";
   app.innerHTML=h+"</div>"}
-ACTS.stPer=function(b){ST.periode=b.dataset.p;ST.d=null;render()};
-ACTS.stMag=function(b){ST.magasin=b.dataset.m;ST.d=null;render()};
+ACTS.stPer=function(b){STA.periode=b.dataset.p;STA.d=null;render()};
+ACTS.stMag=function(b){STA.magasin=b.dataset.m;STA.d=null;render()};
 `;
