@@ -99,12 +99,13 @@ function etqFormat(){
 function etqLabel(it,F){
   var code=it.barcode||it.sku||"";
   var L=F.h-3,A=F.w-4-9-1.5;
-  var pr=String(it.prix).replace(".",",")+" €";
-  var tf=Math.round(F.h*0.4*10)/10,pf=Math.round(Math.min(F.h*0.85,A/(0.2*pr.length))*10)/10;
+  var pr=String(it.prix).replace(".",",")+" €",em=it.empl||"";
+  var tf=Math.round(F.h*0.4*10)/10,pf=Math.round(Math.min(F.h*0.85,(A-(em?11:0))/(0.2*pr.length))*10)/10,ef=Math.round(F.h*0.36*10)/10;
   return"<div class='etq' style='width:"+F.w+"mm;height:"+F.h+"mm;box-sizing:border-box;padding:1.5mm 2mm;overflow:hidden;font-family:Arial,Helvetica,sans-serif;color:#000;background:#fff;display:flex;gap:1.5mm'>"
     +"<div style='flex:1;min-width:0;display:flex;flex-direction:column;justify-content:space-between'>"
     +"<div style='font-size:"+tf+"pt;font-weight:800;line-height:1.1;max-height:"+(tf*0.353*2.25)+"mm;overflow:hidden'>"+esc(it.titre)+"</div>"
-    +"<div style='font-size:"+pf+"pt;font-weight:900;line-height:1;white-space:nowrap'>"+esc(pr)+"</div></div>"
+    +"<div style='display:flex;align-items:flex-end;justify-content:space-between;gap:1mm'><div style='font-size:"+pf+"pt;font-weight:900;line-height:1;white-space:nowrap'>"+esc(pr)+"</div>"
+    +(em?"<div style='font-size:"+ef+"pt;font-weight:800;line-height:1;border:0.4mm solid #000;padding:0.6mm 1mm;white-space:nowrap'>"+esc(em)+"</div>":"")+"</div></div>"
     +"<div style='width:9mm;flex:none;position:relative'>"
     +(code?"<div style='position:absolute;left:0;top:0;width:"+L+"mm;height:8mm;transform-origin:0 0;transform:translate(0,"+L+"mm) rotate(-90deg)'>"+code128Svg(code,6)+"<div style='font-size:5pt;text-align:center;line-height:1.1'>"+esc(code)+"</div></div>":"")
     +"</div></div>"}
@@ -119,7 +120,12 @@ function etqImprimer(){
   if(F.page){h="<div class='etqgrid'>";for(var s=0;s<ETQSKIP;s++)h+="<div class='etqempty'></div>";L.forEach(function(it){h+=etqLabel(it,F)});h+="</div>"}
   else L.forEach(function(it){h+=etqLabel(it,F)});
   impImprimer(h,"",etqCss(F))}
-function vEtq(){
+function etqEmpl(){
+  var todo=ETQ.filter(function(it){return it.empl===undefined&&(it.barcode||it.sku)});
+  if(!todo.length)return;
+  todo.forEach(function(it){it.empl=""});
+  Promise.all(todo.map(function(it){return api("/stock/scan",{magasin:MAG||"",code:it.barcode||it.sku,local:true}).then(function(r){if(r.produit&&r.produit.emplacement)it.empl=r.produit.emplacement}).catch(function(){})})).then(function(){if(TAB==="etq")render()})}
+function vEtq(){etqEmpl();
   var F=ETQFORMATS[etqFormat()],nb=etqToutes().length;
   var h=subHtml()+"<div class='card'><div class='step'>Étiquettes produits</div><div class='muted'>Cherche un produit, ajoute-le, choisis le nombre d'étiquettes puis imprime. Chaque étiquette : nom, prix et code-barres.</div>"+prodBox("etq")+"</div>";
   h+="<div class='card'><div class='step'>Imprimer sur</div><div class='actions'><button class='"+(F.page?"":"sec")+"' data-act='etqMode' data-f='a4'>🖨 Imprimante A4 (feuille à découper)</button><button class='"+(F.page?"sec":"")+"' data-act='etqMode' data-f='62x29'>🏷 Brother (rouleau)</button></div><div class='muted' style='margin-top:6px'>Autres formats :</div><select id='etqf' data-act='etqFormat'>"+Object.keys(ETQFORMATS).map(function(k){return"<option value='"+k+"'"+(k===etqFormat()?" selected":"")+">"+esc(ETQFORMATS[k].l)+"</option>"}).join("")+"</select>"

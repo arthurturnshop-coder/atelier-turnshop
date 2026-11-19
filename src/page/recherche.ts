@@ -80,7 +80,7 @@ document.addEventListener("input",function(e){
   PST[ctx]=setTimeout(function(){
     box.innerHTML="<div class='muted'>Recherche…</div>";
     api("/recherche?q="+encodeURIComponent(q)).then(function(d){if(t.value.trim()!==q)return;box.innerHTML=psHtml(ctx,d)}).catch(function(err){box.innerHTML="<div class='muted'>"+esc(err.message)+"</div>"})},300)});
-ACTS.psLoc=function(b){var p=(PSLOC[b.dataset.ctx]||[])[+b.dataset.i];if(!p)return;ETQ.push({titre:p.nom,prix:(p.prixCents/100).toFixed(2),barcode:p.code,sku:"",qte:Math.max(1,p.qte)});render()};
+ACTS.psLoc=function(b){var p=(PSLOC[b.dataset.ctx]||[])[+b.dataset.i];if(!p)return;ETQ.push({empl:p.emplacement||"",titre:p.nom,prix:(p.prixCents/100).toFixed(2),barcode:p.code,sku:"",qte:Math.max(1,p.qte)});render()};
 ACTS.psAdd=async function(b){
   var ctx=b.dataset.ctx,p=(PSRES[ctx]||[])[+b.dataset.pi],x=p&&p.variantes[+b.dataset.vi];if(!x)return;
   var vt=x.titre&&x.titre!=="Default Title"?" - "+x.titre:"";

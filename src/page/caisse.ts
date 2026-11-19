@@ -123,7 +123,7 @@ async function scanCode(q,ctx,silent){
   try{
     var r=await api("/code?q="+encodeURIComponent(q));
     if(r.produit){await ajouterProduit(r.produit,ctx);return}
-    if(ctx==="etq"){var lc=await api("/stock/scan",{magasin:MAG||"",code:q,local:true});if(lc.produit){ETQ.push({titre:lc.produit.nom,prix:(lc.produit.prixCents/100).toFixed(2),barcode:lc.produit.code,sku:"",qte:Math.max(1,lc.produit.qte)});render();return}}
+    if(ctx==="etq"){var lc=await api("/stock/scan",{magasin:MAG||"",code:q,local:true});if(lc.produit){ETQ.push({empl:lc.produit.emplacement||"",titre:lc.produit.nom,prix:(lc.produit.prixCents/100).toFixed(2),barcode:lc.produit.code,sku:"",qte:Math.max(1,lc.produit.qte)});render();return}}
     if(ctx!=="caisse"){if(!silent)alert("Code inconnu : "+q);return}
     var cid=r.clientId;
     if(!cid){var s=await api("/caisse/scan?q="+encodeURIComponent(q));cid=s.clientId}
