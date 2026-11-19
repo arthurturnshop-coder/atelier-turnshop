@@ -25,6 +25,11 @@ await sql`CREATE TABLE IF NOT EXISTS reglages (cle TEXT PRIMARY KEY, valeur TEXT
 await sql`CREATE TABLE IF NOT EXISTS ventes (id SERIAL PRIMARY KEY, client_id INT REFERENCES clients(id), reparation_id INT REFERENCES reparations(id), magasin TEXT, vendeur TEXT, total_cents INT NOT NULL DEFAULT 0, remise_cents INT NOT NULL DEFAULT 0, points_gagnes INT NOT NULL DEFAULT 0, points_utilises INT NOT NULL DEFAULT 0, cree_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
 await sql`CREATE TABLE IF NOT EXISTS vente_lignes (id SERIAL PRIMARY KEY, vente_id INT NOT NULL REFERENCES ventes(id), libelle TEXT NOT NULL, quantite INT NOT NULL DEFAULT 1, prix_unitaire_cents INT NOT NULL DEFAULT 0)`;
 await sql`CREATE TABLE IF NOT EXISTS vente_paiements (id SERIAL PRIMARY KEY, vente_id INT NOT NULL REFERENCES ventes(id), moyen TEXT NOT NULL CHECK (moyen IN ('carte','especes','virement')), montant_cents INT NOT NULL)`;
+await sql`ALTER TABLE vente_paiements DROP CONSTRAINT IF EXISTS vente_paiements_moyen_check`;
+await sql`ALTER TABLE vente_paiements ADD CONSTRAINT vente_paiements_moyen_check CHECK (moyen IN ('carte','especes','virement','en_ligne'))`;
+// Ventes "En ligne" restées sans paiement (échec avant la correction ci-dessus) : on les supprime, elles seront recréées proprement.
+await sql`DELETE FROM vente_lignes WHERE vente_id IN (SELECT v.id FROM ventes v WHERE v.vendeur = 'En ligne' AND NOT EXISTS (SELECT 1 FROM vente_paiements p WHERE p.vente_id = v.id))`;
+await sql`DELETE FROM ventes v WHERE v.vendeur = 'En ligne' AND NOT EXISTS (SELECT 1 FROM vente_paiements p WHERE p.vente_id = v.id)`;
 await sql`ALTER TABLE ventes ADD COLUMN IF NOT EXISTS shopify_order_id TEXT`;
 await sql`ALTER TABLE ventes ADD COLUMN IF NOT EXISTS shopify_order_name TEXT`;
 await sql`ALTER TABLE ventes ADD COLUMN IF NOT EXISTS shopify_erreur TEXT`;
