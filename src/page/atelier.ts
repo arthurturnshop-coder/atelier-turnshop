@@ -87,10 +87,12 @@ function webHtml(f){
   var st=f.rdvStatut||"confirme";
   var h="<div class='card avbox'><b>Demande faite en ligne par le client</b><div class='muted'>"+esc(f.magasin||"")+" · créneau souhaité : "+esc(f.rdvSouhaite||"")+"</div>";
   if(!f.devis.lignes.length)h+="<div class='muted'>Panne non chiffrée : blocage de rendez-vous demandé au client (déduit de la facture, gardé s'il ne vient pas, remboursable avec « Rembourser l'acompte » ci-dessous).</div>";
+  if((st==="attente"||st==="propose"||st==="confirme")&&!(f.acompte&&f.acompte.verseCents>0))h+="<div class='muted'><span class='tag warn'>Aucun acompte versé</span> Risque de RDV fantôme : le client n'a encore rien payé.</div>";
   if(st==="attente"){
     h+="<div class='step' style='margin-top:8px'>À valider</div><div class='dl'><button data-act='rdvAct' data-a='accepter' data-id='"+f.id+"'>Accepter le créneau</button><button class='danger' data-act='rdvAct' data-a='refuser' data-id='"+f.id+"'>Refuser</button></div>"
     +"<div class='dl'><input id='rdv-d' type='date' class='t'><select id='rdv-c' class='t'><option value='matin'>Matin</option><option value='après-midi'>Après-midi</option></select><button data-act='rdvAct' data-a='proposer' data-id='"+f.id+"'>Proposer un autre créneau</button></div>";
   }else if(st==="propose")h+="<div class='muted'><span class='tag warn'>Autre créneau proposé</span> En attente de la réponse du client.</div>";
+  else if(st==="annule")h+="<div class='muted'><span class='tag warn'>Annulé par le client</span> Pense à rembourser l'acompte s'il y en a un.</div>";
   else if(st==="confirme")h+="<div class='muted'><span class='tag ok'>RDV confirmé</span> Place-le dans le Planning.</div>";
   return h+"</div>"}
 function acompteHtml(f){

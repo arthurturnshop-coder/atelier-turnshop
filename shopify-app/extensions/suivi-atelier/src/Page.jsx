@@ -61,7 +61,8 @@ function Page() {
       const j = await appel('/pub/payer', {repairId: id, mode});
       setPayUrl(j.url);
       try { shopify.navigation.navigate(j.url); } catch (e) { /* le bouton ci-dessous prend le relais */ }
-    } catch (e) { setMsg({err: true, texte: e.message}); }
+      return true;
+    } catch (e) { setMsg({err: true, texte: e.message}); return false; }
   };
   const repondre = async (id, reponse) => {
     try { const j = await appel('/pub/rdv/reponse', {repairId: id, reponse}); setMsg({err: false, texte: j.message}); await charge(); }
@@ -79,7 +80,7 @@ function Page() {
         </s-stack>
         {vue === 'suivi'
           ? <Suivi data={data} payer={payer} repondre={repondre} nouveau={() => setVue('nouveau')} />
-          : <Nouvelle onFait={async (j) => { setVue('suivi'); setMsg({err: false, texte: j.message + ' (' + j.numero + '). Pour engager ton rendez-vous, verse un acompte ci-dessous.'}); await charge(); }} payer={payer} setMsg={setMsg} />}
+          : <Nouvelle profil={data ? data.profil : null} onFait={async (j, paye) => { setVue('suivi'); if (!paye) setMsg({err: false, texte: j.message + ' (' + j.numero + '). Ton rendez-vous n\'est engagé qu\'après paiement : utilise le bouton de paiement ci-dessous.'}); await charge(); }} payer={payer} setMsg={setMsg} />}
       </s-stack>
     </s-page>
   );
@@ -159,7 +160,7 @@ function Suivi({data, payer, repondre, nouveau}) {
 }
 
 // ---------- Nouvelle demande ----------
-function Nouvelle({onFait, payer, setMsg}) {
+function Nouvelle({onFait, payer, setMsg, profil}) {
   const [marques, setMarques] = useState([]);
   const [marque, setMarque] = useState('');
   const [q, setQ] = useState('');
@@ -177,6 +178,10 @@ function Nouvelle({onFait, payer, setMsg}) {
   const [date, setDate] = useState('');
   const [creneau, setCreneau] = useState('matin');
   const [envoi, setEnvoi] = useState(false);
+  const [prenom, setPrenom] = useState((profil && profil.prenom) || '');
+  const [nom, setNom] = useState((profil && profil.nom) || '');
+  const [tel, setTel] = useState((profil && profil.tel) || '');
+  const [email, setEmail] = useState((profil && profil.email) || '');
   const jours = prochainsJours();
 
   useEffect(() => { lire('/pub/marques').then((j) => setMarques(j.marques)).catch(() => {}); }, []);
@@ -195,15 +200,26 @@ function Nouvelle({onFait, payer, setMsg}) {
     : detail.prestations.reduce((t, p) => t + (prestas[p.id] ? p.prixCents + (p.options || []).reduce((s, o) => s + (options[o.id] ? o.prixCents : 0), 0) : 0), 0)
       + detail.pieces.reduce((t, p) => t + (pieces[p.id] && p.prixCents ? p.prixCents : 0), 0);
 
+  const [erreurs, setErreurs] = useState({});
   const envoyer = async () => {
-    if (!date) { setMsg({err: true, texte: 'Choisis une date.'}); return; }
     const sansDevis = !prestaChoisie && !pieceChoisie;
-    if (sansDevis && !panne.trim()) { setMsg({err: true, texte: 'Décris ta panne ou choisis une prestation.'}); return; }
+    const er = {};
+    if (sansDevis && !panne.trim()) er.panne = 'Décris ta panne ou choisis une prestation.';
+    if (!prenom.trim()) er.prenom = 'Indique ton prénom.';
+    if (!nom.trim()) er.nom = 'Indique ton nom.';
+    if (tel.replace(/\D/g, '').length < 9) er.tel = 'Indique un numéro de portable valide.';
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) er.email = 'Indique une adresse email valide.';
+    if (!date) er.date = 'Choisis une date.';
+    setErreurs(er);
+    if (Object.keys(er).length) { setMsg({err: true, texte: 'Il manque des informations : les champs en rouge sont à compléter.'}); return; }
+    setMsg(null);
     setEnvoi(true);
     try {
-      const j = await appel('/pub/rdv', {modeleId: modele ? modele.id : null, marque: marqueLibre, modele: modeleLibre, magasin, date, creneau, panne, prestationIds: ids(prestas), optionIds: ids(options), pieceIds: ids(pieces)});
-      if (sansDevis) { try { await payer(j.repairId, 'blocage'); } catch (e) { /* repli ci-dessous */ } }
-      await onFait(j);
+      const j = await appel('/pub/rdv', {prenom, nom, tel, email, modeleId: modele ? modele.id : null, marque: marqueLibre, modele: modeleLibre, magasin, date, creneau, panne, prestationIds: ids(prestas), optionIds: ids(options), pieceIds: ids(pieces)});
+      // Paiement obligatoire pour engager le rendez-vous : acompte si devis, blocage sinon (remboursable si besoin).
+      let paye = await payer(j.repairId, sansDevis ? 'blocage' : 'acompte');
+      if (!paye) paye = await payer(j.repairId, sansDevis ? 'acompte' : 'blocage');
+      await onFait(j, paye);
     } catch (e) { setMsg({err: true, texte: e.message}); setEnvoi(false); }
   };
 
@@ -282,16 +298,25 @@ function Nouvelle({onFait, payer, setMsg}) {
       )}
 
       <s-section heading="3. Décris ton besoin">
-        <s-text-area label="Panne ou demande (facultatif si tu as choisi une prestation)" rows="3" value={panne} onInput={(e) => setPanne(e.currentTarget.value)} />
+        <s-text-area label="Panne ou demande (facultatif si tu as choisi une prestation)" rows="3" value={panne} error={erreurs.panne} onInput={(e) => setPanne(e.currentTarget.value)} />
       </s-section>
 
-      <s-section heading="4. Rendez-vous">
+      <s-section heading="4. Tes coordonnées">
+        <s-stack gap="base">
+          <s-text-field label="Prénom" value={prenom} error={erreurs.prenom} onInput={(e) => setPrenom(e.currentTarget.value)} />
+          <s-text-field label="Nom" value={nom} error={erreurs.nom} onInput={(e) => setNom(e.currentTarget.value)} />
+          <s-text-field label="Portable" value={tel} error={erreurs.tel} onInput={(e) => setTel(e.currentTarget.value)} />
+          <s-text-field label="Email" value={email} error={erreurs.email} onInput={(e) => setEmail(e.currentTarget.value)} />
+        </s-stack>
+      </s-section>
+
+      <s-section heading="5. Rendez-vous">
         <s-stack gap="base">
           <s-select label="Atelier" value={magasin} onChange={(e) => setMagasin(e.currentTarget.value)}>
             <s-option value="Amiens">Amiens (mar-sam)</s-option>
             <s-option value="Rouen">Rouen (mar-sam)</s-option>
           </s-select>
-          <s-select label="Date souhaitée (du mardi au samedi)" value={date} onChange={(e) => setDate(e.currentTarget.value)}>
+          <s-select label="Date souhaitée (du mardi au samedi)" value={date} error={erreurs.date} onChange={(e) => setDate(e.currentTarget.value)}>
             <s-option value="">Choisis une date</s-option>
             {jours.map((j) => <s-option key={j.iso} value={j.iso}>{j.label}</s-option>)}
           </s-select>
@@ -301,7 +326,7 @@ function Nouvelle({onFait, payer, setMsg}) {
           </s-select>
           {!prestaChoisie && !pieceChoisie && <s-banner tone="info">Panne à diagnostiquer : un blocage de rendez-vous de 20 € est demandé à la fin. Le diagnostic est gratuit, le montant est déduit de ta facture si tu fais réparer, gardé si tu ne viens pas, et remboursé si le devis ne te convient pas.</s-banner>}
           {total > 0 && <s-text type="strong">{'Total estimé : ' + eur(total)}</s-text>}
-          <s-text color="subdued">Le devis est confirmé par l'atelier. Tu pourras régler en ligne depuis « Mes réparations ».</s-text>
+          <s-text color="subdued">Un acompte est à régler en ligne juste après l'envoi pour engager le rendez-vous. Il est déduit de ta facture et remboursé si l'atelier ne peut pas te recevoir.</s-text>
           <s-button variant="primary" loading={envoi} onClick={envoyer}>Envoyer ma demande</s-button>
         </s-stack>
       </s-section>

@@ -86,6 +86,22 @@ async function clientDe(q: Qui): Promise<number> {
   return c.id;
 }
 
+// Coordonnées obligatoires pour réserver : nom, prénom, portable, email (complète la fiche client avec ce que le client saisit).
+async function coordonnees(cid: number, q: Qui, b: any) {
+  const [c] = (await sql`SELECT prenom, nom, telephone, email FROM clients WHERE id = ${cid}`) as any[];
+  const bon = (x: string) => (x && x !== q.email && x !== "Client" ? x : "");
+  const prenom = clean(b.prenom, 80) || c.prenom || q.prenom;
+  const nom = clean(b.nom, 80) || bon(c.nom) || q.nom;
+  const tel = clean(b.tel, 40) || c.telephone || q.tel;
+  const email = clean(b.email, 120) || c.email || q.email;
+  return { prenom: prenom?.trim() ?? "", nom: nom?.trim() ?? "", tel: tel?.trim() ?? "", email: email?.trim() ?? "" };
+}
+function verifCoordonnees(k: { prenom: string; nom: string; tel: string; email: string }) {
+  if (!k.prenom || !k.nom) throw new AppError(400, "Indique ton nom et ton prénom.");
+  if (k.tel.replace(/\D/g, "").length < 9) throw new AppError(400, "Indique un numéro de portable valide.");
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(k.email)) throw new AppError(400, "Indique une adresse email valide.");
+}
+
 const pcn = (id: number) => "PC-" + String(id).padStart(4, "0");
 
 // Ce que voit le client : "en cours" ou "terminé", une phrase claire et la frise d'avancement (comme un suivi de colis).
@@ -95,7 +111,8 @@ export function etatClient(r: any) {
   let etape = "recu", groupe = "cours", libelle = "";
   if (r.statut === "récupéré") { etape = "termine"; groupe = "termine"; libelle = "Terminée et récupérée"; }
   else if (r.statut === "prêt") { etape = "termine"; groupe = "termine"; libelle = "Terminée : ta trottinette est prête à récupérer"; }
-  else if (web && rs === "refuse") { etape = "demande"; groupe = "termine"; libelle = "Demande annulée"; }
+  else if (web && rs === "refuse") { etape = "demande"; groupe = "termine"; libelle = "Demande refusée : contacte notre support pour plus d'infos"; }
+  else if (web && rs === "annule") { etape = "demande"; groupe = "termine"; libelle = "Demande annulée"; }
   else if (web && rs === "attente") { etape = "demande"; libelle = "Demande reçue : l'atelier doit confirmer ton rendez-vous"; }
   else if (web && rs === "propose") { etape = "demande"; libelle = "L'atelier te propose un autre créneau : à toi de répondre"; }
   else if (r.statut === "devis envoyé") { etape = "validation"; libelle = "Devis à valider : on attend ta réponse"; }
@@ -224,7 +241,7 @@ app.post("/pub/moi", async (c) => {
   const q = await verifie(b);
   const cid = await clientDe(q);
   const blocage = await blocageCents();
-  const rows = (await sql`SELECT r.*, t.marque, t.modele FROM reparations r JOIN trottinettes t ON t.id = r.trottinette_id WHERE r.client_id = ${cid} AND r.supprime_le IS NULL ORDER BY r.id DESC LIMIT 30`) as any[];
+  const rows = (await sql`SELECT r.*, t.marque, t.modele FROM reparations r JOIN trottinettes t ON t.id = r.trottinette_id WHERE r.client_id = ${cid} AND (r.supprime_le IS NULL OR r.rdv_statut = 'refuse') ORDER BY r.id DESC LIMIT 30`) as any[];
   const reparations = [];
   for (const r of rows) {
     if (r.statut !== "récupéré") await paiementsEnAttente(r.id);
@@ -238,13 +255,15 @@ app.post("/pub/moi", async (c) => {
       devis: dv.lignes.map((l) => ({ libelle: l.libelle, quantite: l.quantite, prixCents: l.prixCents })), remiseCents: dv.remiseMultiCents, totalCents: dv.netCents,
       verseCents: ac.verseCents, resteAPayerCents: Math.max(0, dv.netCents - ac.verseCents),
       gardiennage: g && g.fraisCents > 0 ? { jours: g.joursFrais, fraisCents: g.fraisCents } : null, abandonnee: !!r.abandonnee_le,
-      peutPayer: r.statut !== "récupéré" && r.rdv_statut !== "refuse" && dv.netCents - ac.verseCents > 0,
+      peutPayer: r.statut !== "récupéré" && r.rdv_statut !== "refuse" && r.rdv_statut !== "annule" && dv.netCents - ac.verseCents > 0,
       // Panne non chiffrable : un blocage de rendez-vous est demandé (déduit de la facture, gardé si le client ne vient pas).
-      besoinBlocage: r.source === "web" && r.rdv_statut !== "refuse" && r.statut !== "récupéré" && dv.netCents === 0 && ac.verseCents === 0 && r.en_magasin === false,
+      besoinBlocage: r.source === "web" && r.rdv_statut !== "refuse" && r.rdv_statut !== "annule" && r.statut !== "récupéré" && dv.netCents === 0 && ac.verseCents === 0 && r.en_magasin === false,
       blocageCents: blocage,
     });
   }
-  return c.json({ prenom: q.prenom, reparations });
+  const k = await coordonnees(cid, q, {});
+  const coordOk = !!(k.prenom && k.nom && k.tel.replace(/\D/g, "").length >= 9 && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(k.email));
+  return c.json({ prenom: q.prenom, profil: { ...k, ok: coordOk }, reparations });
 });
 
 // ---- Demande de rendez-vous ----
@@ -253,6 +272,9 @@ app.post("/pub/rdv", async (c) => {
   const b = await c.req.json().catch(() => ({}));
   const q = await verifie(b);
   const cid = await clientDe(q);
+  const k = await coordonnees(cid, q, b);
+  verifCoordonnees(k);
+  await sql`UPDATE clients SET prenom = ${k.prenom}, nom = ${k.nom}, telephone = ${k.tel}, email = ${k.email} WHERE id = ${cid}`;
   const magasin = clean(b.magasin, 20);
   if (!MAGASINS.includes(magasin)) throw new AppError(400, "Choisis un atelier.");
   const date = clean(b.date, 10);
@@ -319,7 +341,7 @@ app.post("/pub/rdv/reponse", async (c) => {
     return c.json({ message: "Rendez-vous confirmé, merci !" });
   }
   if (b.reponse === "annuler") {
-    await sql`UPDATE reparations SET rdv_statut = 'refuse', maj_le = now() WHERE id = ${repId}`;
+    await sql`UPDATE reparations SET rdv_statut = 'annule', maj_le = now() WHERE id = ${repId}`;
     await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${repId}, 'statut', 'Le client a refusé le créneau proposé : demande annulée (espace client)')`;
     await sql`INSERT INTO taches (texte, echeance, priorite, cree_par, reparation_id) VALUES (${`Demande annulée par le client ${pcn(repId)} : rembourser l'acompte s'il y en a un`}, (now() AT TIME ZONE 'Europe/Paris')::date, true, 'Espace client', ${repId})`;
     return c.json({ message: "Demande annulée. Si tu as versé un acompte, il te sera remboursé." });
