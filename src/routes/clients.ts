@@ -64,10 +64,20 @@ app.get("/api/recherche", async (c) => {
   try {
     const t = q.replace(/["\\]/g, "");
     const ressembleCode = !/\s/.test(q) && q.length >= 6;
-    const search = ressembleCode ? `${t} OR sku:${t} OR barcode:${t}` : t;
-    let data: any;
-    try { data = await shopifyRead(PRODUITS_QUERY_LIEUX, { q: search }); }
-    catch { data = await shopifyRead(PRODUITS_QUERY, { q: search }); }
+    // 1) recherche Shopify normale (gère déjà le pluriel) ; 2) si peu de résultats, recherche élargie par début de mot.
+    const mots = t.split(/\s+/).filter(Boolean).map((w) => { const x = w.length > 4 && /s$/i.test(w) ? w.slice(0, -1) : w; return /^[A-Za-z0-9À-ÿ]+$/.test(x) ? `${x}*` : x; });
+    const lance = async (qq: string) => { try { return await shopifyRead(PRODUITS_QUERY_LIEUX, { q: qq }); } catch { return await shopifyRead(PRODUITS_QUERY, { q: qq }); } };
+    let data: any = await lance(ressembleCode ? `${t} OR sku:${t} OR barcode:${t}` : t);
+    if (!ressembleCode && (data?.products?.nodes ?? []).length < 5) {
+      const plus = await lance(mots.join(" "));
+      const vus = new Set((data?.products?.nodes ?? []).map((p: any) => p.id));
+      const ajout = (plus?.products?.nodes ?? []).filter((p: any) => !vus.has(p.id));
+      data = { products: { nodes: [...(data?.products?.nodes ?? []), ...ajout] } };
+      if (!data.products.nodes.length && mots.length > 1) {
+        const long = t.split(/\s+/).filter((w) => w.length > 1).sort((x, y) => y.length - x.length)[0];
+        if (long) data = await lance(`${long.replace(/s$/i, "")}*`);
+      }
+    }
     produits = (data?.products?.nodes ?? []).map((p: any) => ({
       id: p.id, titre: p.title, marque: p.vendor ?? "",
       variantes: (p.variants?.nodes ?? []).map((v: any) => ({

@@ -32,7 +32,7 @@ export async function shopifyRead(query: string, variables: Record<string, unkno
 }
 
 export const FIDELITE_QUERY = `query($q: String!) { customers(first: 1, query: $q) { nodes { id points: metafield(namespace: "fidelite", key: "points") { value } } } }`;
-export const PRODUITS_QUERY = `query($q: String!) { products(first: 8, query: $q) { nodes { id title vendor variants(first: 5) { nodes { id title sku barcode price inventoryQuantity } } } } }`;
+export const PRODUITS_QUERY = `query($q: String!) { products(first: 12, query: $q) { nodes { id title vendor variants(first: 5) { nodes { id title sku barcode price inventoryQuantity } } } } }`;
 
 // Écriture (mutations) : renvoie les données ou lève une erreur lisible.
 export async function shopifyMutate(query: string, variables: Record<string, unknown>, version: string = SHOP_API): Promise<any> {
@@ -49,4 +49,4 @@ export async function shopifyMutate(query: string, variables: Record<string, unk
 }
 
 // Même recherche, avec le stock détaillé par emplacement (demande le droit read_locations).
-export const PRODUITS_QUERY_LIEUX = `query($q: String!) { products(first: 8, query: $q) { nodes { id title vendor variants(first: 5) { nodes { id title sku barcode price inventoryQuantity inventoryItem { inventoryLevels(first: 10) { nodes { location { name } quantities(names: ["available"]) { quantity } } } } } } } } }`;
+export const PRODUITS_QUERY_LIEUX = `query($q: String!) { products(first: 12, query: $q) { nodes { id title vendor variants(first: 5) { nodes { id title sku barcode price inventoryQuantity inventoryItem { inventoryLevels(first: 10) { nodes { location { name } quantities(names: ["available"]) { quantity } } } } } } } } }`;
