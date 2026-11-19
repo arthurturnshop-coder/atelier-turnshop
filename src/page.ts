@@ -12,9 +12,10 @@ import { RECHERCHE } from "./page/recherche";
 import { PLANNING } from "./page/planning";
 import { IMPRESSION } from "./page/impression";
 import { COMMANDES } from "./page/commandes";
+import { STOCK } from "./page/stock";
 
 // L'ordre compte : c'est l'ordre d'exécution du script dans le navigateur.
 export const HTML = [
-  SHELL, BASE, LOGIN, PROFIL, DASHBOARD, ATELIER, CAISSE, PARAMETRES, ACTIONS, RECHERCHE, COMMANDES, PLANNING, IMPRESSION,
+  SHELL, BASE, LOGIN, PROFIL, DASHBOARD, ATELIER, CAISSE, PARAMETRES, ACTIONS, RECHERCHE, COMMANDES, STOCK, PLANNING, IMPRESSION,
   "</script></body></html>",
 ].join("\n");

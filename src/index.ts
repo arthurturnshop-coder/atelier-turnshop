@@ -15,6 +15,7 @@ import "./routes/brevo";
 import "./routes/diagnostic";
 import "./routes/ticket";
 import "./routes/achats";
+import "./routes/stock";
 import "./routes/commandes";
 import "./routes/acomptes";
 import "./routes/rdv";

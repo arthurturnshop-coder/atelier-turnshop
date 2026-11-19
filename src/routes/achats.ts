@@ -3,6 +3,7 @@ import { sql } from "../db";
 // Doit passer après la protection /api/* (voir auth.ts).
 import "./auth";
 import { envoyerPieceArrivee } from "../automatisations";
+import { entreeStock } from "./stock";
 import { AppError, clean, signature } from "../util";
 
 const nettoyerQte = (n: any) => Math.max(1, Math.min(999, Math.round(Number(n) || 1)));
@@ -129,7 +130,9 @@ app.post("/api/achats/recevoir", async (c) => {
   const b = await c.req.json().catch(() => ({}));
   const ids: number[] = (Array.isArray(b.ids) ? b.ids : [b.id]).map(Number).filter((n: number) => n > 0);
   if (!ids.length) throw new AppError(400, "Rien à réceptionner.");
-  const rows = (await sql`UPDATE commande_lignes SET statut = 'recue', recue_le = now() WHERE id = ANY(${ids}) AND statut = 'commandee' RETURNING reparation_id`) as any[];
+  const rows = (await sql`UPDATE commande_lignes SET statut = 'recue', recue_le = now() WHERE id = ANY(${ids}) AND statut = 'commandee' RETURNING reparation_id, variant_id, sku, libelle, quantite`) as any[];
+  // Produit hors catalogue (saisie libre, AliExpress…) commandé pour le stock : il entre dans le stock maison à la réception.
+  for (const l of rows) if (!l.reparation_id && !l.variant_id) await entreeStock({ code: l.sku, nom: l.libelle, qte: l.quantite }, "Réception commande");
   const reps = [...new Set(rows.map((r) => r.reparation_id).filter((x) => x))] as number[];
   let prets = 0;
   for (const rid of reps) {

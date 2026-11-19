@@ -1,0 +1,134 @@
+import { app } from "../app";
+import { sql } from "../db";
+// Doit passer après la protection /api/* (voir auth.ts).
+import "./auth";
+import { AppError, clean } from "../util";
+
+// Stock maison : pièces et produits qui ne sont pas (ou pas encore) dans le catalogue Shopify.
+await sql`CREATE TABLE IF NOT EXISTS stock_produits (id SERIAL PRIMARY KEY, code TEXT NOT NULL UNIQUE, nom TEXT NOT NULL, prix_cents INT NOT NULL DEFAULT 0, achat_ht_cents INT, qte INT NOT NULL DEFAULT 0, emplacement TEXT NOT NULL DEFAULT '', archive_le TIMESTAMPTZ, cree_le TIMESTAMPTZ NOT NULL DEFAULT now(), maj_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
+await sql`CREATE TABLE IF NOT EXISTS stock_mouvements (id SERIAL PRIMARY KEY, produit_id INT NOT NULL REFERENCES stock_produits(id), delta INT NOT NULL, motif TEXT NOT NULL DEFAULT '', cree_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
+
+const cents = (x: any): number | null => {
+  const s = String(x ?? "").replace(",", ".").replace(/[^0-9.]/g, "");
+  if (!s) return null;
+  const n = Math.round(Number(s) * 100);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+};
+const emp = (x: any) => clean(x, 20).toUpperCase().replace(/\s+/g, "");
+const codeNet = (x: any) => clean(x, 60).replace(/\s+/g, "");
+
+const vue = (p: any) => ({ id: p.id, code: p.code, nom: p.nom, prixCents: p.prix_cents, achatHtCents: p.achat_ht_cents, qte: p.qte, emplacement: p.emplacement, archive: !!p.archive_le });
+
+// Création / entrée en stock : un seul geste. Code vide = code interne généré (TS-000123).
+// Si le code existe déjà (même archivé), on ajoute la quantité et on met à jour les infos renseignées.
+export async function entreeStock(b: { code?: any; nom?: any; prix?: any; achat?: any; qte?: any; emplacement?: any }, motif = "Entrée en stock") {
+  const nom = clean(b.nom, 200);
+  const code = codeNet(b.code);
+  const qte = Math.max(1, Math.min(9999, Math.round(Number(b.qte) || 1)));
+  const prix = cents(b.prix), achat = cents(b.achat), lieu = emp(b.emplacement);
+  let p: any;
+  if (code) [p] = (await sql`SELECT * FROM stock_produits WHERE code = ${code}`) as any[];
+  if (p) {
+    [p] = (await sql`UPDATE stock_produits SET qte = qte + ${qte}, archive_le = NULL, nom = ${nom || p.nom}, prix_cents = ${prix ?? p.prix_cents}, achat_ht_cents = ${achat ?? p.achat_ht_cents}, emplacement = ${lieu || p.emplacement}, maj_le = now() WHERE id = ${p.id} RETURNING *`) as any[];
+  } else {
+    if (!nom) throw new AppError(400, "Indique le nom du produit.");
+    [p] = (await sql`INSERT INTO stock_produits (code, nom, prix_cents, achat_ht_cents, qte, emplacement) VALUES (${code || "tmp" + Date.now() + Math.random()}, ${nom}, ${prix ?? 0}, ${achat}, ${qte}, ${lieu}) RETURNING *`) as any[];
+    if (!code) [p] = (await sql`UPDATE stock_produits SET code = ${"TS-" + String(p.id).padStart(6, "0")} WHERE id = ${p.id} RETURNING *`) as any[];
+  }
+  await sql`INSERT INTO stock_mouvements (produit_id, delta, motif) VALUES (${p.id}, ${qte}, ${motif})`;
+  return p;
+}
+
+app.get("/api/stock", async (c) => {
+  const q = clean(c.req.query("q"), 60).toLowerCase();
+  const rows = (await sql`SELECT * FROM stock_produits WHERE archive_le IS NULL ORDER BY emplacement, nom LIMIT 1000`) as any[];
+  const f = rows.filter((p) => !q || `${p.nom} ${p.code} ${p.emplacement}`.toLowerCase().includes(q)).slice(0, 300);
+  const lieux = [...new Set(rows.map((p) => p.emplacement).filter(Boolean))].sort();
+  const valeur = rows.reduce((t, p) => t + (p.achat_ht_cents ?? 0) * p.qte, 0);
+  return c.json({ produits: f.map(vue), lieux, nb: rows.length, valeurAchatHtCents: valeur });
+});
+
+app.post("/api/stock/rapide", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const p = await entreeStock(b);
+  return c.json({ message: `${p.nom} : ${p.qte} en stock${p.emplacement ? " (" + p.emplacement + ")" : ""} · code ${p.code}`, produit: vue(p) });
+});
+
+app.post("/api/stock/maj", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const id = Number(b.id);
+  const [p] = (await sql`SELECT * FROM stock_produits WHERE id = ${id}`) as any[];
+  if (!p) throw new AppError(404, "Produit introuvable.");
+  if (b.delta !== undefined) {
+    const d = Math.round(Number(b.delta) || 0);
+    const n = Math.max(0, p.qte + d);
+    await sql`UPDATE stock_produits SET qte = ${n}, maj_le = now() WHERE id = ${id}`;
+    await sql`INSERT INTO stock_mouvements (produit_id, delta, motif) VALUES (${id}, ${n - p.qte}, 'Ajustement')`;
+  } else {
+    await sql`UPDATE stock_produits SET nom = ${clean(b.nom, 200) || p.nom}, prix_cents = ${cents(b.prix) ?? p.prix_cents}, achat_ht_cents = ${b.achat === "" ? null : (cents(b.achat) ?? p.achat_ht_cents)}, emplacement = ${b.emplacement !== undefined ? emp(b.emplacement) : p.emplacement}, maj_le = now() WHERE id = ${id}`;
+  }
+  return c.json({ message: "Enregistré." });
+});
+
+app.post("/api/stock/archiver", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const id = Number(b.id);
+  const [p] = (await sql`SELECT qte FROM stock_produits WHERE id = ${id}`) as any[];
+  if (!p) throw new AppError(404, "Produit introuvable.");
+  await sql`UPDATE stock_produits SET qte = 0, archive_le = now(), maj_le = now() WHERE id = ${id}`;
+  if (p.qte) await sql`INSERT INTO stock_mouvements (produit_id, delta, motif) VALUES (${id}, ${-p.qte}, 'Retiré du stock')`;
+  return c.json({ message: "Produit retiré du stock (récupérable en le rescannant)." });
+});
+
+// Un scan : le produit s'il existe (archivé ou non).
+app.post("/api/stock/scan", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const code = codeNet(b.code);
+  const [p] = (await sql`SELECT * FROM stock_produits WHERE code = ${code}`) as any[];
+  return c.json({ produit: p ? vue(p) : null });
+});
+
+// Inventaire partiel d'un emplacement.
+// scans = [{code, qte}] : ce qui a été compté dans le rayon. Sans "appliquer", simple aperçu.
+//  - produit du rayon scanné : la quantité devient celle comptée
+//  - produit du rayon NON scanné : retiré du stock (archivé, récupérable)
+//  - produit scanné mais rangé ailleurs : déplacé dans ce rayon
+//  - code inconnu : à créer (aperçu seulement)
+app.post("/api/stock/inventaire", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const lieu = emp(b.emplacement);
+  if (!lieu) throw new AppError(400, "Indique l'emplacement inventorié.");
+  const compte = new Map<string, number>();
+  for (const s of Array.isArray(b.scans) ? b.scans.slice(0, 5000) : []) {
+    const code = codeNet(s.code);
+    if (code) compte.set(code, (compte.get(code) ?? 0) + Math.max(1, Math.round(Number(s.qte) || 1)));
+  }
+  const attendus = (await sql`SELECT * FROM stock_produits WHERE emplacement = ${lieu} AND archive_le IS NULL`) as any[];
+  const connus = compte.size ? ((await sql`SELECT * FROM stock_produits WHERE code = ANY(${[...compte.keys()]})`) as any[]) : [];
+  const parCode = new Map(connus.map((p) => [p.code, p]));
+  const absents = attendus.filter((p) => !compte.has(p.code));
+  const inconnus = [...compte.keys()].filter((k) => !parCode.has(k)).map((k) => ({ code: k, qte: compte.get(k) }));
+  const deplaces = connus.filter((p) => p.emplacement !== lieu && !p.archive_le);
+  const revenus = connus.filter((p) => p.archive_le);
+  const ecarts = connus.filter((p) => !p.archive_le && p.emplacement === lieu && p.qte !== compte.get(p.code));
+  const apercu = {
+    emplacement: lieu, scannes: connus.length,
+    absents: absents.map(vue), inconnus,
+    deplaces: deplaces.map((p) => ({ ...vue(p), vers: lieu })),
+    revenus: revenus.map(vue),
+    ecarts: ecarts.map((p) => ({ ...vue(p), compte: compte.get(p.code) })),
+  };
+  if (!b.appliquer) return c.json({ apercu });
+  for (const p of connus) {
+    const n = compte.get(p.code)!;
+    if (p.qte !== n || p.emplacement !== lieu || p.archive_le) {
+      await sql`UPDATE stock_produits SET qte = ${n}, emplacement = ${lieu}, archive_le = NULL, maj_le = now() WHERE id = ${p.id}`;
+      if (n !== p.qte) await sql`INSERT INTO stock_mouvements (produit_id, delta, motif) VALUES (${p.id}, ${n - p.qte}, ${"Inventaire " + lieu})`;
+    }
+  }
+  for (const p of absents) {
+    await sql`UPDATE stock_produits SET qte = 0, archive_le = now(), maj_le = now() WHERE id = ${p.id}`;
+    if (p.qte) await sql`INSERT INTO stock_mouvements (produit_id, delta, motif) VALUES (${p.id}, ${-p.qte}, ${"Inventaire " + lieu + " : non retrouvé"})`;
+  }
+  return c.json({ message: `Inventaire ${lieu} validé : ${connus.length} produit(s) comptés, ${absents.length} retiré(s), ${deplaces.length} déplacé(s).${inconnus.length ? " " + inconnus.length + " code(s) inconnu(s) à créer." : ""}` });
+});
