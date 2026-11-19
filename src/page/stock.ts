@@ -5,26 +5,26 @@ function vStock(){
   var h="<div class='pmsg'>"+esc(STMSG)+"</div><div class='actions'><button class='"+(STSUB==="liste"?"":"sec")+"' data-act='stSub' data-s='liste'>Stock</button><button class='"+(STSUB==="inv"?"":"sec")+"' data-act='stSub' data-s='inv'>Inventaire d'un emplacement</button></div>";
   if(STSUB==="inv"){app.innerHTML=h+vInv();stFocus(STINV.lieu?"iscan":"ilieu");return}
   if(!STK){app.innerHTML=h+"<div class='card'>Chargement…</div>";api("/stock?magasin="+encodeURIComponent(MAG||"")).then(function(d){STK=d;render()}).catch(function(e){STMSG=e.message;STK={produits:[],lieux:[],nb:0,valeurAchatHtCents:0};render()});return}
-  h+="<div class='card'><div class='step'>Ajout rapide</div><div class='muted'>Scanne le code-barres (ou laisse vide : un code interne est créé), tape le nom et le prix, Entrée. Si le code existe déjà, la quantité s'ajoute.</div>"
-    +"<div class='dl' style='margin-top:6px'><input id='sk' class='lb' placeholder='Code-barres (scan)'><input id='sn' class='lb' placeholder='Nom du produit'><input id='sp' class='p' placeholder='Prix vente TTC'><input id='sa' class='p' placeholder='Achat HT'><input id='sq' class='q' type='number' min='1' value='1' title='Quantité'><input id='sl' class='q' placeholder='Empl.' value='"+esc(STLIEU)+"' title='Emplacement (A11…)'></div>"
+  h+="<div class='card'><div class='step'>Ajout rapide</div><div class='muted'>Scanne l'EAN-13 (ou laisse vide : un EAN-13 interne commençant par 200 est créé, à étiqueter), tape le nom et le prix, Entrée. Si le code existe déjà, la quantité s'ajoute.</div>"
+    +"<div class='dl' style='margin-top:6px'><input id='sk' class='lb' placeholder='EAN-13 (scan) - vide = généré'><input id='sn' class='lb' placeholder='Nom du produit'><input id='sp' class='p' placeholder='Prix vente TTC'><input id='sa' class='p' placeholder='Achat HT'><input id='sq' class='q' type='number' min='1' value='1' title='Quantité'><input id='sm' class='q' type='number' min='0' placeholder='Min' title='Stock minimum : en dessous, une commande est suggérée'><input id='sl' class='q' placeholder='Empl.' value='"+esc(STLIEU)+"' title='Emplacement (A11…)'></div>"
     +"<div class='actions'><button data-act='stAdd'>Ajouter au stock</button></div></div>";
   h+="<div class='card'><div class='head'><div class='step'>Stock "+esc(STK.magasin||"")+" : "+STK.nb+" produit"+(STK.nb>1?"s":"")+" en stock"+(STK.valeurAchatHtCents?" · valeur d'achat HT "+eur(STK.valeurAchatHtCents):"")+"</div><input id='stq' class='lb' placeholder='Chercher (nom, code, emplacement)' value='"+esc(STQ)+"'></div>";
   if(!STK.produits.length)h+="<div class='muted'>Aucun produit.</div>";
-  else h+="<table class='devis' style='width:100%'><tr><th>Produit</th><th>Empl.</th><th class='n'>Achat HT</th><th class='n'>Vente</th><th class='n'>Qté</th><th></th></tr>"+STK.produits.map(function(p){
+  else h+="<table class='devis' style='width:100%'><tr><th>Produit</th><th>Empl.</th><th class='n'>Achat HT</th><th class='n'>Vente</th><th class='n'>Qté</th><th class='n'>Min</th><th></th></tr>"+STK.produits.map(function(p){
     return"<tr><td>"+esc(p.nom)+"<div class='muted'>"+esc(p.code)+"</div></td><td>"+esc(p.emplacement||"-")+"</td><td class='n'>"+(p.achatHtCents==null?"-":eur(p.achatHtCents))+"</td><td class='n'>"+eur(p.prixCents)+"</td>"
       +"<td class='n'><button class='sec' data-act='stDelta' data-id='"+p.id+"' data-d='-1'>-</button> <b>"+p.qte+"</b> <button class='sec' data-act='stDelta' data-id='"+p.id+"' data-d='1'>+</button></td>"
-      +"<td class='n'><button class='link' data-act='stEtq' data-id='"+p.id+"'>Étiquette</button> <button class='link' data-act='stEdit' data-id='"+p.id+"'>Modifier</button> <button class='link' data-act='stDel' data-id='"+p.id+"'>Retirer</button></td></tr>"}).join("")+"</table>";
+      +"<td class='n'>"+(p.min?(p.qte<p.min?"<span class='tag warn'>"+p.min+"</span>":p.min):"-")+"</td><td class='n'><button class='link' data-act='stEtq' data-id='"+p.id+"'>Étiquette</button> <button class='link' data-act='stEdit' data-id='"+p.id+"'>Modifier</button> <button class='link' data-act='stDel' data-id='"+p.id+"'>Retirer</button></td></tr>"}).join("")+"</table>";
   app.innerHTML=h+"</div>";
   if(!STQ)stFocus("sk")}
 function stProd(id){return(STK&&STK.produits||[]).filter(function(p){return p.id===id})[0]}
 function stRun(p,msg){return p.then(function(d){STMSG=(d&&d.message)||msg||"";STK=null;render()}).catch(function(e){STMSG=e.message;render()})}
 ACTS.stSub=function(b){STSUB=b.dataset.s;STMSG="";STAP=null;render()};
 ACTS.stAdd=function(){
-  stRun(api("/stock/rapide",{magasin:MAG||"",code:v("sk"),nom:v("sn"),prix:v("sp"),achat:v("sa"),qte:v("sq")||1,emplacement:v("sl")}).then(function(d){STLIEU=v("sl")||STLIEU;return d}));
+  stRun(api("/stock/rapide",{magasin:MAG||"",code:v("sk"),nom:v("sn"),prix:v("sp"),achat:v("sa"),qte:v("sq")||1,min:v("sm"),emplacement:v("sl")}).then(function(d){STLIEU=v("sl")||STLIEU;return d}));
   };
 ACTS.stCode=function(){
   var c=v("sk");if(!c)return;
-  api("/stock/scan",{magasin:MAG||"",code:c}).then(function(d){var p=d.produit,sh=d.shopify;if(!p&&sh){document.getElementById("sn").value=sh.nom;document.getElementById("sp").value=sh.prixCents?(sh.prixCents/100).toFixed(2):"";document.getElementById("sa").value=sh.achatHtCents==null?"":(sh.achatHtCents/100).toFixed(2);STMSG="Trouvé dans le catalogue Shopify : "+sh.nom+". Indique la quantité et l'emplacement.";var m2=document.querySelector(".pmsg");if(m2)m2.textContent=STMSG;stFocus("sq");return}if(p){document.getElementById("sn").value=p.nom;document.getElementById("sp").value=p.prixCents?(p.prixCents/100).toFixed(2):"";document.getElementById("sa").value=p.achatHtCents==null?"":(p.achatHtCents/100).toFixed(2);if(p.emplacement)document.getElementById("sl").value=p.emplacement;STMSG="Déjà en stock : "+p.nom+" ("+p.qte+"). La quantité saisie s'ajoutera.";var m=document.querySelector(".pmsg");if(m)m.textContent=STMSG;stFocus("sq")}else stFocus("sn")}).catch(function(){})};
+  api("/stock/scan",{magasin:MAG||"",code:c}).then(function(d){var p=d.produit,sh=d.shopify;if(!p&&sh){document.getElementById("sn").value=sh.nom;document.getElementById("sp").value=sh.prixCents?(sh.prixCents/100).toFixed(2):"";document.getElementById("sa").value=sh.achatHtCents==null?"":(sh.achatHtCents/100).toFixed(2);STMSG="Trouvé dans le catalogue Shopify : "+sh.nom+". Indique la quantité et l'emplacement.";var m2=document.querySelector(".pmsg");if(m2)m2.textContent=STMSG;stFocus("sq");return}if(p){document.getElementById("sn").value=p.nom;document.getElementById("sp").value=p.prixCents?(p.prixCents/100).toFixed(2):"";document.getElementById("sa").value=p.achatHtCents==null?"":(p.achatHtCents/100).toFixed(2);if(p.emplacement)document.getElementById("sl").value=p.emplacement;if(p.min)document.getElementById("sm").value=p.min;STMSG="Déjà en stock : "+p.nom+" ("+p.qte+"). La quantité saisie s'ajoutera.";var m=document.querySelector(".pmsg");if(m)m.textContent=STMSG;stFocus("sq")}else stFocus("sn")}).catch(function(){})};
 ACTS.stSearch=function(){STQ=v("stq");api("/stock?magasin="+encodeURIComponent(MAG||"")+"&q="+encodeURIComponent(STQ)).then(function(d){STK=d;var p=STQ;render();var e=document.getElementById("stq");if(e){e.focus();e.setSelectionRange(p.length,p.length)}}).catch(function(){})};
 ACTS.stDelta=function(b){stRun(api("/stock/maj",{id:+b.dataset.id,delta:+b.dataset.d}),"")};
 ACTS.stDel=function(b){var p=stProd(+b.dataset.id);if(p&&confirm("Retirer "+p.nom+" du stock ? (récupérable en le rescannant)"))stRun(api("/stock/archiver",{id:p.id}))};
@@ -34,7 +34,8 @@ ACTS.stEdit=function(b){var p=stProd(+b.dataset.id);if(!p)return;
   var pv=prompt("Prix de vente TTC",(p.prixCents/100).toFixed(2));if(pv===null)return;
   var a=prompt("Prix d'achat HT (vide = inconnu)",p.achatHtCents==null?"":(p.achatHtCents/100).toFixed(2));if(a===null)return;
   var l=prompt("Emplacement",p.emplacement);if(l===null)return;
-  stRun(api("/stock/maj",{id:p.id,nom:n,prix:pv,achat:a,emplacement:l}))};
+  var mn=prompt("Stock minimum (0 = pas de suggestion de commande)",p.min||0);if(mn===null)return;
+  stRun(api("/stock/maj",{id:p.id,nom:n,prix:pv,achat:a,emplacement:l,min:mn}))};
 // ----- Inventaire -----
 function vInv(){
   var h="<div class='card'><div class='step'>Inventaire partiel</div><div class='muted'>Choisis l'emplacement, puis scanne tout ce qui s'y trouve (un scan par pièce). Ce qui était rangé là mais n'est pas scanné sera retiré du stock.</div>";
@@ -74,6 +75,6 @@ document.addEventListener("keydown",function(e){
   if(t.id==="iscan"){e.preventDefault();ACTS.iScan();return}
   if(t.id==="ilieu"){e.preventDefault();ACTS.iLieu();stFocus("iscan");return}
   if(t.id==="sk"){e.preventDefault();ACTS.stCode();return}
-  if(t.id==="sn"||t.id==="sp"||t.id==="sa"||t.id==="sq"||t.id==="sl"){e.preventDefault();ACTS.stAdd()}});
+  if(t.id==="sn"||t.id==="sp"||t.id==="sa"||t.id==="sq"||t.id==="sm"||t.id==="sl"){e.preventDefault();ACTS.stAdd()}});
 document.addEventListener("input",function(e){var t=e.target;if(t&&t.id==="stq"&&TAB==="stock"){clearTimeout(window.__stt);window.__stt=setTimeout(ACTS.stSearch,250)}});
 `;

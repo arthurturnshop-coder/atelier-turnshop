@@ -1,5 +1,5 @@
 export const COMMANDES = `// ---------- Commandes fournisseurs ----------
-var CMD=null,CMDMSG="";
+var CMD=null,CMDMSG="",RE=null;
 function nlc(){return String.fromCharCode(10)}
 function texteCommande(f){
   var nl=nlc();
@@ -19,8 +19,16 @@ function ligneCmd(l,mode){
   else h+="<td class='n'>"+l.quantite+"</td><td class='n'><span class='tag ok'>Reçu</span></td>";
   return h+"</tr>"}
 function vCmd(){
-  if(!CMD){app.innerHTML="<div class='card'>Chargement…</div>";api("/achats").then(function(d){CMD=d;render()}).catch(function(e){app.innerHTML="<div class='card'>"+esc(e.message)+"</div>"});return}
+  if(!CMD){app.innerHTML="<div class='card'>Chargement…</div>";api("/achats").then(function(d){return api("/stock/reappro?magasin="+encodeURIComponent(MAG||"")).then(function(r){RE=r;return d}).catch(function(){RE=null;return d})}).then(function(d){CMD=d;render()}).catch(function(e){app.innerHTML="<div class='card'>"+esc(e.message)+"</div>"});return}
   var h="<div class='pmsg'>"+esc(CMDMSG)+"</div><div class='card'><div class='step'>Nouveau fournisseur</div><div class='dl'><input id='fn' class='lb' placeholder='Nom (ex : eWheel)'><input id='fe' class='lb' placeholder='Email pour les commandes'><button data-act='fAdd'>Ajouter</button></div></div>";
+  if(RE&&RE.produits.length){
+    h+="<div class='card'><div class='step'>À recommander : stock minimum atteint ("+RE.produits.length+")</div><div class='muted'>Suggestion pour "+esc(RE.magasin)+". Choisis le fournisseur et ajoute au panier.</div>";
+    RE.produits.forEach(function(p){
+      h+="<div class='dl' style='margin-top:6px;align-items:center'><div class='lb'><b>"+esc(p.nom)+"</b><div class='muted'>"+p.qte+" en stock / minimum "+p.min+(p.enCommande?" · "+p.enCommande+" déjà en commande":"")+(p.emplacement?" · "+esc(p.emplacement):"")+"</div></div>"
+        +"<input id='rq-"+p.id+"' class='q' type='number' min='1' value='"+p.aCommander+"' title='Quantité à commander'>"
+        +"<select id='rf-"+p.id+"'>"+CMD.fournisseurs.map(function(f){return"<option value='"+f.id+"'>"+esc(f.nom)+"</option>"}).join("")+"</select>"
+        +"<button data-act='cmdReappro' data-id='"+p.id+"'>Ajouter au panier</button></div>"});
+    h+="</div>"}
   if(!CMD.fournisseurs.length)h+="<div class='card'>Ajoute ton premier fournisseur ci-dessus (eWheel, ...). Chaque fournisseur a son panier.</div>";
   CMD.fournisseurs.forEach(function(f){
     h+="<div class='card'><div class='head'><div class='big'>"+esc(f.nom)+"</div><div class='dl'><input id='fe-"+f.id+"' value='"+esc(f.email)+"' placeholder='Email de commande' class='lb'><button class='sec' data-act='fMail' data-id='"+f.id+"'>Enregistrer l'email</button></div></div>";
@@ -37,6 +45,7 @@ function vCmd(){
     h+="</div>"});
   app.innerHTML=h}
 function cmdRun(p,msg){return p.then(function(d){HISTC=null;CMDMSG=(d&&d.message)||msg||"";CMD=null;render()}).catch(function(e){CMDMSG=e.message;render()})}
+ACTS.cmdReappro=function(b){var id=+b.dataset.id,f=document.getElementById("rf-"+id);if(!f||!f.value){CMDMSG="Ajoute d'abord un fournisseur.";render();return}cmdRun(api("/stock/reappro/ajouter",{id:id,fournisseurId:+f.value,quantite:v("rq-"+id)}))};
 ACTS.fAdd=function(){cmdRun(api("/achats/fournisseur",{nom:v("fn"),email:v("fe")}))};
 ACTS.fMail=function(b){cmdRun(api("/achats/fournisseur/modifier",{id:+b.dataset.id,email:v("fe-"+b.dataset.id)}))};
 ACTS.cmdLigne=function(b){var id=+b.dataset.id;cmdRun(api("/achats/ligne",{fournisseurId:id,libelle:v("cl-"+id),quantite:v("cq-"+id)}))};
