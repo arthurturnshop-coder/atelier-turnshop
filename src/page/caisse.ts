@@ -118,6 +118,7 @@ async function ajouterProduit(p,ctx){
   CMSG="Ajouté : "+p.libelle+(p.stock==null?"":" (stock "+p.stock+")");render()}
 async function scanCode(q,ctx,silent){
   q=(q||"").trim();if(!q)return;
+  var mpc=q.match(/^pc[^0-9a-z]*0*([0-9]+)$/i);if(mpc){ouvrirFiche(Number(mpc[1]));return}
   try{
     var r=await api("/code?q="+encodeURIComponent(q));
     if(r.produit){await ajouterProduit(r.produit,ctx);return}
@@ -133,11 +134,12 @@ document.addEventListener("keydown",function(e){
   var t=e.target,tag=t&&t.tagName?t.tagName:"";
   if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT")return;
   var sctx=document.getElementById("cq")?"caisse":(FICHE&&TAB==="enc"?"devis":"");if(REC&&TAB==="cmd")sctx="recep";
-  if(!sctx||e.ctrlKey||e.metaKey||e.altKey)return;
+  if(e.ctrlKey||e.metaKey||e.altKey)return;
+  if(!sctx)sctx="pc";
   var now=Date.now();
   if(now-SCLAST>80)SCBUF="";
   SCLAST=now;
-  if(e.key==="Enter"){if(SCBUF.length>=4){var code=SCBUF;SCBUF="";if(sctx==="recep")recepScan(code);else scanCode(code,sctx)}return}
+  if(e.key==="Enter"){if(SCBUF.length>=4){var code=SCBUF;SCBUF="";if(sctx==="pc"){if(/^pc[^0-9a-z]*0*[0-9]+$/i.test(code))ouvrirFiche(Number(code.replace(/[^0-9]/g,"")))}else if(sctx==="recep")recepScan(code);else scanCode(code,sctx)}return}
   if(e.key.length===1)SCBUF+=e.key});
 function caisseBind(){var q=document.getElementById("cq");if(q)q.addEventListener("keydown",function(e){if(e.key==="Enter")ACTS.cScan()})}
 function chargeHisto(){
