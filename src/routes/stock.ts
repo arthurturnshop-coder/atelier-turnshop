@@ -133,52 +133,60 @@ app.post("/api/stock/scan", async (c) => {
 //  - code inconnu : à créer (aperçu seulement)
 app.post("/api/stock/inventaire", async (c) => {
   const b = await c.req.json().catch(() => ({}));
-  const lieu = emp(b.emplacement), m = mag(c, b);
-  if (!lieu) throw new AppError(400, "Indique l'emplacement inventorié.");
-  const compte = new Map<string, number>();
+  const zone = emp(b.emplacement), m = mag(c, b);
+  if (!zone) throw new AppError(400, "Indique l'emplacement ou le panneau inventorié (ex : A11, ou A pour tout le panneau A).");
+  // « A » (lettres seules) = tout le panneau A (A11, A12, A22…) ; « A11 » = ce rayon seulement.
+  const panneau = /^[A-Z]+$/.test(zone);
+  const dans = (lieu: string) => (panneau ? lieu.startsWith(zone) : lieu === zone);
+  const compte = new Map<string, number>(), lieuDe = new Map<string, string>();
+  let sansLieu = 0;
   for (const s of Array.isArray(b.scans) ? b.scans.slice(0, 5000) : []) {
     const code = codeNet(s.code);
-    if (code) compte.set(code, (compte.get(code) ?? 0) + Math.max(1, Math.round(Number(s.qte) || 1)));
+    if (!code) continue;
+    compte.set(code, (compte.get(code) ?? 0) + Math.max(1, Math.round(Number(s.qte) || 1)));
+    let l = emp(s.emplacement);
+    if (!l || !dans(l)) { l = zone; if (panneau) sansLieu++; }
+    if (!lieuDe.has(code)) lieuDe.set(code, l);
   }
-  const attendus = (await sql`SELECT * FROM stock_produits WHERE emplacement = ${lieu} AND archive_le IS NULL AND magasin = ${m}`) as any[];
+  const attendus = ((await sql`SELECT * FROM stock_produits WHERE archive_le IS NULL AND magasin = ${m} AND emplacement <> ''`) as any[]).filter((p) => dans(p.emplacement));
   const connus = compte.size ? ((await sql`SELECT * FROM stock_produits WHERE magasin = ${m} AND code = ANY(${[...compte.keys()]})`) as any[]) : [];
   const parCode = new Map(connus.map((p) => [p.code, p]));
   const absents = attendus.filter((p) => !compte.has(p.code));
   const inconnus: any[] = [];
   for (const k of [...compte.keys()].filter((k) => !parCode.has(k))) {
     const sh = await shopifyParCode(k);
-    inconnus.push({ code: k, qte: compte.get(k), nom: sh?.nom ?? "", prixCents: sh?.prixCents ?? 0, achatHtCents: sh?.achatHtCents ?? null, shopify: !!sh });
+    inconnus.push({ code: k, qte: compte.get(k), vers: lieuDe.get(k), nom: sh?.nom ?? "", prixCents: sh?.prixCents ?? 0, achatHtCents: sh?.achatHtCents ?? null, shopify: !!sh });
   }
-  const deplaces = connus.filter((p) => p.emplacement !== lieu && !p.archive_le);
+  const deplaces = connus.filter((p) => !p.archive_le && p.emplacement !== lieuDe.get(p.code));
   const revenus = connus.filter((p) => p.archive_le);
-  const ecarts = connus.filter((p) => !p.archive_le && p.emplacement === lieu && p.qte !== compte.get(p.code));
+  const ecarts = connus.filter((p) => !p.archive_le && p.qte !== compte.get(p.code));
   const apercu = {
-    emplacement: lieu, scannes: connus.length,
+    emplacement: zone, panneau, scannes: connus.length, sansLieu,
     absents: absents.map(vue), inconnus,
-    deplaces: deplaces.map((p) => ({ ...vue(p), vers: lieu })),
+    deplaces: deplaces.map((p) => ({ ...vue(p), vers: lieuDe.get(p.code) })),
     revenus: revenus.map(vue),
     ecarts: ecarts.map((p) => ({ ...vue(p), compte: compte.get(p.code) })),
   };
   if (!b.appliquer) return c.json({ apercu });
   for (const p of connus) {
-    const n = compte.get(p.code)!;
+    const n = compte.get(p.code)!, lieu = lieuDe.get(p.code)!;
     if (p.qte !== n || p.emplacement !== lieu || p.archive_le) {
       await sql`UPDATE stock_produits SET qte = ${n}, emplacement = ${lieu}, archive_le = NULL, maj_le = now() WHERE id = ${p.id}`;
-      if (n !== p.qte) await sql`INSERT INTO stock_mouvements (produit_id, delta, motif) VALUES (${p.id}, ${n - p.qte}, ${"Inventaire " + lieu})`;
+      if (n !== p.qte) await sql`INSERT INTO stock_mouvements (produit_id, delta, motif) VALUES (${p.id}, ${n - p.qte}, ${"Inventaire " + zone})`;
     }
   }
   for (const p of absents) {
     await sql`UPDATE stock_produits SET qte = 0, archive_le = now(), maj_le = now() WHERE id = ${p.id}`;
-    if (p.qte) await sql`INSERT INTO stock_mouvements (produit_id, delta, motif) VALUES (${p.id}, ${-p.qte}, ${"Inventaire " + lieu + " : non retrouvé"})`;
+    if (p.qte) await sql`INSERT INTO stock_mouvements (produit_id, delta, motif) VALUES (${p.id}, ${-p.qte}, ${"Inventaire " + zone + " : non retrouvé"})`;
   }
-  // Codes inconnus mais présents dans le catalogue Shopify : créés tout seuls dans ce rayon.
+  // Codes inconnus mais présents dans le catalogue Shopify : créés tout seuls à l'endroit où ils ont été scannés.
   let crees = 0;
   for (const i of inconnus.filter((x) => x.shopify)) {
-    await entreeStock({ code: i.code, nom: i.nom, prix: (i.prixCents / 100).toFixed(2), achat: i.achatHtCents == null ? "" : (i.achatHtCents / 100).toFixed(2), qte: i.qte, emplacement: lieu }, "Inventaire " + lieu, m);
+    await entreeStock({ code: i.code, nom: i.nom, prix: (i.prixCents / 100).toFixed(2), achat: i.achatHtCents == null ? "" : (i.achatHtCents / 100).toFixed(2), qte: i.qte, emplacement: i.vers }, "Inventaire " + zone, m);
     crees++;
   }
   const reste = inconnus.length - crees;
-  return c.json({ message: `Inventaire ${lieu} (${m}) validé : ${connus.length} produit(s) comptés, ${crees} créé(s) depuis Shopify, ${absents.length} retiré(s), ${deplaces.length} déplacé(s).${reste ? " " + reste + " code(s) inconnu(s) à créer à la main." : ""}` });
+  return c.json({ message: `Inventaire ${panneau ? "panneau " : ""}${zone} (${m}) validé : ${connus.length} produit(s) comptés, ${crees} créé(s) depuis Shopify, ${absents.length} retiré(s), ${deplaces.length} déplacé(s).${reste ? " " + reste + " code(s) inconnu(s) à créer à la main." : ""}` });
 });
 
 // Produits sous leur stock minimum, avec la quantité à recommander (en tenant compte de ce qui est déjà au panier ou commandé).
