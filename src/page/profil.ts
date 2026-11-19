@@ -31,7 +31,18 @@ async function loadCa(){
   var c=CUR;if(!c)return;CALOAD=c.id;var d;
   try{d=await api("/clients/ca?id="+c.id)}catch(e){d={atelierCents:0,nb:0}}
   CALOAD=null;if(!CUR||CUR.id!==c.id)return;
-  CACLI={id:c.id,d:d};var el=document.getElementById("cacli");if(el)el.innerHTML=caHtml()}
+  CACLI={id:c.id,d:d};kpiMaj()}
+function kpiHtml(){
+  var f=FID,d=CACLI&&CUR&&CACLI.id===CUR.id?CACLI.d:null;
+  function ln(l,x){return"<tr><td style='padding:4px 14px 4px 0;color:#666'>"+l+"</td><td style='padding:4px 0;text-align:right;font-weight:700;white-space:nowrap'>"+x+"</td></tr>"}
+  var t="<table style='border-collapse:collapse;font-size:15px'>";
+  t+=ln("Points fidélité",f===null?"…":f.trouve?esc(f.points)+" pts":"-");
+  t+=ln("Réduction disponible",f===null?"…":f.trouve?esc(f.euros)+" €":"-");
+  t+=ln("CA atelier",d?eur(d.atelierCents):"…");
+  t+=ln("Factures atelier",d?d.nb+(d.derniere?" <span style='font-weight:400;color:#666'>(dernière le "+esc(day(d.derniere))+")</span>":""):"…");
+  t+=ln("Dépensé sur Shopify",d?(d.shopifyCents!=null?eur(d.shopifyCents):"-"):"…");
+  return t+"</table>"}
+function kpiMaj(){var el=document.getElementById("kpi");if(el)el.innerHTML=kpiHtml()}
 function vProfil(){
   var c=CUR;
   var h="<button class='sec' data-act='back' style='max-width:260px'>← Retour au dashboard</button>"
@@ -44,7 +55,7 @@ function vProfil(){
       +"<div class='muted'>"+esc(c.phone||"Pas de téléphone")+" · "+esc(c.email||"Pas d'email")+"</div><div class='muted'>Client depuis le "+esc(day(c.creeLe))+"</div>"
       +"<button class='sec' data-act='editCli'>Modifier</button>"+(estResp()?" <button class='sec' data-act='cliFusion'>Fusionner dans une autre fiche</button> <button class='danger' data-act='cliSuppr'>Supprimer la fiche</button>":"");
   }
-  h+="<div class='muted' id='fid'>"+fidHtml()+"</div><div class='muted' id='cacli'>"+caHtml()+"</div></div></div></div>";
+  h+="</div><div id='kpi' style='flex:0 0 auto;margin-left:auto'>"+kpiHtml()+"</div></div></div>";
   if(ADDT)h+="<div class='card'><b>Ajouter une trottinette</b><input id='m' placeholder='Marque'><input id='mo' placeholder='Modèle'><input id='s' placeholder='Numéro de série'><button data-act='addT'>Associer</button><button class='sec' data-act='cancelAddT'>Annuler</button></div>";
   else h+="<button class='sec' data-act='showAddT'>+ Ajouter une trottinette</button>";
   h+="<div class='step' style='margin-top:14px'>Trottinettes</div>";
@@ -66,5 +77,5 @@ async function loadFid(){
   try{d=await api("/fidelite?id="+c.id)}catch(e){d={trouve:false}}
   FIDLOAD=null;
   if(!CUR||CUR.id!==c.id)return;
-  FID=d;var el=document.getElementById("fid");if(el)el.innerHTML=fidHtml()}
+  FID=d;kpiMaj()}
 `;
