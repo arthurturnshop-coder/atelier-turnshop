@@ -265,3 +265,47 @@ app.post("/api/stock/associer-code", async (c) => {
   if (errs.length) throw new AppError(502, "Shopify : " + errs[0].message);
   return c.json({ message: `Code ${code} enregistré sur « ${v.productVariant.displayName} ».` });
 });
+
+// Reprend les vrais codes-barres des fournisseurs déjà présents dans Shopify (métachamps Ewheel "codigo-alternativo")
+// et les écrit dans le champ code-barres des variantes qui n'en ont pas. 100 variantes par appel.
+const gs1Ok = (c: string) => {
+  if (!/^\d+$/.test(c) || ![8, 12, 13, 14].includes(c.length)) return false;
+  let t = 0;
+  for (let i = 0; i < c.length - 1; i++) t += Number(c[c.length - 2 - i]) * (i % 2 ? 1 : 3);
+  return (10 - (t % 10)) % 10 === Number(c[c.length - 1]);
+};
+app.post("/api/stock/codes-fournisseurs", async (c) => {
+  const user = c.get("user") as any;
+  if (user?.role !== "admin" && user?.role !== "responsable") throw new AppError(403, "Réservé au responsable.");
+  const pris = new Set<string>();
+  const aFaire: { id: string; productId: string; code: string }[] = [];
+  let after: string | null = null, sans = 0;
+  for (let i = 0; i < 120; i++) {
+    const d: any = await shopifyRead(`query($after:String){productVariants(first:100,after:$after){pageInfo{hasNextPage endCursor} nodes{id barcode product{id a:metafield(namespace:"custom",key:"codigo-alternativo"){value} b:metafield(namespace:"custom",key:"codigo-alternativo-2"){value}}}}}`, { after });
+    const pv = d.productVariants;
+    for (const v of pv.nodes) {
+      if (v.barcode) { pris.add(String(v.barcode)); continue; }
+      const code = [v.product?.a?.value, v.product?.b?.value].map((x: any) => String(x ?? "").trim()).find(gs1Ok);
+      if (code) aFaire.push({ id: v.id, productId: v.product.id, code }); else sans++;
+    }
+    if (!pv.pageInfo.hasNextPage) break;
+    after = pv.pageInfo.endCursor;
+  }
+  const lot: typeof aFaire = [];
+  let doublons = 0;
+  for (const v of aFaire) {
+    if (pris.has(v.code)) { doublons++; continue; }
+    pris.add(v.code);
+    if (lot.length < 100) lot.push(v);
+  }
+  const parProduit = new Map<string, { id: string; barcode: string }[]>();
+  for (const v of lot) { if (!parProduit.has(v.productId)) parProduit.set(v.productId, []); parProduit.get(v.productId)!.push({ id: v.id, barcode: v.code }); }
+  let faits = 0;
+  for (const [productId, variants] of parProduit) {
+    const r: any = await shopifyMutate(`mutation($productId:ID!,$variants:[ProductVariantsBulkInput!]!){productVariantsBulkUpdate(productId:$productId,variants:$variants){productVariants{id} userErrors{message}}}`, { productId, variants });
+    const errs = r?.productVariantsBulkUpdate?.userErrors || [];
+    if (errs.length) throw new AppError(502, "Shopify : " + errs[0].message);
+    faits += variants.length;
+  }
+  return c.json({ faits, restant: aFaire.length - doublons - faits, doublons, sansCode: sans });
+});

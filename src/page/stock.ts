@@ -9,7 +9,7 @@ function vStock(){
   if(!STK){app.innerHTML=h+"<div class='card'>Chargement…</div>";api("/stock?magasin="+encodeURIComponent(MAG||"")).then(function(d){STK=d;render()}).catch(function(e){STMSG=e.message;STK={produits:[],lieux:[],nb:0,valeurAchatHtCents:0};render()});return}
   h+="<div class='card'><div class='step'>Ajout rapide</div><div class='muted'>Scanne l'EAN-13 (ou laisse vide : un EAN-13 interne commençant par 200 est créé, à étiqueter), tape le nom et le prix, Entrée. Si le code existe déjà, la quantité s'ajoute.</div>"
     +"<div class='dl' style='margin-top:6px'><input id='sk' class='lb' placeholder='EAN-13 (scan) - vide = généré'><input id='sn' class='lb' placeholder='Nom du produit'><input id='sp' class='p' placeholder='Prix vente TTC'><input id='sa' class='p' placeholder='Achat HT'><input id='sq' class='q' type='number' min='1' value='1' title='Quantité'><input id='sm' class='q' type='number' min='0' placeholder='Min' title='Stock minimum : en dessous, une commande est suggérée'><input id='sl' class='q' placeholder='Empl.' value='"+esc(STLIEU)+"' title='Emplacement (A11…)'></div>"
-    +"<div class='actions'><button data-act='stAdd'>Ajouter au stock</button><button class='sec' data-act='stCodesShopify'>Créer les codes-barres manquants des produits Shopify</button></div></div>";
+    +"<div class='actions'><button data-act='stAdd'>Ajouter au stock</button><button class='sec' data-act='stCodesFourn'>Récupérer les codes-barres fournisseurs (Ewheel)</button><button class='sec' data-act='stCodesShopify'>Créer des codes internes pour le reste</button></div></div>";
   h+="<div class='card'><div class='step'>Associer un code-barres fournisseur à un produit Shopify</div><div class='muted'>1) Scanne le code-barres du carton. 2) Cherche le produit (ex : pneu plein Xiaomi) et clique la bonne variante : le code est écrit dans Shopify.</div>"
     +"<div class='dl' style='margin-top:6px'><input id='asc' class='lb' placeholder='Scanne le code-barres du fournisseur' value='"+esc(STAS)+"'></div>"+prodBox("assoc")+"</div>";
   h+="<div class='card'><div class='head'><div class='step'>Stock "+esc(STK.magasin||"")+" : "+STK.nb+" produit"+(STK.nb>1?"s":"")+" en stock"+(STK.valeurAchatHtCents?" · valeur d'achat HT "+eur(STK.valeurAchatHtCents):"")+"</div><input id='stq' class='lb' placeholder='Chercher (nom, code, emplacement)' value='"+esc(STQ)+"'></div>";
@@ -98,6 +98,10 @@ ACTS.stAssocie=async function(x,force){
   try{var d=await api("/stock/associer-code",{code:code,variantId:x.id,force:!!force});
     if(d.conflit){if(confirm(d.message))return ACTS.stAssocie(x,true);return}
     STMSG=d.message;STAS="";render()}catch(err){alert(err.message)}};
+ACTS.stCodesFourn=function(){
+  if(!confirm("Ecrire dans Shopify les vrais codes-barres fournisseurs (Ewheel) pour les produits qui n en ont pas ? 100 a la fois."))return;
+  STMSG="Recuperation des codes-barres fournisseurs... (peut prendre une minute)";render();
+  api("/stock/codes-fournisseurs",{}).then(function(d){STMSG=d.faits+" code(s) fournisseur ecrit(s) dans Shopify. "+(d.restant>0?"Il en reste "+d.restant+" : clique encore.":"Tout est fait.")+" ("+d.sansCode+" produits sans code fournisseur"+(d.doublons?", "+d.doublons+" doublons ignores":"")+")";render()}).catch(function(e){STMSG=e.message;render()})};
 ACTS.stCodesShopify=function(){
   if(!confirm("Donner un code-barres EAN-13 a tous les produits Shopify qui n en ont pas ? (ecrit dans Shopify, 100 produits a la fois)"))return;
   STMSG="Creation des codes-barres Shopify...";render();
