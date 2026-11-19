@@ -1,3 +1,4 @@
+import { shopifyMutate } from "../shopify";
 import { app } from "../app";
 import { sql } from "../db";
 // Doit passer après la protection /api/* (voir auth.ts).
@@ -45,7 +46,7 @@ app.post("/api/reparations/rembourser", async (c) => {
   const b = await c.req.json().catch(() => ({}));
   const repId = Number(b.repairId);
   const moyen = String(b.moyen ?? "");
-  if (![...MOYENS, "bon"].includes(moyen)) throw new AppError(400, "Choisis comment rembourser : carte, espèces, virement ou bon d'achat.");
+  if (![...MOYENS, "bon", "carte_cadeau"].includes(moyen)) throw new AppError(400, "Choisis comment rembourser : carte, espèces, virement ou bon d'achat.");
   const [r] = (await sql`SELECT id, client_id FROM reparations WHERE id = ${repId}`) as any[];
   if (!r) throw new AppError(404, "Réparation introuvable.");
   const ac = await acomptesDe(repId);
@@ -55,15 +56,29 @@ app.post("/api/reparations/rembourser", async (c) => {
   const [{ n: enLigne }] = (await sql`SELECT count(*)::int AS n FROM paiements_web WHERE reparation_id = ${repId} AND statut = 'paye' AND rembourse_le IS NULL`) as any[];
   let msgLigne = "";
   if (enLigne > 0) {
-    if (moyen !== "carte" && moyen !== "bon") throw new AppError(400, "Ce paiement a été fait en ligne : rembourse par carte (via Shopify) ou en bon d'achat.");
+    if (moyen !== "carte" && moyen !== "bon" && moyen !== "carte_cadeau") throw new AppError(400, "Ce paiement a été fait en ligne : rembourse par carte (via Shopify) ou en bon d'achat.");
     if (moyen === "carte") {
       try { msgLigne = await rembourserEnLigne(repId); } catch (e: any) { throw new AppError(502, "Remboursement Shopify impossible : " + String(e?.message ?? e).slice(0, 200) + ". Fais-le dans Shopify (Commandes) puis note-le ici."); }
     }
   }
+  // Carte cadeau Shopify : vrai bon d'achat, utilisable en ligne et sur Shopify POS, envoyé par email au client.
+  let gc: { id: string; fin: string; code: string; envoye: boolean } | null = null;
+  if (moyen === "carte_cadeau") {
+    const [cl] = (await sql`SELECT prenom, shopify_id FROM clients WHERE id = ${r.client_id}`) as any[];
+    try {
+      const input: any = { initialValue: (ac.resteCents / 100).toFixed(2), note: `Remboursement acompte ${pcn(repId)}` };
+      if (cl?.shopify_id) { input.customerId = cl.shopify_id; input.recipientAttributes = { id: cl.shopify_id, message: "Voici ton bon d'achat TURN Shop, utilisable en ligne et en boutique." }; }
+      const d = await shopifyMutate(`mutation($input: GiftCardCreateInput!) { giftCardCreate(input: $input) { giftCard { id lastCharacters } giftCardCode userErrors { field message } } }`, { input });
+      const res = d?.giftCardCreate;
+      if (res?.userErrors?.length) throw new Error(res.userErrors.map((e: any) => e.message).join(" · "));
+      if (!res?.giftCard?.id) throw new Error("Shopify n'a pas créé la carte cadeau.");
+      gc = { id: res.giftCard.id, fin: res.giftCard.lastCharacters, code: res.giftCardCode ?? "", envoye: !!cl?.shopify_id };
+    } catch (e: any) { throw new AppError(502, "Carte cadeau Shopify impossible : " + String(e?.message ?? e).slice(0, 200) + " (vérifie que l'app Shopify a l'accès aux cartes cadeaux). Rien n'a été remboursé."); }
+  }
   await sql`UPDATE ventes SET utilise_cents = total_cents WHERE reparation_id = ${repId} AND type = 'acompte'`;
-  await sql`INSERT INTO remboursements (reparation_id, client_id, montant_cents, moyen, motif, par) VALUES (${repId}, ${r.client_id}, ${ac.resteCents}, ${moyen}, ${"Acompte " + pcn(repId)}, ${u.prenom})`;
+  await sql`INSERT INTO remboursements (reparation_id, client_id, montant_cents, moyen, motif, par, gift_card_id, gift_card_fin) VALUES (${repId}, ${r.client_id}, ${ac.resteCents}, ${moyen}, ${"Acompte " + pcn(repId)}, ${u.prenom}, ${gc?.id ?? null}, ${gc?.fin ?? null})`;
   if (moyen === "bon") await sql`INSERT INTO bons_achat (client_id, montant_cents, motif) VALUES (${r.client_id}, ${ac.resteCents}, ${"Remboursement acompte " + pcn(repId)})`;
-  const nom: Record<string, string> = { carte: "par carte", especes: "en espèces", virement: "par virement", bon: "en bon d'achat" };
+  const nom: Record<string, string> = { carte: "par carte", especes: "en espèces", virement: "par virement", bon: "en bon d'achat", carte_cadeau: "en carte cadeau Shopify" + (gc ? " (…" + gc.fin + ")" : "") };
   await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${repId}, 'caisse', ${`Acompte remboursé ${nom[moyen]} : ${(ac.resteCents / 100).toFixed(2)} €${signature(c)}`})`;
-  return c.json({ message: msgLigne ? msgLigne : moyen === "bon" ? "Bon d'achat créé sur la fiche du client." : `Rembourse ${(ac.resteCents / 100).toFixed(2).replace(".", ",")} € ${nom[moyen]} au client.`, acompte: await acomptesDe(repId) });
+  return c.json({ message: gc ? `Carte cadeau Shopify de ${(ac.resteCents / 100).toFixed(2).replace(".", ",")} € créée (…${gc.fin}).${gc.envoye ? " Le client la reçoit par email de Shopify." : " Le client n'a pas de compte Shopify : donne-lui ce code : " + gc.code}` : msgLigne ? msgLigne : moyen === "bon" ? "Bon d'achat créé sur la fiche du client." : `Rembourse ${(ac.resteCents / 100).toFixed(2).replace(".", ",")} € ${nom[moyen]} au client.`, acompte: await acomptesDe(repId) });
 });
