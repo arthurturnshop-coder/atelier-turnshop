@@ -89,7 +89,7 @@ function caisseHtml(){
   h+="</div>";
   h+="<div class='card'><div class='step'>Panier</div>";
   if(!PAN.length)h+="<div class='muted'>Panier vide. Ajoute un article ci-dessous.</div>";
-  else h+="<table class='panier' style='width:100%;border-collapse:collapse'><tr><th style='text-align:left'>Article</th><th>Qté</th><th>Prix €</th><th></th></tr>"+PAN.map(function(l,i){return"<tr><td>"+esc(l.libelle)+"</td><td><input type='number' min='1' value='"+l.quantite+"' data-act='cQte' data-i='"+i+"'></td><td><input value='"+esc(l.prix)+"' data-act='cPrix' data-i='"+i+"'></td><td><button class='link' data-act='cDel' data-i='"+i+"'>Retirer</button></td></tr>"}).join("")+"</table>";
+  else h+="<table class='panier' style='width:100%;border-collapse:collapse'><tr><th style='text-align:left'>Article</th><th>Qté</th><th>Prix €</th><th></th></tr>"+PAN.map(function(l,i){return"<tr><td>"+esc(l.libelle)+((l.barcode||l.sku)?"<div class='muted' style='font-size:12px'>"+(l.barcode?"EAN "+esc(l.barcode):"")+(l.barcode&&l.sku?" · ":"")+(l.sku?"sku "+esc(l.sku):"")+"</div>":"")+"</td><td><input type='number' min='1' value='"+l.quantite+"' data-act='cQte' data-i='"+i+"'></td><td><input value='"+esc(l.prix)+"' data-act='cPrix' data-i='"+i+"'></td><td><button class='link' data-act='cDel' data-i='"+i+"'>Retirer</button></td></tr>"}).join("")+"</table>";
   h+="<div style='margin-top:8px'>"+prodBox("caisse")+"</div>";
   h+="<div class='dl' style='margin-top:8px'><input id='cl' class='lb' placeholder='Article (libellé)'><input id='cq2' class='q' type='number' min='1' value='1'><input id='cp' class='p' placeholder='Prix €'><button data-act='cAdd'>Ajouter</button></div></div>";
   var dispo=(CAV||[]).filter(function(a){return avApplicable(a,brut)});
@@ -115,7 +115,7 @@ async function ajouterProduit(p,ctx){
   if(ctx.indexOf("cmd")===0){var d=await api("/achats/ligne",{fournisseurId:+ctx.slice(3),libelle:p.libelle,sku:p.sku,barcode:p.barcode,variantId:p.variantId,quantite:1});CMDMSG=d.message;CMD=null;render();return}
   lirePay();CUR=null;FICHE=null;TAB="accueil";CREC=null;
   var ex=PAN.filter(function(l){return l.variantId&&l.variantId===p.variantId})[0];
-  if(ex)ex.quantite++;else PAN.push({libelle:p.libelle,quantite:1,prix:String(p.prix).replace(".",","),type:"piece",variantId:p.variantId,sku:p.sku});
+  if(ex)ex.quantite++;else PAN.push({libelle:p.libelle,quantite:1,prix:String(p.prix).replace(".",","),type:"piece",variantId:p.variantId,sku:p.sku,barcode:p.barcode||""});
   CMSG="Ajouté : "+p.libelle+(p.stock==null?"":" (stock "+p.stock+")");render()}
 async function scanCode(q,ctx,silent){
   q=(q||"").trim();if(!q)return;

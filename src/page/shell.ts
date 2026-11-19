@@ -176,7 +176,7 @@ a.btn{display:inline-block;background:#111;color:#fff;text-decoration:none;paddi
 @page{size:80mm auto;margin:3mm}
 @media print{body *{visibility:hidden}.printme,.printme *{visibility:visible}.printme{position:absolute;left:0;top:0;width:74mm;max-width:none;border:0;margin:0;padding:0;font-size:12px}}
 .qr svg{width:38mm;height:38mm;display:block;margin:6px auto}
-@media(min-width:1000px){.dash{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}.dright{position:sticky;top:8px}}
+@media(min-width:1000px){.dash{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}.dright{position:sticky;top:8px;max-height:calc(100vh - 16px);overflow-y:auto}}
 @media(min-width:800px){.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}.grid .card{margin:10px 0}}
 .presta{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:6px 0}.presta button{text-align:left}
 .tache{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid #e3e3e3}.tache.top{border-left:4px solid #111;padding-left:8px;background:#fafafa}.tache.fait .tx{text-decoration:line-through;color:#888}.tache .tx{flex:1}.tache .tbtn{white-space:nowrap}.chk{min-height:26px;width:26px;min-width:26px;padding:0;background:#fff;color:#111;border:2px solid #111;font-size:15px}.rec-ok{border-left:4px solid #1a7f37;padding:8px 12px;background:#f0faf2}.rec-ko{border-left:4px solid #b42318;padding:8px 12px;background:#fdf1f0}

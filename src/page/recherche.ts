@@ -88,7 +88,7 @@ ACTS.psAdd=async function(b){
   if(ctx==="assoc"){ACTS.stAssocie(x);return}
   if(ctx==="etq"){ETQ.push({titre:l.libelle,prix:String(x.prix||"0"),barcode:l.barcode,sku:l.sku,qte:1});render();return}
   if(ctx.indexOf("mod")===0){try{await api("/modeles/piece",{modeleId:+ctx.slice(3),libelle:l.libelle,sku:l.sku,variantId:l.variantId,categorie:"pneu"});MODS=null;render()}catch(err){alert(err.message)}return}
-  if(ctx==="caisse"){lirePay();PAN.push({libelle:l.libelle,quantite:1,prix:l.prix,type:"piece",variantId:l.variantId,sku:l.sku});CREC=null;render();return}
+  if(ctx==="caisse"){lirePay();PAN.push({libelle:l.libelle,quantite:1,prix:l.prix,type:"piece",variantId:l.variantId,sku:l.sku,barcode:l.barcode});CREC=null;render();return}
   if(ctx.indexOf("cmd")===0){try{var d=await api("/achats/ligne",{fournisseurId:+ctx.slice(3),libelle:l.libelle,sku:l.sku,barcode:l.barcode,variantId:l.variantId,quantite:1});CMDMSG=d.message;CMD=null;render()}catch(err){alert(err.message)}return}
   if(!FICHE)return;
   try{await api("/devis/ligne",{repairId:FICHE.id,type:"piece",libelle:l.libelle,quantite:1,prix:l.prix,variantId:l.variantId,sku:l.sku,barcode:l.barcode,marque:l.marque});await recharger(FICHE.id)}catch(err){alert(err.message)}};
