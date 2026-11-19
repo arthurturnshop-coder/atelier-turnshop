@@ -135,17 +135,29 @@ document.addEventListener("pointermove",function(e){
   if(!DRAG||e.pointerId!==DRAG.pid)return;
   var dx=e.clientX-DRAG.sx,dy=e.clientY-DRAG.sy;
   if(!DRAG.moved&&Math.abs(dx)+Math.abs(dy)<6)return;
-  DRAG.moved=true;DRAG.el.classList.add("drag");DRAG.el.style.transform="translate("+dx+"px,"+dy+"px)";
+  if(!DRAG.moved){
+    DRAG.moved=true;DRAG.el.classList.add("drag");
+    if(!DRAG.pl){
+      var r0=DRAG.el.getBoundingClientRect(),ph=document.createElement("div");
+      ph.style.cssText="height:"+r0.height+"px;margin:"+getComputedStyle(DRAG.el).margin;
+      DRAG.el.parentNode.insertBefore(ph,DRAG.el);DRAG.ph=ph;
+      DRAG.el.style.cssText+=";position:fixed;left:"+r0.left+"px;top:"+r0.top+"px;width:"+r0.width+"px;height:"+r0.height+"px;margin:0;z-index:9999";
+    }
+  }
+  DRAG.el.style.transform="translate("+dx+"px,"+dy+"px)";
   e.preventDefault();
 });
 document.addEventListener("pointerup",pointerFin);
-document.addEventListener("pointercancel",function(e){if(DRAG&&e.pointerId===DRAG.pid){DRAG.el.style.transform="";DRAG.el.classList.remove("drag");DRAG=null}});
+function dragNettoie(d){
+  d.el.style.transform="";d.el.classList.remove("drag");
+  if(d.ph){d.el.style.position="";d.el.style.left="";d.el.style.top="";d.el.style.width="";d.el.style.height="";d.el.style.margin="";d.el.style.zIndex="";if(d.ph.parentNode)d.ph.parentNode.removeChild(d.ph)}}
+document.addEventListener("pointercancel",function(e){if(DRAG&&e.pointerId===DRAG.pid){dragNettoie(DRAG);DRAG=null}});
 function pointerFin(e){
   if(!DRAG||e.pointerId!==DRAG.pid)return;
   var d=DRAG;DRAG=null;
   if(!d.moved){d.el.style.transform="";PSEL=d.id;PPEND=null;renderPlan();var pp=document.getElementById("ppanel");if(pp)pp.scrollIntoView({block:"nearest"});return}
   var r=d.el.getBoundingClientRect();
-  d.el.style.transform="";d.el.classList.remove("drag");
+  dragNettoie(d);
   var cols=document.querySelectorAll(".pcol"),col=null,i;
   for(i=0;i<cols.length;i++){var cr=cols[i].getBoundingClientRect();if(e.clientX>=cr.left&&e.clientX<cr.right&&e.clientY>=cr.top&&e.clientY<=cr.bottom){col=cols[i];break}}
   if(!col){setMsg("Dépose la carte sur une colonne du planning.");return}
