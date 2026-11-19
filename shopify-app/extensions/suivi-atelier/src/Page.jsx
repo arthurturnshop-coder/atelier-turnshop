@@ -88,9 +88,14 @@ function Page() {
 
 // ---------- Mes réparations ----------
 function Frise({etapes}) {
+  // Un seul badge : l'étape en cours (ou la dernière faite si tout est terminé).
+  const liste = etapes || [];
+  const cur = liste.filter((e) => e.etat === 'courant');
+  const faits = liste.filter((e) => e.etat === 'fait');
+  const vue = cur.length ? cur : faits.length ? [faits[faits.length - 1]] : liste.slice(0, 1);
   return (
     <s-stack direction="inline" gap="small-300">
-      {(etapes || []).map((e) => (
+      {vue.map((e) => (
         <s-badge key={e.k} tone={e.etat === 'fait' ? 'success' : e.etat === 'courant' ? 'info' : 'neutral'}>
           {(e.etat === 'fait' ? '✓ ' : e.etat === 'courant' ? '● ' : '○ ') + e.l}
         </s-badge>
