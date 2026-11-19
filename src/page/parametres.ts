@@ -97,5 +97,7 @@ function vParam(){
     +"<label class='muted'>Lien d'avis Google - Amiens</label><input id='tk-am' value='"+esc(TICK.avisAmiens)+"' placeholder='https://g.page/r/...'>"
     +"<label class='muted'>Lien d'avis Google - Rouen</label><input id='tk-ro' value='"+esc(TICK.avisRouen)+"' placeholder='https://g.page/r/...'>"
     +"<button data-act='tickSave'>Enregistrer le ticket</button><div class='muted'>"+esc(TICKMSG)+"</div></div>"}
+  cptLoad();
+  if(CPT)h+=cptCard();
   app.innerHTML=h}
 `;
