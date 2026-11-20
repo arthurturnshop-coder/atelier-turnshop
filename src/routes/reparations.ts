@@ -5,6 +5,7 @@ import { sql } from "../db";
 import { envoyerPret } from "../automatisations";
 import { remiseMulti } from "./prestations";
 import { acomptesDe } from "./acomptes";
+import { trouverMaitre } from "./maitres";
 import { GARDE, infosGarde } from "../garde";
 import { AppError, clean, exigeResponsable, signature } from "../util";
 
@@ -160,9 +161,15 @@ app.post("/api/devis/ligne", async (c) => {
   if (!libelle) throw new AppError(400, "Le libellé est obligatoire.");
   const quantite = Math.max(1, Math.min(999, Math.round(Number(b.quantite) || 1)));
   const prixCents = Math.max(0, Math.round((Number(String(b.prix ?? "0").replace(",", ".")) || 0) * 100));
-  await sql`INSERT INTO devis_lignes (reparation_id, type, libelle, quantite, prix_unitaire_cents, shopify_variant_id, sku, barcode, marque) VALUES (${repId}, ${type}, ${libelle}, ${quantite}, ${prixCents}, ${clean(b.variantId, 80) || null}, ${clean(b.sku, 80) || null}, ${clean(b.barcode, 80) || null}, ${clean(b.marque, 80) || null})`;
+  // Un produit associé à un produit maître (Paramètres > Produit maître) : le maître prend sa place sur le devis.
+  // On garde la variante / le SKU / le code-barres du produit réellement choisi (pour commander la bonne pièce)
+  // et son libellé d'origine. Le prix du maître s'applique s'il en a un, sinon celui du produit choisi.
+  const maitre = type === "piece" ? await trouverMaitre({ variantId: b.variantId, barcode: b.barcode, sku: b.sku }) : undefined;
+  const libelleFinal = maitre ? maitre.nom : libelle;
+  const prixFinal = maitre && maitre.prix_cents != null ? maitre.prix_cents : prixCents;
+  await sql`INSERT INTO devis_lignes (reparation_id, type, libelle, quantite, prix_unitaire_cents, shopify_variant_id, sku, barcode, marque, maitre_id, libelle_origine) VALUES (${repId}, ${type}, ${libelleFinal}, ${quantite}, ${prixFinal}, ${clean(b.variantId, 80) || null}, ${clean(b.sku, 80) || null}, ${clean(b.barcode, 80) || null}, ${clean(b.marque, 80) || null}, ${maitre ? maitre.id : null}, ${maitre ? libelle : null})`;
   await sql`UPDATE reparations SET maj_le = now() WHERE id = ${repId}`;
-  return c.json({ devis: await devisDe(repId) });
+  return c.json({ devis: await devisDe(repId), maitre: maitre ? { nom: maitre.nom, origine: libelle } : null });
 });
 
 app.post("/api/devis/ligne/supprimer", async (c) => {

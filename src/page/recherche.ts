@@ -86,12 +86,14 @@ ACTS.psAdd=async function(b){
   var vt=x.titre&&x.titre!=="Default Title"?" - "+x.titre:"";
   var l={libelle:(p.titre+vt).slice(0,200),prix:String(x.prix||"0").replace(".",","),variantId:x.id,sku:x.sku||"",barcode:x.barcode||"",marque:p.marque||""};
   if(ctx==="assoc"){ACTS.stAssocie(x);return}
+  if(ctx.indexOf("mait")===0){maitLier(ctx,l);return}
+  if(ctx==="dvs"){try{await dvAjoutProduit(l)}catch(err){alert(err.message)}return}
   if(ctx==="etq"){ETQ.push({titre:l.libelle,prix:String(x.prix||"0"),barcode:l.barcode,sku:l.sku,qte:1});render();return}
   if(ctx.indexOf("mod")===0){try{await api("/modeles/piece",{modeleId:+ctx.slice(3),libelle:l.libelle,sku:l.sku,variantId:l.variantId,categorie:"pneu"});MODS=null;render()}catch(err){alert(err.message)}return}
   if(ctx==="caisse"){lirePay();PAN.push({libelle:l.libelle,quantite:1,prix:l.prix,type:"piece",variantId:l.variantId,sku:l.sku,barcode:l.barcode});CREC=null;render();return}
   if(ctx.indexOf("cmd")===0){try{var d=await api("/achats/ligne",{fournisseurId:+ctx.slice(3),libelle:l.libelle,sku:l.sku,barcode:l.barcode,variantId:l.variantId,quantite:1});CMDMSG=d.message;CMD=null;render()}catch(err){alert(err.message)}return}
   if(!FICHE)return;
-  try{await api("/devis/ligne",{repairId:FICHE.id,type:"piece",libelle:l.libelle,quantite:1,prix:l.prix,variantId:l.variantId,sku:l.sku,barcode:l.barcode,marque:l.marque});await recharger(FICHE.id)}catch(err){alert(err.message)}};
+  try{var rd=await api("/devis/ligne",{repairId:FICHE.id,type:"piece",libelle:l.libelle,quantite:1,prix:l.prix,variantId:l.variantId,sku:l.sku,barcode:l.barcode,marque:l.marque});DEVHINT=rd.maitre?"Produit maître mis sur le devis : "+rd.maitre.nom+" (produit choisi : "+rd.maitre.origine+")":"";await recharger(FICHE.id)}catch(err){alert(err.message)}};
 document.getElementById("rq").addEventListener("input",rechInput);
 document.getElementById("rq").addEventListener("keydown",function(e){if(e.key==="Escape")rechHide();if(e.key==="Enter"){var q=v("rq");var mpc=q.match(/^(?:pc|#)[ -]*0*([0-9]+)$/i);if(mpc){rechHide();document.getElementById("rq").value="";ouvrirFiche(Number(mpc[1]));return}if(q.length>=4&&q.indexOf(" ")<0){scanCode(q,"caisse",true).then(function(){})}}});
 document.getElementById("rpanel").addEventListener("click",function(e){var r=e.target.closest("[data-rid]");if(r){rechHide();var q=document.getElementById("rq");if(q)q.value="";ouvrirFiche(Number(r.dataset.rid));return}var b=e.target.closest("[data-cid]");if(b)rechOpen(b.dataset.cid)});

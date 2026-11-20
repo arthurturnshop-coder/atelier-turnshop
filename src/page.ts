@@ -20,10 +20,11 @@ import { DEVIS } from "./page/devis";
 import { COMMANDES } from "./page/commandes";
 import { STOCK } from "./page/stock";
 import { COMPTA } from "./page/compta";
+import { MAITRES } from "./page/maitres";
 
 // L'ordre compte : c'est l'ordre d'exécution du script dans le navigateur.
 export const HTML = [
-  SHELL, BASE, LOGIN, PROFIL, DASHBOARD, ATELIER, CAISSE, PARAMETRES, ACTIONS, RECHERCHE, COMMANDES, STOCK, COMPTA, PLANNING, IMPRESSION, STATS, RETOURS, GARANTIE, CREATION, CLIENT, DEVIS,
+  SHELL, BASE, LOGIN, PROFIL, DASHBOARD, ATELIER, CAISSE, PARAMETRES, ACTIONS, RECHERCHE, COMMANDES, STOCK, COMPTA, MAITRES, PLANNING, IMPRESSION, STATS, RETOURS, GARANTIE, CREATION, CLIENT, DEVIS,
   "render();",
   "</script></body></html>",
 ].join("\n");
