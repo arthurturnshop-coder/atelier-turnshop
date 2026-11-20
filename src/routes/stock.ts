@@ -16,6 +16,8 @@ await sql`CREATE TABLE IF NOT EXISTS stock_mouvements (id SERIAL PRIMARY KEY, pr
 // Plusieurs codes-barres (EAN de grossistes différents) pour un même produit : un seul stock total.
 await sql`CREATE TABLE IF NOT EXISTS stock_codes (id SERIAL PRIMARY KEY, produit_id INT NOT NULL REFERENCES stock_produits(id), code TEXT NOT NULL, fournisseur TEXT NOT NULL DEFAULT '', cree_le TIMESTAMPTZ NOT NULL DEFAULT now(), UNIQUE (produit_id, code))`;
 await sql`CREATE INDEX IF NOT EXISTS stock_codes_code ON stock_codes (code)`;
+// Dénomination libre d'un code (ex : « Fournisseur A - CST 8,5x2 »), affichée dans les alertes de commande.
+await sql`ALTER TABLE stock_codes ADD COLUMN IF NOT EXISTS denomination TEXT NOT NULL DEFAULT ''`;
 
 const cents = (x: any): number | null => {
   const s = String(x ?? "").replace(",", ".").replace(/[^0-9.]/g, "");
@@ -54,10 +56,39 @@ export const eanValide = (c: string) => /^\d{13}$/.test(c) && cleEan(c.slice(0, 
 const eanInterne = (id: number) => { const d = "200" + String(id).padStart(9, "0"); return d + cleEan(d); };
 
 // Le produit d'un code scanné : son code principal ou l'un de ses codes supplémentaires.
-async function produitParCode(code: string, magasin: string): Promise<any | undefined> {
+export async function produitParCode(code: string, magasin: string): Promise<any | undefined> {
   if (!code) return undefined;
   const [p] = (await sql`SELECT * FROM stock_produits WHERE magasin = ${magasin} AND (code = ${code} OR id IN (SELECT produit_id FROM stock_codes WHERE code = ${code})) ORDER BY (code = ${code}) DESC, archive_le NULLS FIRST LIMIT 1`) as any[];
   return p;
+}
+
+// Code principal + codes supplémentaires d'un produit : toutes les références sous lesquelles on peut l'acheter.
+async function codesDuProduit(p: any): Promise<string[]> {
+  const cs = (await sql`SELECT code FROM stock_codes WHERE produit_id = ${p.id}`) as any[];
+  return [p.code, ...cs.map((x) => x.code)];
+}
+
+// Avertissements « référence sœur » : la même pièce est-elle déjà au panier ou commandée chez un AUTRE fournisseur ?
+// Un message par appel, avec les quantités par fournisseur et le stock actuel de la boutique.
+export async function alertesSoeurs(o: { ref: string | null | undefined; fournisseurId: number; magasin: string }): Promise<string[]> {
+  const ref = codeNet(o.ref);
+  if (!ref) return [];
+  const p = await produitParCode(ref, o.magasin);
+  const codes = p ? await codesDuProduit(p) : [ref];
+  const lignes = (await sql`SELECT l.quantite, l.statut, l.reparation_id, l.libelle, l.sku, l.barcode, f.nom AS fournisseur
+    FROM commande_lignes l JOIN fournisseurs f ON f.id = l.fournisseur_id
+    WHERE l.statut IN ('panier','commandee') AND l.fournisseur_id <> ${o.fournisseurId} AND (l.barcode = ANY(${codes}) OR l.sku = ANY(${codes}))
+    ORDER BY f.nom, l.id`) as any[];
+  if (!lignes.length) return [];
+  const noms = p ? ((await sql`SELECT code, denomination FROM stock_codes WHERE produit_id = ${p.id} AND denomination <> ''`) as any[]) : [];
+  const parF = new Map<string, string[]>();
+  for (const l of lignes) {
+    const nom = noms.find((x) => x.code === l.barcode || x.code === l.sku)?.denomination || l.libelle;
+    const detail = `${l.quantite} × « ${nom} » (${l.statut === "commandee" ? "déjà commandé" : "dans le panier"}${l.reparation_id ? ", pour un client" : ""})`;
+    parF.set(l.fournisseur, [...(parF.get(l.fournisseur) ?? []), detail]);
+  }
+  const txt = [...parF.entries()].map(([f, d]) => `chez ${f} : ${d.join(", ")}`).join(" ; ");
+  return [`Attention, même pièce (référence sœur) ${txt}.${p ? ` Stock actuel ${o.magasin} : ${p.qte}.` : ""}`];
 }
 const vue = (p: any, codes: any[] = []) => ({ id: p.id, code: p.code, nom: p.nom, prixCents: p.prix_cents, achatHtCents: p.achat_ht_cents, qte: p.qte, min: p.stock_min, emplacement: p.emplacement, archive: !!p.archive_le, codes });
 
@@ -92,8 +123,8 @@ app.get("/api/stock", async (c) => {
   const f = rows.filter((p) => !q || `${p.nom} ${p.code} ${p.emplacement} ${(alias.get(p.id) ?? []).join(" ")}`.toLowerCase().includes(q)).slice(0, 300);
   const lieux = [...new Set(rows.map((p) => p.emplacement).filter(Boolean))].sort();
   const valeur = rows.reduce((t, p) => t + (p.achat_ht_cents ?? 0) * p.qte, 0);
-  const ac = f.length ? ((await sql`SELECT produit_id, code, fournisseur FROM stock_codes WHERE produit_id = ANY(${f.map((p) => p.id)}) ORDER BY id`) as any[]) : [];
-  return c.json({ magasin: m, produits: f.map((p) => vue(p, ac.filter((x) => x.produit_id === p.id).map((x) => ({ code: x.code, fournisseur: x.fournisseur })))), lieux, nb: rows.length, valeurAchatHtCents: valeur });
+  const ac = f.length ? ((await sql`SELECT produit_id, code, fournisseur, denomination FROM stock_codes WHERE produit_id = ANY(${f.map((p) => p.id)}) ORDER BY id`) as any[]) : [];
+  return c.json({ magasin: m, produits: f.map((p) => vue(p, ac.filter((x) => x.produit_id === p.id).map((x) => ({ code: x.code, fournisseur: x.fournisseur, denomination: x.denomination })))), lieux, nb: rows.length, valeurAchatHtCents: valeur });
 });
 
 app.post("/api/stock/rapide", async (c) => {
@@ -217,7 +248,7 @@ app.post("/api/stock/code-ajouter", async (c) => {
   const autre = await produitParCode(code, p.magasin);
   if (autre && autre.id !== p.id) throw new AppError(409, `Ce code est déjà sur « ${autre.nom} ». Utilise « Fusionner » si c'est le même produit.`);
   if (autre) return c.json({ message: "Ce code est déjà sur ce produit." });
-  await sql`INSERT INTO stock_codes (produit_id, code, fournisseur) VALUES (${p.id}, ${code}, ${clean(b.fournisseur, 60)})`;
+  await sql`INSERT INTO stock_codes (produit_id, code, fournisseur, denomination) VALUES (${p.id}, ${code}, ${clean(b.fournisseur, 60)}, ${clean(b.denomination, 120)})`;
   return c.json({ message: `Code ${code} ajouté à « ${p.nom} » : même stock (${p.qte}).` });
 });
 
@@ -262,7 +293,9 @@ app.get("/api/stock/reappro", async (c) => {
   const rows = (await sql`SELECT * FROM stock_produits WHERE archive_le IS NULL AND magasin = ${m} AND stock_min > 0 AND qte < stock_min ORDER BY nom`) as any[];
   const out = [];
   for (const p of rows) {
-    const [e] = (await sql`SELECT COALESCE(sum(quantite), 0)::int AS n FROM commande_lignes WHERE reparation_id IS NULL AND statut IN ('panier','commandee') AND (sku = ${p.code} OR barcode = ${p.code})`) as any[];
+    // Compte aussi les lignes commandées sous un code supplémentaire du produit (référence sœur d'un autre fournisseur).
+    const codes = await codesDuProduit(p);
+    const [e] = (await sql`SELECT COALESCE(sum(quantite), 0)::int AS n FROM commande_lignes WHERE reparation_id IS NULL AND statut IN ('panier','commandee') AND (sku = ANY(${codes}) OR barcode = ANY(${codes}))`) as any[];
     const aCommander = p.stock_min - p.qte - e.n;
     out.push({ id: p.id, code: p.code, nom: p.nom, qte: p.qte, min: p.stock_min, enCommande: e.n, aCommander: Math.max(0, aCommander), emplacement: p.emplacement });
   }
@@ -277,7 +310,8 @@ app.post("/api/stock/reappro/ajouter", async (c) => {
   if (!f) throw new AppError(400, "Choisis un fournisseur.");
   const q = Math.max(1, Math.min(999, Math.round(Number(b.quantite) || 1)));
   await sql`INSERT INTO commande_lignes (fournisseur_id, libelle, sku, barcode, quantite) VALUES (${f.id}, ${p.nom}, ${p.code}, ${p.code}, ${q})`;
-  return c.json({ message: `${q} x ${p.nom} ajouté au panier.` });
+  const avertissements = await alertesSoeurs({ ref: p.code, fournisseurId: f.id, magasin: p.magasin });
+  return c.json({ message: [`${q} x ${p.nom} ajouté au panier.`, ...avertissements].join(" "), avertissements });
 });
 
 // Donne un EAN-13 interne (préfixe 201) aux variantes Shopify qui n'ont pas de code-barres, et l'écrit dans Shopify.
