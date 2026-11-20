@@ -105,53 +105,91 @@ ACTS.cEmail=function(b){
 ACTS.docPrint=function(b){imprimerDoc(+b.dataset.id,b.dataset.mode)};
 
 
-// ----- Clôture de caisse (ticket Z) -----
-var CLO={open:false,d:null,msg:""};
+// ----- Caisse : ouverture / fermeture (ticket Z) -----
+var CLO={open:false,d:null,h:null,per:"30j",msg:""};
 function cloLigne(l,v){return"<tr><td>"+l+"</td><td class='n'>"+eur(v)+"</td></tr>"}
-function cloAttendu(){var d=CLO.d,f=document.getElementById("clo-fond"),fond=Math.round((Number(String((f&&f.value)||"0").split(",").join("."))||0)*100);return fond+d.especesNettes}
-function cloHtml(){
-  if(!CLO.open)return"<div class='actions' style='margin-top:12px'><button class='sec' data-act='cloOuvre'>Clôture de caisse</button></div>";
-  var d=CLO.d;if(!d)return"<div class='card'>Chargement...</div>";
-  var e=d.encaisse,r=d.rembourse||{},cl=d.cloture;
-  var h="<div class='card'><div class='step'>Clôture de caisse · "+esc(d.magasin)+" · "+esc(d.jour.split("-").reverse().join("/"))+"</div>"
-    +"<table class='devis' style='width:100%'>"+cloLigne("Carte",e.carte)+cloLigne("Espèces encaissées",e.especes)+cloLigne("Virement",e.virement)+cloLigne("En ligne (Shopify)",e.en_ligne);
+function cloHeure(x){var t=new Date(x);return t.toLocaleDateString("fr-FR")+" "+t.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}
+function cloTotaux(t){
+  var e=t.encaisse,r=t.rembourse||{},h="<table class='devis' style='width:100%'>"+cloLigne("Carte",e.carte)+cloLigne("Espèces encaissées",e.especes)+cloLigne("Virement",e.virement)+cloLigne("En ligne (Shopify)",e.en_ligne);
   Object.keys(r).forEach(function(k){h+=cloLigne("Remboursé ("+esc(k)+")",-r[k])});
-  h+="</table><div class='muted'>"+d.nbVentes+" vente(s) · "+d.nbAcomptes+" acompte(s) · CA ventes "+eur(d.caCents)+"</div>";
-  if(cl){
-    h+="<div style='margin-top:8px'><span class='tag ok'>Clôturée</span> par "+esc(cl.par)+" · fond "+eur(cl.fondCents)+" · attendu "+eur(cl.attenduCents)+" · compté "+eur(cl.compteCents)+" · <b>écart "+(cl.ecartCents>0?"+":"")+eur(cl.ecartCents)+"</b>"+(cl.note?" · "+esc(cl.note):"")+"</div>"
-      +"<div class='actions'><button data-act='cloPrint'>Imprimer le ticket Z</button><button class='sec' data-act='cloFerme'>Fermer</button></div>"}
-  else{
-    h+="<div class='dl' style='margin-top:8px'><label class='muted'>Fond de caisse du matin (€)</label><input id='clo-fond' placeholder='0' value='0'></div>"
-      +"<div class='muted'>Espèces attendues dans le tiroir : <b id='clo-att'>"+eur(d.especesNettes)+"</b></div>"
+  return h+"</table><div class='muted'>"+t.nbVentes+" vente(s) · "+t.nbAcomptes+" acompte(s) · CA ventes "+eur(t.caCents)+"</div>"}
+function cloEcartTxt(c){return(c>0?"+":"")+eur(c)}
+function cloOuvreForm(d){
+  var sug=d.fondConseilleCents?(d.fondConseilleCents/100).toFixed(2).split(".").join(","):"";
+  return"<div class='step' style='margin-top:10px'>Ouvrir la caisse</div><div class='dl'><label class='muted'>Montant présent dans le tiroir (€)</label><input id='clo-fond' placeholder='Compte le tiroir' value='"+sug+"'></div>"
+    +"<div class='actions'><button data-act='cloOuvrir'>Ouvrir la caisse</button></div>"}
+function cloHist(){
+  var h=CLO.h;if(!h)return"<div class='muted'>Chargement...</div>";
+  var PER=[["30j","30 derniers jours"],["mois","Ce mois"],["mois-1","Mois dernier"]];
+  var o="<div class='step' style='margin-top:14px'>Encaissements · "+esc(h.magasin)+" · du "+esc(h.du.split("-").reverse().join("/"))+" au "+esc(h.au.split("-").reverse().join("/"))+"</div><div class='actions'>"
+    +PER.map(function(x){return"<button class='"+(CLO.per===x[0]?"":"sec")+"' data-act='cloPer' data-v='"+x[0]+"'>"+x[1]+"</button>"}).join("")+"</div>";
+  var T={carte:0,especes:0,virement:0,en_ligne:0,rembourse:0};
+  o+="<table class='devis' style='width:100%'><tr><th>Jour</th><th class='n'>Carte</th><th class='n'>Espèces</th><th class='n'>Virement</th><th class='n'>En ligne</th><th class='n'>Remb.</th><th class='n'>Total</th></tr>";
+  h.jours.forEach(function(j){
+    var tot=j.carte+j.especes+j.virement+j.en_ligne-j.rembourse;Object.keys(T).forEach(function(k){T[k]+=j[k]});
+    o+="<tr><td>"+esc(j.jour.slice(8,10)+"/"+j.jour.slice(5,7))+"</td><td class='n'>"+eur(j.carte)+"</td><td class='n'>"+eur(j.especes)+"</td><td class='n'>"+eur(j.virement)+"</td><td class='n'>"+eur(j.en_ligne)+"</td><td class='n'>"+eur(j.rembourse)+"</td><td class='n'><b>"+eur(tot)+"</b></td></tr>"});
+  o+="<tr><td><b>Total</b></td><td class='n'><b>"+eur(T.carte)+"</b></td><td class='n'><b>"+eur(T.especes)+"</b></td><td class='n'><b>"+eur(T.virement)+"</b></td><td class='n'><b>"+eur(T.en_ligne)+"</b></td><td class='n'><b>"+eur(T.rembourse)+"</b></td><td class='n'><b>"+eur(T.carte+T.especes+T.virement+T.en_ligne-T.rembourse)+"</b></td></tr></table>";
+  if(!h.jours.length)o+="<div class='muted'>Aucun encaissement sur la période.</div>";
+  o+="<div class='step' style='margin-top:14px'>Tickets Z et écarts de caisse</div>";
+  var fermees=h.sessions.filter(function(x){return x.fermeeLe});
+  if(!fermees.length)o+="<div class='muted'>Aucune fermeture de caisse sur la période.</div>";
+  else{o+="<table class='devis' style='width:100%'><tr><th>Fermée le</th><th class='n'>Fond</th><th class='n'>Attendu</th><th class='n'>Compté</th><th class='n'>Écart</th><th></th></tr>";
+    var ec=0;fermees.forEach(function(x){ec+=x.ecartCents;
+      o+="<tr><td>"+esc(cloHeure(x.fermeeLe))+"<div class='muted'>"+esc(x.fermePar||"")+"</div></td><td class='n'>"+eur(x.fondCents)+"</td><td class='n'>"+eur(x.attenduCents)+"</td><td class='n'>"+eur(x.compteCents)+"</td><td class='n'><b"+(x.ecartCents?" style='color:#b00'":"")+">"+cloEcartTxt(x.ecartCents)+"</b></td><td><button class='sec' data-act='cloZ' data-id='"+x.id+"'>Ticket Z</button></td></tr>"});
+    o+="<tr><td colspan='4'><b>Cumul des écarts</b></td><td class='n'><b>"+cloEcartTxt(ec)+"</b></td><td></td></tr></table>"}
+  return o}
+function cloHtml(){
+  if(!CLO.open)return"<div class='actions' style='margin-top:12px'><button class='sec' data-act='cloOuvre'>Caisse : ouvrir / clôturer</button></div>";
+  var d=CLO.d;if(!d)return"<div class='card'>Chargement...</div>";
+  var h="<div class='card'><div class='step'>Caisse · "+esc(d.magasin)+"</div>";
+  if(d.ouverte){
+    var o=d.ouverte,att=o.fondCents+d.live.especesNettes;
+    h+="<div><span class='tag ok'>Caisse ouverte</span> depuis "+esc(cloHeure(o.ouverteLe))+" par "+esc(o.ouvertPar)+" · tiroir à l ouverture "+eur(o.fondCents)+"</div>"+cloTotaux(d.live)
+      +"<div class='muted'>Espèces attendues dans le tiroir : <b id='clo-att'>"+eur(att)+"</b></div>"
       +"<div class='dl'><label class='muted'>Espèces comptées (€)</label><input id='clo-compte' placeholder='Compte le tiroir'></div>"
-      +"<div class='muted'>Écart : <b id='clo-ecart'>-</b></div>"
-      +"<div class='dl'><input id='clo-note' placeholder='Note (facultatif)'></div>"
-      +"<div class='actions'><button data-act='cloValide'>Clôturer la caisse</button><button class='sec' data-act='cloFerme'>Fermer</button></div>"}
+      +"<div class='muted'>Écart : <b id='clo-ecart'>-</b></div><div class='dl'><input id='clo-note' placeholder='Note (facultatif)'></div>"
+      +"<div class='actions'><button data-act='cloFermer'>Fermer la caisse (ticket Z)</button></div>"}
+  else{
+    h+="<div><span class='tag'>Caisse fermée</span></div>";
+    if(d.dernier){var z=d.dernier;h+="<div class='muted' style='margin-top:6px'>Dernier ticket Z : fermée le "+esc(cloHeure(z.fermeeLe))+" par "+esc(z.fermePar||"")+" · compté "+eur(z.compteCents)+" · <b>écart "+cloEcartTxt(z.ecartCents)+"</b></div>"
+      +"<div class='actions'><button class='sec' data-act='cloZ' data-id='"+z.id+"'>Imprimer le ticket Z</button></div>"}
+    h+=cloOuvreForm(d)}
   if(CLO.msg)h+="<div class='muted'>"+esc(CLO.msg)+"</div>";
+  if(estResp())h+=cloHist();
+  h+="<div class='actions'><button class='sec' data-act='cloFerme'>Fermer ce panneau</button></div>";
   return h+"</div>"}
-function cloCharge(){return api("/caisse/cloture").then(function(d){CLO.d=d;render()}).catch(function(e){CLO.msg=e.message;render()})}
-ACTS.cloOuvre=function(){CLO={open:true,d:null,msg:""};render();cloCharge()};
-ACTS.cloFerme=function(){CLO={open:false,d:null,msg:""};render()};
-ACTS.cloValide=function(){
+function cloCharge(){return api("/caisse/session").then(function(d){CLO.d=d;render()}).catch(function(e){CLO.msg=e.message;render()})}
+function cloHistCharge(){if(!estResp())return;api("/caisse/historique?periode="+CLO.per).then(function(h){CLO.h=h;render()}).catch(function(e){CLO.msg=e.message;render()})}
+ACTS.cloOuvre=function(){CLO={open:true,d:null,h:null,per:CLO.per||"30j",msg:""};render();cloCharge();cloHistCharge()};
+ACTS.cloFerme=function(){CLO={open:false,d:null,h:null,per:CLO.per,msg:""};render()};
+ACTS.cloPer=function(b){CLO.per=b.dataset.v;CLO.h=null;render();cloHistCharge()};
+ACTS.cloOuvrir=function(){
+  var f=document.getElementById("clo-fond");if(!f||!f.value.trim()){CLO.msg="Saisis le montant présent dans le tiroir.";render();return}
+  api("/caisse/ouvrir",{fond:f.value}).then(function(){CLO.msg="Caisse ouverte.";return cloCharge()}).catch(function(e){CLO.msg=e.message;render()})};
+ACTS.cloFermer=function(){
   var cp=document.getElementById("clo-compte");if(!cp||!cp.value.trim()){CLO.msg="Saisis les espèces comptées.";render();return}
-  var att=cloAttendu(),cpt=Math.round((Number(cp.value.split(",").join("."))||0)*100);
-  if(!confirm("Clôturer la caisse ? Attendu "+eur(att)+", compté "+eur(cpt)+", écart "+eur(cpt-att)+"."))return;
-  api("/caisse/cloture",{fond:document.getElementById("clo-fond").value,compte:cp.value,note:document.getElementById("clo-note").value}).then(function(){CLO.msg="";return cloCharge()}).catch(function(e){CLO.msg=e.message;render()})};
-ACTS.cloPrint=function(){
-  var d=CLO.d,cl=d&&d.cloture;if(!cl)return;var e=d.encaisse,nl=String.fromCharCode(10);
-  var h="<div class='rc'><b>CLÔTURE DE CAISSE</b><br>TURN SOCIETY · "+esc(d.magasin)+"<br>"+esc(d.jour.split("-").reverse().join("/"))+"</div><hr>"
+  var att=CLO.d.ouverte.fondCents+CLO.d.live.especesNettes,cpt=Math.round((Number(cp.value.split(",").join("."))||0)*100);
+  if(!confirm("Fermer la caisse ? Attendu "+eur(att)+", compté "+eur(cpt)+", écart "+eur(cpt-att)+"."))return;
+  var n=document.getElementById("clo-note");
+  api("/caisse/fermer",{compte:cp.value,note:n?n.value:""}).then(function(){CLO.msg="Caisse fermée. Ticket Z enregistré.";return cloCharge()}).then(function(){cloHistCharge();var z=CLO.d&&CLO.d.dernier;if(z)cloImprimeZ(z)}).catch(function(e){CLO.msg=e.message;render()})};
+function cloImprimeZ(z){
+  var t=z.totaux||{encaisse:{carte:0,especes:0,virement:0,en_ligne:0},rembourse:{},nbVentes:0,caCents:0},e=t.encaisse;
+  var h="<div class='rc'><b>TICKET Z - CLÔTURE DE CAISSE</b><br>TURN SOCIETY · "+esc(z.magasin)+"<br>Ouverte "+esc(cloHeure(z.ouverteLe))+"<br>Fermée "+esc(cloHeure(z.fermeeLe))+"</div><hr>"
     +"<div class='rl'><span>Carte</span><span>"+eur(e.carte)+"</span></div><div class='rl'><span>Espèces</span><span>"+eur(e.especes)+"</span></div><div class='rl'><span>Virement</span><span>"+eur(e.virement)+"</span></div><div class='rl'><span>En ligne</span><span>"+eur(e.en_ligne)+"</span></div>";
-  Object.keys(d.rembourse||{}).forEach(function(k){h+="<div class='rl'><span>Remboursé "+esc(k)+"</span><span>-"+eur(d.rembourse[k])+"</span></div>"});
-  h+="<hr><div class='rl'><span>Ventes</span><span>"+d.nbVentes+"</span></div><div class='rl'><span>CA ventes</span><span>"+eur(d.caCents)+"</span></div><hr>"
-    +"<div class='rl'><span>Fond de caisse</span><span>"+eur(cl.fondCents)+"</span></div><div class='rl'><span>Espèces attendues</span><span>"+eur(cl.attenduCents)+"</span></div><div class='rl'><span>Espèces comptées</span><span>"+eur(cl.compteCents)+"</span></div><div class='rl rt'><span>ÉCART</span><span>"+(cl.ecartCents>0?"+":"")+eur(cl.ecartCents)+"</span></div>"
-    +(cl.note?"<div class='rm'>"+esc(cl.note)+"</div>":"")+"<div class='rc rm'>Clôturé par "+esc(cl.par)+"</div>";
-  impImprimer(h,"recu",pecCss())};
+  Object.keys(t.rembourse||{}).forEach(function(k){h+="<div class='rl'><span>Remboursé "+esc(k)+"</span><span>-"+eur(t.rembourse[k])+"</span></div>"});
+  h+="<hr><div class='rl'><span>Ventes</span><span>"+t.nbVentes+"</span></div><div class='rl'><span>CA ventes</span><span>"+eur(t.caCents)+"</span></div><hr>"
+    +"<div class='rl'><span>Tiroir à l ouverture</span><span>"+eur(z.fondCents)+"</span></div><div class='rl'><span>Espèces attendues</span><span>"+eur(z.attenduCents)+"</span></div><div class='rl'><span>Espèces comptées</span><span>"+eur(z.compteCents)+"</span></div><div class='rl rt'><span>ÉCART</span><span>"+cloEcartTxt(z.ecartCents)+"</span></div>"
+    +(z.note?"<div class='rm'>"+esc(z.note)+"</div>":"")+"<div class='rc rm'>Ouverte par "+esc(z.ouvertPar||"")+" · fermée par "+esc(z.fermePar||"")+"</div>";
+  impImprimer(h,"recu",pecCss())}
+ACTS.cloZ=function(b){
+  var id=+b.dataset.id,z=null;
+  if(CLO.d&&CLO.d.dernier&&CLO.d.dernier.id===id)z=CLO.d.dernier;
+  if(!z&&CLO.h)z=CLO.h.sessions.filter(function(x){return x.id===id})[0];
+  if(z)cloImprimeZ(z)};
 document.addEventListener("input",function(e){
-  var t=e.target;if(!t||!CLO.d||CLO.d.cloture)return;
-  if(t.id==="clo-fond"||t.id==="clo-compte"){
-    var a=document.getElementById("clo-att"),ec=document.getElementById("clo-ecart"),cp=document.getElementById("clo-compte");
-    var att=cloAttendu();if(a)a.textContent=eur(att);
-    if(ec)ec.textContent=cp&&cp.value.trim()?eur(Math.round((Number(cp.value.split(",").join("."))||0)*100)-att):"-"}});
+  var t=e.target;if(!t||t.id!=="clo-compte"||!CLO.d||!CLO.d.ouverte)return;
+  var a=CLO.d.ouverte.fondCents+CLO.d.live.especesNettes,ec=document.getElementById("clo-ecart");
+  if(ec)ec.textContent=t.value.trim()?cloEcartTxt(Math.round((Number(t.value.split(",").join("."))||0)*100)-a):"-"});
 
 // ----- Étiquettes produits : nom, prix, code-barres -----
 var ETQ=[],ETQF=null,ETQSKIP=0;
