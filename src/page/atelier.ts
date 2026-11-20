@@ -1,6 +1,6 @@
 export const ATELIER = `// ---------- Atelier : sous-menu Liste / Planning ----------
 function subHtml(){
-  return "<div class='sub'><button class='"+(ATSUB==="liste"?"":"sec")+"' data-act='subEnc' data-sub='liste'>Liste</button><button class='"+(ATSUB==="planning"?"":"sec")+"' data-act='subEnc' data-sub='planning'>Planning</button><span class='spacer'></span><button data-act='racc' data-k='prise'>+ Prise en charge</button><button class='sec' data-act='racc' data-k='rdv'>+ Rendez-vous</button><button class='sec' data-act='racc' data-k='devis'>+ Devis</button></div>"}
+  return "<div class='sub'><button class='"+(ATSUB==="liste"?"":"sec")+"' data-act='subEnc' data-sub='liste'>Liste</button><button class='"+(ATSUB==="planning"?"":"sec")+"' data-act='subEnc' data-sub='planning'>Planning</button><span class='spacer'></span><button data-act='creer' data-k='prise'>+ Prise en charge</button><button class='sec' data-act='creer' data-k='rdv'>+ Rendez-vous</button><button class='sec' data-act='creer' data-k='devis'>+ Devis</button></div>"}
 function vEnc(){
   if(ATSUB==="planning"){
     if(!PJOUR)PJOUR=aujourdhui();
@@ -8,6 +8,7 @@ function vEnc(){
     app.innerHTML=subHtml()+"<div id='pl'>Chargement…</div>";
     loadPlan();
     return}
+  if(ATSUB==="creer"){vCreer();return}
   if(FICHE){vFiche();return}
   app.innerHTML=subHtml()+"<div id='vues' class='vues'></div><div id='liste'>Chargement…</div>";
   loadEnc()}

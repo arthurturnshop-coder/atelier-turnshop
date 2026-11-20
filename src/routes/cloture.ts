@@ -80,7 +80,7 @@ app.post("/api/caisse/fermer", async (c) => {
 });
 
 // Historique : encaissements jour par jour (par moyen) + tickets Z, pour vérifier les écarts compte / caisse sur un mois.
-app.get("/api/caisse/historique", async (c) => {
+app.get("/api/caisse/cloture-historique", async (c) => {
   exigeResponsable(c);
   const u = c.get("user") as any;
   const demande = String(c.req.query("magasin") ?? "");
@@ -105,4 +105,14 @@ app.get("/api/caisse/historique", async (c) => {
     jours: Object.values(jours).sort((a: any, b: any) => (a.jour < b.jour ? 1 : -1)),
     sessions: sess.map(vue),
   });
+});
+
+// Tous les tickets Z enregistrés (12 mois), pour les retrouver et les réimprimer. Réservé au responsable.
+app.get("/api/caisse/tickets-z", async (c) => {
+  exigeResponsable(c);
+  const u = c.get("user") as any;
+  const demande = String(c.req.query("magasin") ?? "");
+  const m = u?.role === "admin" ? (demande === "Amiens" || demande === "Rouen" ? demande : "") : magDe(c);
+  const sess = (await sql`SELECT * FROM caisse_sessions WHERE fermee_le IS NOT NULL AND (${m} = '' OR magasin = ${m}) AND jour >= (now() - interval '12 months')::date ORDER BY id DESC LIMIT 400`) as any[];
+  return c.json({ sessions: sess.map(vue) });
 });

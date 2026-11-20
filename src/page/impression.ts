@@ -159,7 +159,7 @@ function cloHtml(){
   h+="<div class='actions'><button class='sec' data-act='cloFerme'>Fermer ce panneau</button></div>";
   return h+"</div>"}
 function cloCharge(){return api("/caisse/session").then(function(d){CLO.d=d;render()}).catch(function(e){CLO.msg=e.message;render()})}
-function cloHistCharge(){if(!estResp())return;api("/caisse/historique?periode="+CLO.per).then(function(h){CLO.h=h;render()}).catch(function(e){CLO.msg=e.message;render()})}
+function cloHistCharge(){if(!estResp())return;api("/caisse/cloture-historique?periode="+CLO.per).then(function(h){CLO.h=h;render()}).catch(function(e){CLO.msg=e.message;render()})}
 ACTS.cloOuvre=function(){CLO={open:true,d:null,h:null,per:CLO.per||"30j",msg:""};render();cloCharge();cloHistCharge()};
 ACTS.cloFerme=function(){CLO={open:false,d:null,h:null,per:CLO.per,msg:""};render()};
 ACTS.cloPer=function(b){CLO.per=b.dataset.v;CLO.h=null;render();cloHistCharge()};

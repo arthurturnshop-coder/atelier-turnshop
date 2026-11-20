@@ -14,13 +14,15 @@ import { IMPRESSION } from "./page/impression";
 import { STATS } from "./page/stats";
 import { RETOURS } from "./page/retours";
 import { GARANTIE } from "./page/garantie";
+import { CREATION } from "./page/creation";
+import { CLIENT } from "./page/client";
 import { COMMANDES } from "./page/commandes";
 import { STOCK } from "./page/stock";
 import { COMPTA } from "./page/compta";
 
 // L'ordre compte : c'est l'ordre d'exécution du script dans le navigateur.
 export const HTML = [
-  SHELL, BASE, LOGIN, PROFIL, DASHBOARD, ATELIER, CAISSE, PARAMETRES, ACTIONS, RECHERCHE, COMMANDES, STOCK, COMPTA, PLANNING, IMPRESSION, STATS, RETOURS, GARANTIE,
+  SHELL, BASE, LOGIN, PROFIL, DASHBOARD, ATELIER, CAISSE, PARAMETRES, ACTIONS, RECHERCHE, COMMANDES, STOCK, COMPTA, PLANNING, IMPRESSION, STATS, RETOURS, GARANTIE, CREATION, CLIENT,
   "render();",
   "</script></body></html>",
 ].join("\n");

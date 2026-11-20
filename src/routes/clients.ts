@@ -186,10 +186,11 @@ app.post("/api/trottinettes", async (c) => {
   if (!marque || !modele || !serie) throw new AppError(400, "Marque, modèle et numéro de série sont obligatoires.");
   const clientId = Number(b.customerId);
   await fiche(clientId);
+  let tid: any;
   try {
-    await sql`INSERT INTO trottinettes (client_id, marque, modele, serie) VALUES (${clientId}, ${marque}, ${modele}, ${serie})`;
+    [tid] = (await sql`INSERT INTO trottinettes (client_id, marque, modele, serie) VALUES (${clientId}, ${marque}, ${modele}, ${serie}) RETURNING id`) as any[];
   } catch {
     throw new AppError(409, "Ce numéro de série est déjà associé à ce client.");
   }
-  return c.json({ message: "Trottinette associée." });
+  return c.json({ id: tid.id, message: "Trottinette associée." });
 });

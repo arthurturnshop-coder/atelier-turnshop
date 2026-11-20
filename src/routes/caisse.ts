@@ -96,6 +96,25 @@ app.get("/api/code", async (c) => {
   return c.json({});
 });
 
+// Recherche de ventes / factures de caisse : par nom, n°, montant, produit, date ; avec ou sans compte client.
+app.get("/api/ventes/recherche", async (c) => {
+  const q = clean(c.req.query("q"), 80);
+  const like = "%" + q.replace(/[%_\\]/g, "") + "%";
+  const num = Number(q.replace(/^#/, ""));
+  const euros = Number(q.replace(",", ".").replace(/[^0-9.]/g, ""));
+  const cts = Number.isFinite(euros) && /\d/.test(q) ? Math.round(euros * 100) : -1;
+  const du = /^\d{4}-\d{2}-\d{2}$/.test(String(c.req.query("du") ?? "")) ? String(c.req.query("du")) : "";
+  const rows = (await sql`SELECT v.*, trim(cl.prenom || ' ' || cl.nom) AS client_nom FROM ventes v LEFT JOIN clients cl ON cl.id = v.client_id
+    WHERE (${du} = '' OR (v.cree_le AT TIME ZONE 'Europe/Paris')::date = NULLIF(${du}, '')::date)
+    AND (${q} = '' OR trim(cl.prenom || ' ' || cl.nom) ILIKE ${like} OR cl.email ILIKE ${like} OR cl.telephone ILIKE ${like}
+      OR v.id = ${Number.isFinite(num) && Number.isInteger(num) ? num : -1} OR v.total_cents = ${cts}
+      OR EXISTS (SELECT 1 FROM vente_lignes vl WHERE vl.vente_id = v.id AND vl.libelle ILIKE ${like}))
+    ORDER BY v.id DESC LIMIT 40`) as any[];
+  const ventes = [];
+  for (const r of rows) ventes.push(await detailVente(r));
+  return c.json({ ventes });
+});
+
 // Détail complet d'une vente (pour le reçu).
 export async function detailVente(v: any) {
   const lignes = (await sql`SELECT libelle, quantite, prix_unitaire_cents FROM vente_lignes WHERE vente_id = ${v.id} ORDER BY id`) as any[];
