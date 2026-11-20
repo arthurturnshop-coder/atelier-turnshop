@@ -11,7 +11,9 @@ function blocConsignes(){
     :"<div class='muted'>Aucune consigne pour l'instant.</div>")
     +"<button class='sec' data-act='editCons'>Modifier les consignes</button></div>"}
 var TACH=null,TACHBUSY=false,TREC=null,TRECBUSY=false,TTAB="ponct";
-function tacheLoad(){if(TACH===null&&!TACHBUSY){TACHBUSY=true;api("/taches").then(function(d){TACH=d;TACHBUSY=false;render()}).catch(function(){TACH=[];TACHBUSY=false;render()})}}
+var TSEQ=0;
+function tacheLoad(){if(TACH===null&&!TACHBUSY){TACHBUSY=true;var s=++TSEQ;api("/taches").then(function(d){if(s!==TSEQ)return;TACH=d;TACHBUSY=false;render()}).catch(function(){if(s!==TSEQ)return;TACH=[];TACHBUSY=false;render()})}}
+function tacheRecharge(){TSEQ++;TACH=null;TACHBUSY=false;render()}
 function trecLoad(){if(TREC===null&&!TRECBUSY){TRECBUSY=true;api("/taches/recurrentes").then(function(d){TREC=d;TRECBUSY=false;render()}).catch(function(){TREC=[];TRECBUSY=false;render()})}}
 function jourCourt(d){return d?d.slice(8,10)+"/"+d.slice(5,7):""}
 function blocTaches(){
@@ -54,7 +56,7 @@ function newCliForm(){
 function vAccueil(){
   if(CUR){vProfil();return}
   var RL={prise:"Nouvelle prise en charge",rdv:"Nouveau rendez-vous",devis:"Nouveau devis"};
-  var h="<div class='dash'><div class='dleft'>"+(RACC?"<div class='card avbox'><b>"+RL[RACC]+"</b><div class='muted'>Cherche le client ci-dessous (ou crée-le), puis « Créer une prise en charge ».</div><button class='link' data-act='raccFin'>Annuler</button></div>":"")+"<div class='search'><input id='q' placeholder='Rechercher un client' autofocus><button data-act='search'>Rechercher</button></div>";
+  var h="<div class='dash'><div class='dleft'><div class='dtop'><div class='dtl'>"+(RACC?"<div class='card avbox'><b>"+RL[RACC]+"</b><div class='muted'>Cherche le client ci-dessous (ou crée-le), puis « Créer une prise en charge ».</div><button class='link' data-act='raccFin'>Annuler</button></div>":"")+"<div class='search'><input id='q' placeholder='Rechercher un client' autofocus><button data-act='search'>Rechercher</button></div>";
   if(NEWCLI)h+=newCliForm();
   else h+="<div class='newbtn'><button class='sec' data-act='showNew'>+ Nouveau client</button></div>";
   if(SEARCHED&&!RES.length)h+="<div class='card'>Aucun client trouvé. Utilise « + Nouveau client ».</div>";
@@ -63,7 +65,7 @@ function vAccueil(){
     h+="<div class='card'><b>"+esc(c.name||"Sans nom")+"</b>"+(enCours?" <span class='tag'>"+enCours+" en cours</span>":"")
       +"<div class='muted'>"+esc(c.phone||"")+(c.phone&&c.email?" · ":"")+esc(c.email||"")+"</div>"
       +"<div class='actions'><button class='sec' data-act='open' data-i='"+i+"'>Voir le profil</button><button data-act='priseEnCharge' data-i='"+i+"'>Créer une prise en charge</button></div></div>"});
-  h+=blocTaches()+"<div class='grid'>"+blocConsignes()+blocChiffres()+"</div></div><div class='dright'>"+caisseHtml()+"</div></div>";
+  h+="</div>"+blocConsignes()+"</div>"+blocTaches()+"<div class='grid'>"+blocChiffres()+"</div></div><div class='dright'>"+caisseHtml()+"</div></div>";
   app.innerHTML=h;caisseBind();
   var q=document.getElementById("q");if(q)q.addEventListener("keydown",function(e){if(e.key==="Enter")ACTS.search()});
   if(!CONS||!CHIF)loadAccueil()}
