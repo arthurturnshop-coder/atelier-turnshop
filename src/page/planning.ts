@@ -73,6 +73,10 @@ function renderPlan(){
   h+="<div class='pmsg' id='pmsg'>"+esc(PMSG)+"</div>";
   var side="";
   var nl=P.nonPlanifiees||[];
+  var er=P.enRetard||[];
+  if(er.length){side+="<div class='card pside late'><b>En retard ("+er.length+")</b><div class='muted'>Planifiées dont le créneau est passé, pas encore prêtes. Touche pour replanifier.</div>";
+    er.forEach(function(r){side+="<div class='pcard ucard late"+(PSEL===r.id?" sel":"")+"' data-id='"+r.id+"' data-pl='0'><b>"+esc(r.client)+"</b><div>"+esc(r.trottinette)+"</div><div class='muted'>"+esc(r.statut)+" · prévue le "+esc(jourNum(jourParis(r.debut),{day:"numeric",month:"short"}))+" "+esc(hm(minParis(r.debut)))+"</div></div>"});
+    side+="</div>"}
   side+="<div class='card pside'><b>Non planifiées ("+nl.length+")</b><div class='muted'>Glisse une carte sur le planning, ou touche-la pour choisir technicien, jour et heure.</div>";
   if(!nl.length)side+="<div class='muted' style='margin-top:8px'>Aucune réparation à planifier.</div>";
   nl.forEach(function(r){side+="<div class='pcard ucard"+(r.enMagasin===false?" abs":"")+(PSEL===r.id?" sel":"")+"' data-id='"+r.id+"' data-pl='0'><b>"+esc(r.client)+"</b><div>"+esc(r.trottinette)+"</div><div class='muted'>"+esc(r.statut)+" · "+esc(r.panne)+(r.enMagasin===false?" · pas en magasin":"")+"</div></div>"});

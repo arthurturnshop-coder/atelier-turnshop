@@ -76,9 +76,21 @@ app.get("/api/planning", async (c) => {
       AND COALESCE(r.magasin, ${magasinUtilisateur}) = ${magasin}
     ORDER BY r.cree_le, r.id`;
 
+  const enRetard = await sql`SELECT r.id, r.client_id, r.statut, r.panne, r.technicien, r.debut, r.duree_min, r.en_magasin,
+      c.prenom, c.nom, t.marque, t.modele, t.serie
+    FROM reparations r
+    JOIN clients c ON c.id = r.client_id
+    JOIN trottinettes t ON t.id = r.trottinette_id
+    WHERE r.debut IS NOT NULL AND r.supprime_le IS NULL AND r.en_magasin IS NOT FALSE
+      AND r.statut NOT IN ('prêt', 'récupéré')
+      AND r.debut + (COALESCE(r.duree_min, 60) || ' minutes')::interval < now()
+      AND COALESCE(r.magasin, ${magasinUtilisateur}) = ${magasin}
+    ORDER BY r.debut LIMIT 30`;
+
   return c.json({
     techniciens,
     jours,
+    enRetard: (enRetard as any[]).map(ligneListePlanning),
     planifiees: (planifiees as any[]).map(ligneListePlanning),
     nonPlanifiees: (nonPlanifiees as any[]).map(ligneListePlanning),
   });

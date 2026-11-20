@@ -117,6 +117,7 @@ app.post("/api/reparations/maj", async (c) => {
   if (!r) throw new AppError(404, "Réparation introuvable.");
   const statut = b.statut ? String(b.statut) : "";
   if (statut && !STATUTS.includes(statut)) throw new AppError(400, "Statut inconnu.");
+  if (statut === "devis envoyé" && statut !== r.statut) throw new AppError(400, "Le statut « devis envoyé » se met tout seul quand tu envoies le devis au client (bouton d'envoi dans la fiche).");
   const note = clean(b.note, 500);
   const changed = !!statut && statut !== r.statut;
   let touche = false;

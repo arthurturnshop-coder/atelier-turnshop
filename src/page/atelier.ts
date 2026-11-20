@@ -85,7 +85,7 @@ function vFiche(){
     +(f.source==="web"?webHtml(f):"")
     +"<div class='muted'>"+(f.phone?esc(f.phone)+" · ":"")+"Dépôt "+esc(day(f.dateDepot))+"</div>"
     +(f.enMagasin===false?"<div class='tag warn' style='margin:6px 0'>Trottinette pas en magasin</div><button data-act='arrivee' data-id='"+f.id+"' data-fiche='1'>Trottinette arrivée</button>":"")
-    +"<div class='step' style='margin-top:10px'>Statut</div><div class='stbtns'>"+ST.map(function(s){return"<button class='"+(s===f.statut?"on":"")+"' data-act='setStatut' data-id='"+f.id+"' data-s='"+esc(s)+"'>"+esc(s)+"</button>"}).join("")+"</div>"
+    +"<div class='step' style='margin-top:10px'>Statut</div><div class='stbtns'>"+ST.map(function(s){if(s==="devis envoyé"&&s!==f.statut)return"<button class='dis' disabled title='Se met tout seul quand tu envoies le devis au client'>"+esc(s)+" (auto)</button>";return"<button class='"+(s===f.statut?"on":"")+"' data-act='setStatut' data-id='"+f.id+"' data-s='"+esc(s)+"'>"+esc(s)+"</button>"}).join("")+"</div>"
     +"<label class='muted' style='display:flex;gap:8px;align-items:center'><input type='checkbox' style='width:auto;margin:0' "+(f.sousGarantie?"checked ":"")+"data-act='setGarantie' data-id='"+f.id+"'> Sous garantie</label></div>"
     +garantieHtml(f)+gardeHtml(f)+acompteHtml(f)
     +"<div class='card'><div class='step'>Description de la panne</div><textarea id='fp' rows='3'>"+esc(f.panne)+"</textarea>"
