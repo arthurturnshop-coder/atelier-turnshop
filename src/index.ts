@@ -16,6 +16,7 @@ import "./routes/diagnostic";
 import "./routes/ticket";
 import "./routes/achats";
 import "./routes/stock";
+import "./routes/maitres";
 import "./routes/compta";
 import "./routes/devisenvoi";
 import "./routes/cloture";

@@ -4,6 +4,7 @@ import { sql } from "../db";
 import "./auth";
 import { AppError, clean } from "../util";
 import { shopifyRead, shopifyMutate } from "../shopify";
+import { resoudre, alertesSoeurs } from "./maitres";
 
 // Stock maison : pièces et produits qui ne sont pas (ou pas encore) dans le catalogue Shopify.
 await sql`CREATE TABLE IF NOT EXISTS stock_produits (id SERIAL PRIMARY KEY, code TEXT NOT NULL UNIQUE, nom TEXT NOT NULL, prix_cents INT NOT NULL DEFAULT 0, achat_ht_cents INT, qte INT NOT NULL DEFAULT 0, emplacement TEXT NOT NULL DEFAULT '', archive_le TIMESTAMPTZ, cree_le TIMESTAMPTZ NOT NULL DEFAULT now(), maj_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
@@ -54,9 +55,13 @@ const vue = (p: any) => ({ id: p.id, code: p.code, nom: p.nom, prixCents: p.prix
 // Création / entrée en stock : un seul geste. Code vide = code interne généré (TS-000123).
 // Si le code existe déjà (même archivé), on ajoute la quantité et on met à jour les infos renseignées.
 export async function entreeStock(b: { min?: any; code?: any; nom?: any; prix?: any; achat?: any; qte?: any; emplacement?: any }, motif = "Entrée en stock", magasin = "Amiens") {
-  const nom = clean(b.nom, 200);
-  const code = codeNet(b.code);
-  const qte = Math.max(1, Math.min(9999, Math.round(Number(b.qte) || 1)));
+  // Un code fournisseur associé à un produit maître est ramené au code du maître (et à sa quantité par unité).
+  const brut = codeNet(b.code);
+  const rs = brut ? await resoudre(brut) : null;
+  // Pour une référence fournisseur, le nom du produit maître prime (pas de renommage par le libellé du fournisseur).
+  const nom = rs?.alias ? rs.nomMaitre : clean(b.nom, 200);
+  const code = rs ? rs.code : brut;
+  const qte = Math.max(1, Math.min(9999, Math.round(Number(b.qte) || 1))) * (rs?.qteParUnite ?? 1);
   const prix = cents(b.prix), achat = cents(b.achat), lieu = emp(b.emplacement);
   const min = b.min === undefined || String(b.min).trim() === "" ? null : Math.max(0, Math.min(9999, Math.round(Number(b.min) || 0)));
   let p: any;
@@ -85,7 +90,8 @@ app.get("/api/stock", async (c) => {
 app.post("/api/stock/rapide", async (c) => {
   const b = await c.req.json().catch(() => ({}));
   const code = codeNet(b.code);
-  if (code && !eanValide(code)) throw new AppError(400, /^\d{13}$/.test(code) ? "Code EAN-13 invalide (clé de contrôle fausse) : rescanne le produit." : "Il faut un code EAN-13 (13 chiffres). Laisse vide pour en générer un.");
+  const rs = code ? await resoudre(code) : null;
+  if (code && !rs?.alias && !eanValide(code)) throw new AppError(400, /^\d{13}$/.test(code) ? "Code EAN-13 invalide (clé de contrôle fausse) : rescanne le produit." : "Il faut un code EAN-13 (13 chiffres). Laisse vide pour en générer un.");
   const p = await entreeStock(b, "Entrée en stock", mag(c, b));
   return c.json({ message: `${p.nom} : ${p.qte} en stock${p.emplacement ? " (" + p.emplacement + ")" : ""} · code ${p.code}`, produit: vue(p) });
 });
@@ -119,9 +125,12 @@ app.post("/api/stock/archiver", async (c) => {
 // Un scan : le produit s'il existe (archivé ou non).
 app.post("/api/stock/scan", async (c) => {
   const b = await c.req.json().catch(() => ({}));
-  const code = codeNet(b.code);
+  const rs = await resoudre(codeNet(b.code));
+  const code = rs.code;
   const [p] = (await sql`SELECT * FROM stock_produits WHERE code = ${code} AND magasin = ${mag(c, b)}`) as any[];
-  if (p || b.local) return c.json({ produit: p ? vue(p) : null });
+  const alias = rs.alias ? { maitre: rs.nomMaitre, denomination: rs.denomination, qteParUnite: rs.qteParUnite } : null;
+  if (p || b.local) return c.json({ produit: p ? vue(p) : null, alias });
+  if (alias) return c.json({ produit: null, alias, shopify: null });
   return c.json({ produit: null, shopify: code ? await shopifyParCode(code) : null });
 });
 
@@ -140,10 +149,13 @@ app.post("/api/stock/inventaire", async (c) => {
   const dans = (lieu: string) => (panneau ? lieu.startsWith(zone) : lieu === zone);
   const compte = new Map<string, number>(), lieuDe = new Map<string, string>();
   let sansLieu = 0;
+  const nomMaitre = new Map<string, string>();
   for (const s of Array.isArray(b.scans) ? b.scans.slice(0, 5000) : []) {
-    const code = codeNet(s.code);
+    const rs = await resoudre(codeNet(s.code));
+    const code = rs.code;
     if (!code) continue;
-    compte.set(code, (compte.get(code) ?? 0) + Math.max(1, Math.round(Number(s.qte) || 1)));
+    if (rs.alias) nomMaitre.set(code, rs.nomMaitre);
+    compte.set(code, (compte.get(code) ?? 0) + Math.max(1, Math.round(Number(s.qte) || 1)) * rs.qteParUnite);
     let l = emp(s.emplacement);
     if (!l || !dans(l)) { l = zone; if (panneau) sansLieu++; }
     if (!lieuDe.has(code)) lieuDe.set(code, l);
@@ -154,7 +166,8 @@ app.post("/api/stock/inventaire", async (c) => {
   const absents = attendus.filter((p) => !compte.has(p.code));
   const inconnus: any[] = [];
   for (const k of [...compte.keys()].filter((k) => !parCode.has(k))) {
-    const sh = await shopifyParCode(k);
+    // Produit maître sans stock dans cette boutique : créé tout seul (sous son nom de maître) à l'endroit scanné.
+    const sh = nomMaitre.has(k) ? { nom: nomMaitre.get(k)!, prixCents: 0, achatHtCents: null } : await shopifyParCode(k);
     inconnus.push({ code: k, qte: compte.get(k), vers: lieuDe.get(k), nom: sh?.nom ?? "", prixCents: sh?.prixCents ?? 0, achatHtCents: sh?.achatHtCents ?? null, shopify: !!sh });
   }
   const deplaces = connus.filter((p) => !p.archive_le && p.emplacement !== lieuDe.get(p.code));
@@ -195,7 +208,9 @@ app.get("/api/stock/reappro", async (c) => {
   const rows = (await sql`SELECT * FROM stock_produits WHERE archive_le IS NULL AND magasin = ${m} AND stock_min > 0 AND qte < stock_min ORDER BY nom`) as any[];
   const out = [];
   for (const p of rows) {
-    const [e] = (await sql`SELECT COALESCE(sum(quantite), 0)::int AS n FROM commande_lignes WHERE reparation_id IS NULL AND statut IN ('panier','commandee') AND (sku = ${p.code} OR barcode = ${p.code})`) as any[];
+    // Compte aussi les lignes commandées sous un code fournisseur associé à ce produit maître (référence sœur).
+    const [e] = (await sql`SELECT COALESCE(sum(l.quantite * COALESCE(a.qte_par_unite, 1)), 0)::int AS n FROM commande_lignes l LEFT JOIN produits_alias a ON a.ean = COALESCE(NULLIF(l.barcode, ''), l.sku)
+      WHERE l.reparation_id IS NULL AND l.statut IN ('panier','commandee') AND (l.sku = ${p.code} OR l.barcode = ${p.code} OR a.code_maitre = ${p.code})`) as any[];
     const aCommander = p.stock_min - p.qte - e.n;
     out.push({ id: p.id, code: p.code, nom: p.nom, qte: p.qte, min: p.stock_min, enCommande: e.n, aCommander: Math.max(0, aCommander), emplacement: p.emplacement });
   }
@@ -210,7 +225,8 @@ app.post("/api/stock/reappro/ajouter", async (c) => {
   if (!f) throw new AppError(400, "Choisis un fournisseur.");
   const q = Math.max(1, Math.min(999, Math.round(Number(b.quantite) || 1)));
   await sql`INSERT INTO commande_lignes (fournisseur_id, libelle, sku, barcode, quantite) VALUES (${f.id}, ${p.nom}, ${p.code}, ${p.code}, ${q})`;
-  return c.json({ message: `${q} x ${p.nom} ajouté au panier.` });
+  const avertissements = await alertesSoeurs({ ref: p.code, fournisseurId: f.id, magasin: p.magasin });
+  return c.json({ message: [`${q} x ${p.nom} ajouté au panier.`, ...avertissements].join(" "), avertissements });
 });
 
 // Donne un EAN-13 interne (préfixe 201) aux variantes Shopify qui n'ont pas de code-barres, et l'écrit dans Shopify.

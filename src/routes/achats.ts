@@ -4,9 +4,11 @@ import { sql } from "../db";
 import "./auth";
 import { envoyerPieceArrivee } from "../automatisations";
 import { entreeStock } from "./stock";
+import { alertesSoeurs, resoudre } from "./maitres";
 import { AppError, clean, signature } from "../util";
 
 const nettoyerQte = (n: any) => Math.max(1, Math.min(999, Math.round(Number(n) || 1)));
+const magasinDe = (c: any) => (c.get("user")?.magasin === "Rouen" ? "Rouen" : "Amiens");
 
 // Tout l'espace Commandes : par fournisseur, le panier, ce qui est commandé et ce qui est reçu récemment.
 app.get("/api/achats", async (c) => {
@@ -61,7 +63,9 @@ app.post("/api/achats/ligne", async (c) => {
   const [f] = await sql`SELECT id FROM fournisseurs WHERE id = ${Number(b.fournisseurId)} AND actif = true`;
   if (!f) throw new AppError(400, "Choisis un fournisseur.");
   await sql`INSERT INTO commande_lignes (fournisseur_id, libelle, sku, barcode, variant_id, quantite) VALUES (${f.id}, ${libelle}, ${clean(b.sku, 80) || null}, ${clean(b.barcode, 80) || null}, ${clean(b.variantId, 80) || null}, ${nettoyerQte(b.quantite)})`;
-  return c.json({ message: "Ajouté au panier." });
+  // Même pièce (référence sœur) déjà au panier ou commandée chez un autre fournisseur ?
+  const avertissements = await alertesSoeurs({ ref: clean(b.barcode, 80) || clean(b.sku, 80), fournisseurId: f.id, magasin: magasinDe(c) });
+  return c.json({ message: ["Ajouté au panier.", ...avertissements].join(" "), avertissements });
 });
 
 // Depuis un devis : « À commander ». La prise en charge passe en « en attente de pièce » (vue En commande).
@@ -94,7 +98,8 @@ app.post("/api/achats/depuis-devis", async (c) => {
     await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${d.reparation_id}, 'statut', ${`Statut : ${r.statut} → en attente de pièce${signature(c)}`})`;
   }
   await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${d.reparation_id}, 'note', ${`Pièce à commander chez ${f.nom} : ${d.quantite} × ${d.libelle}${signature(c)}`})`;
-  return c.json({ message: `Ajouté au panier ${f.nom}${raison ? ` (${raison})` : ""}.` });
+  const avertissements = await alertesSoeurs({ ref: d.barcode || d.sku, fournisseurId: f.id, magasin: magasinDe(c) });
+  return c.json({ message: [`Ajouté au panier ${f.nom}${raison ? ` (${raison})` : ""}.`, ...avertissements].join(" "), avertissements });
 });
 
 app.post("/api/achats/ligne/maj", async (c) => {
@@ -130,9 +135,13 @@ app.post("/api/achats/recevoir", async (c) => {
   const b = await c.req.json().catch(() => ({}));
   const ids: number[] = (Array.isArray(b.ids) ? b.ids : [b.id]).map(Number).filter((n: number) => n > 0);
   if (!ids.length) throw new AppError(400, "Rien à réceptionner.");
-  const rows = (await sql`UPDATE commande_lignes SET statut = 'recue', recue_le = now() WHERE id = ANY(${ids}) AND statut = 'commandee' RETURNING reparation_id, variant_id, sku, libelle, quantite`) as any[];
+  const rows = (await sql`UPDATE commande_lignes SET statut = 'recue', recue_le = now() WHERE id = ANY(${ids}) AND statut = 'commandee' RETURNING reparation_id, variant_id, sku, barcode, libelle, quantite`) as any[];
   // Produit hors catalogue (saisie libre, AliExpress…) commandé pour le stock : il entre dans le stock maison à la réception.
-  for (const l of rows) if (!l.reparation_id && !l.variant_id) await entreeStock({ code: l.sku, nom: l.libelle, qte: l.quantite }, "Réception commande", c.get("user")?.magasin === "Rouen" ? "Rouen" : "Amiens");
+  // Si la ligne porte le code-barres d'un fournisseur associé à un produit maître, c'est le stock du maître qui est crédité.
+  for (const l of rows) if (!l.reparation_id && !l.variant_id) {
+    const parAlias = l.barcode && (await resoudre(l.barcode)).alias;
+    await entreeStock({ code: parAlias ? l.barcode : l.sku, nom: l.libelle, qte: l.quantite }, "Réception commande", magasinDe(c));
+  }
   const reps = [...new Set(rows.map((r) => r.reparation_id).filter((x) => x))] as number[];
   let prets = 0;
   for (const rid of reps) {
