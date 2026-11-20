@@ -2,7 +2,7 @@ export const CLIENT = `// ---------- Onglet Client : recherche clients, factures
 var CLV={q:"",res:null,vq:"",vd:"",ventes:null,open:0,z:null,msg:""};
 function vClient(){
   var h="<div class='card'><div class='step'>Chercher un client</div><div class='dl'><input id='cl-q' class='lb' placeholder='Nom, téléphone ou email' value='"+esc(CLV.q)+"'><button data-act='clChercher'>Chercher</button></div>";
-  if(CLV.res)h+="<div class='actions'><button data-act='showNewPre' data-q='"+esc(CLV.q)+"'>+ Créer un client « "+esc(CLV.q)+" »</button></div>";
+  if(CLV.res)h+="<div class='actions'><button class='sec' data-act='showNewPre' data-q='"+esc(CLV.q)+"'>+ Créer un client « "+esc(CLV.q)+" »</button></div>";
   if(CLV.res)h+=CLV.res.length?CLV.res.map(function(c,i){return"<button class='sec hrow' data-act='clOuvre' data-i='"+i+"'><b>"+esc(c.name)+"</b> <span class='muted'>"+esc(c.telephone||"")+" "+esc(c.email||"")+" · "+(c.trottinettes||[]).length+" trottinette(s)</span></button>"}).join(""):"<div class='muted'>Aucun client trouvé.</div>";
   h+="</div><div class='card'><div class='step'>Factures et tickets de caisse (avec ou sans compte client)</div><div class='muted'>Cherche par nom, n° de vente, montant (ex : 44,90) ou produit. Laisse vide pour voir les dernières ventes.</div>"
     +"<div class='dl'><input id='cl-vq' class='lb' placeholder='Nom, n°, montant, produit' value='"+esc(CLV.vq)+"'><input id='cl-vd' type='date' class='p' value='"+esc(CLV.vd)+"'><button data-act='clVentes'>Chercher</button></div>";
@@ -29,4 +29,22 @@ ACTS.clVentes=function(){CLV.vq=v("cl-vq");CLV.vd=v("cl-vd");CLV.ventes=null;CLV
 ACTS.clRecu=function(b){var id=+b.dataset.id;CLV.open=CLV.open===id?0:id;render()};
 ACTS.clZ=function(b){var id=+b.dataset.id,z=(CLV.z||[]).filter(function(x){return x.id===id})[0];if(z)cloImprimeZ(z)};
 document.addEventListener("keydown",function(e){if(e.key!=="Enter"||!e.target||TAB!=="cli")return;if(e.target.id==="cl-q"){e.preventDefault();ACTS.clChercher()}if(e.target.id==="cl-vq"||e.target.id==="cl-vd"){e.preventDefault();ACTS.clVentes()}});
+// ----- Recherche client au fil de la frappe : 5 propositions sous le champ, sans cliquer sur Chercher -----
+var LIVT=null,LIVSEQ=0;
+document.addEventListener("input",function(e){
+  var t=e.target;if(!t||!t.id)return;
+  if(["q","cl-q","cre-q","dq"].indexOf(t.id)<0)return;
+  var id=t.id;clearTimeout(LIVT);
+  LIVT=setTimeout(function(){
+    var el=document.getElementById(id);if(!el)return;var q=el.value.trim(),seq=++LIVSEQ;
+    var fin=function(r){
+      if(seq!==LIVSEQ)return;
+      if(id==="q"){RES=r;SEARCHED=!!q}
+      else if(id==="cl-q"){CLV.q=q;CLV.res=q?r:null}
+      else if(id==="cre-q"){CRE.q=q;CRE.res=q?r:null}
+      else if(id==="dq"){dvLire();DV.res=q?r:null}
+      var pos=el.selectionStart;render();
+      var n=document.getElementById(id);if(n){n.value=el.value;n.focus();try{n.setSelectionRange(pos,pos)}catch(x){}}};
+    if(!q){fin([]);return}
+    api("/search?q="+encodeURIComponent(q)).then(fin).catch(function(){})},220)});
 `;

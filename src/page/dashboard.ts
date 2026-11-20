@@ -63,7 +63,7 @@ function vAccueil(){
   if(NEWCLI)h+=newCliForm();
   else h+="<div class='newbtn'><button class='sec' data-act='showNew'>+ Nouveau client</button></div>";
   if(SEARCHED&&!RES.length)h+="<div class='card'>Aucun client trouvé.</div>";
-  if(SEARCHED&&!NEWCLI)h+="<div class='actions'><button data-act='showNewPre' data-q='"+esc(v("q"))+"'>+ Créer un client « "+esc(v("q"))+" »</button></div>";
+  if(SEARCHED&&!NEWCLI)h+="<div class='actions'><button class='sec' data-act='showNewPre' data-q='"+esc(v("q"))+"'>+ Créer un client « "+esc(v("q"))+" »</button></div>";
   RES.forEach(function(c,i){
     var enCours=0;c.trottinettes.forEach(function(t){enCours+=t.reparations.filter(function(r){return r.statut!=="récupéré"}).length});
     h+="<div class='card'><b>"+esc(c.name||"Sans nom")+"</b>"+(enCours?" <span class='tag'>"+enCours+" en cours</span>":"")
