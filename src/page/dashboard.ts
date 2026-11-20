@@ -69,7 +69,7 @@ function vAccueil(){
     h+="<div class='card'><b>"+esc(c.name||"Sans nom")+"</b>"+(enCours?" <span class='tag'>"+enCours+" en cours</span>":"")
       +"<div class='muted'>"+esc(c.phone||"")+(c.phone&&c.email?" · ":"")+esc(c.email||"")+"</div>"
       +"<div class='actions'><button class='sec' data-act='open' data-i='"+i+"'>Voir le profil</button><button data-act='priseEnCharge' data-i='"+i+"'>Créer une prise en charge</button></div></div>"});
-  h+="</div>"+blocConsignes()+"</div>"+blocTaches()+"<div class='grid'>"+blocChiffres()+"</div></div><div class='dright'>"+caisseHtml()+"</div></div>";
+  h+="</div>"+blocConsignes()+"</div>"+blocTaches()+blocChiffres()+"</div><div class='dright'>"+caisseHtml()+"</div></div>";
   app.innerHTML=h;caisseBind();
   var q=document.getElementById("q");if(q)q.addEventListener("keydown",function(e){if(e.key==="Enter")ACTS.search()});
   if(!CONS||!CHIF)loadAccueil()}
