@@ -66,7 +66,7 @@ app.get("/api/reparations", async (c) => {
     if (vue === "garantie") return r.sous_garantie === true;
     return true;
   };
-  const sel = rows.filter(filtre).slice(0, 100);
+  const sel = rows.filter(filtre).slice(0, 300);
   const ids = sel.map((r) => r.id);
   const journal = ids.length ? ((await sql`SELECT reparation_id, date, type, texte FROM journal WHERE reparation_id = ANY(${ids}) ORDER BY id`) as any[]) : [];
   return c.json({ compteurs, reparations: sel.map((r) => ligneListe(r, journal)) });

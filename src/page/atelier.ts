@@ -21,11 +21,16 @@ async function loadEnc(){
   var vu=document.getElementById("vues");if(vu)vu.innerHTML=vuesHtml(d.compteurs);
   var l=d.reparations;
   if(!l.length){el.innerHTML="<div class='card'>Aucune réparation dans cette vue.</div>";return}
-  el.innerHTML="<div class='grid'>"+l.map(function(r){
+  var card=function(r){
     var cls="tk"+(r.enMagasin===false?" abs":(r.statut==="prêt"?" pret":(r.statut==="en attente de pièce"?" cmd":"")));
     return"<button class='"+cls+"' data-act='ouvrirFiche' data-id='"+r.id+"'><div class='l1'><span><b>"+pcn(r.id)+"</b> · "+esc(r.client)+"</span><span class='tag'>"+esc(r.statut)+"</span></div>"
       +"<div>"+esc(r.trottinette)+"</div><div class='muted'>"+esc(r.panne)+"</div>"
-      +"<div class='muted'>"+(r.pieceArrivee?"<span class='tag warn'>Pièce arrivée : prévenir</span> ":"")+(r.source==="web"?"<span class='tag ok'>Demande en ligne</span> ":"")+(r.rdvStatut==="attente"?"<span class='tag warn'>RDV à valider</span> ":"")+(r.enMagasin===false?"<span class='tag warn'>Pas en magasin</span> ":"")+(r.sousGarantie?"<span class='tag ok'>Sous garantie</span> ":"")+(r.abandonnee?"<span class='tag warn'>Abandonnée</span> ":(r.garde&&r.garde.fraisCents>0?"<span class='tag warn'>Gardiennage "+eur(r.garde.fraisCents)+"</span> ":(r.garde&&r.garde.jours>=4?"<span class='tag warn'>Prête depuis "+r.garde.jours+" j</span> ":"")))+"Dépôt "+esc(day(r.dateDepot))+"</div></button>"}).join("")+"</div>"}
+      +"<div class='muted'>"+(r.pieceArrivee?"<span class='tag warn'>Pièce arrivée : prévenir</span> ":"")+(r.source==="web"?"<span class='tag ok'>Demande en ligne</span> ":"")+(r.rdvStatut==="attente"?"<span class='tag warn'>RDV à valider</span> ":"")+(r.enMagasin===false?"<span class='tag warn'>Pas en magasin</span> ":"")+(r.sousGarantie?"<span class='tag ok'>Sous garantie</span> ":"")+(r.abandonnee?"<span class='tag warn'>Abandonnée</span> ":(r.garde&&r.garde.fraisCents>0?"<span class='tag warn'>Gardiennage "+eur(r.garde.fraisCents)+"</span> ":(r.garde&&r.garde.jours>=4?"<span class='tag warn'>Prête depuis "+r.garde.jours+" j</span> ":"")))+"Dépôt "+esc(day(r.dateDepot))+"</div></button>"};
+  if(VUE==="tout"){
+    var AFE=["reçu","diagnostic","devis envoyé","en réparation"];
+    var cols=[["Rendez-vous",function(r){return r.enMagasin===false}],["Commande",function(r){return r.statut==="en attente de pièce"}],["À faire",function(r){return r.enMagasin!==false&&AFE.indexOf(r.statut)>=0}],["Sous garantie",function(r){return r.sousGarantie===true}],["Prête",function(r){return r.statut==="prêt"}]];
+    el.innerHTML="<div class='kan'>"+cols.map(function(c){var x=l.filter(c[1]);return"<div class='kcol'><div class='khead'>"+c[0]+" <b>"+x.length+"</b></div>"+(x.length?x.map(card).join(""):"<div class='muted'>Aucune</div>")+"</div>"}).join("")+"</div>";return}
+  el.innerHTML="<div class='grid'>"+l.map(card).join("")+"</div>"}
 
 // ---------- Fiche d'une réparation : clic sur le ticket ----------
 async function ouvrirFiche(id){
