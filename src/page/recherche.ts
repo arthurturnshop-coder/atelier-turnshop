@@ -8,7 +8,7 @@ function stockTxt(x){
   var ab={Amiens:"A",Rouen:"R",Fournisseur:"F"};return l.map(function(e){return esc(ab[e.lieu]||e.lieu)+" "+e.qte}).join(" · ")+emplTxt(x)}
 function stockLocalHtml(d){
   var sl=d.stockLocal||[];if(!sl.length)return"";
-  return"<div class='rp-sec'>Stock atelier (rayon)</div>"+sl.map(function(p){return"<div class='rp-static'><b>"+esc(p.nom)+"</b><div class='rp-muted'>"+esc(p.code)+" · "+eur(p.prixCents)+" · "+p.qte+" en stock · <b>Empl. "+esc(p.emplacement||"non rangé")+"</b></div></div>"}).join("")}
+  return"<div class='rp-sec'>Stock atelier (rayon)</div>"+sl.map(function(p){return"<div class='rp-line'><span class='rp-t'><b>"+esc(p.nom)+"</b> · "+esc(p.code)+" · "+eur(p.prixCents)+" · "+p.qte+" en stock · <b>Empl. "+esc(p.emplacement||"non rangé")+"</b></span></div>"}).join("")}
 var RT=null,RCTL=null,RSEQ=0,RPROD=[];
 function rechHide(){RSEQ++;if(RCTL){RCTL.abort();RCTL=null}var p=document.getElementById("rpanel");if(p)p.style.display="none"}
 function rechShow(html){var p=document.getElementById("rpanel");p.innerHTML=html;p.style.display="block"}
@@ -27,21 +27,19 @@ function rechRun(q){
 function pcn(id){return"PC-"+("0000"+id).slice(-4)}
 function rechHtml(d){
   var h="",rp=d.reparations||[];
-  if(rp.length){h+="<div class='rp-sec'>Prises en charge</div>";rp.forEach(function(r){h+="<button class='rp-item' data-rid='"+esc(r.id)+"'><b>"+pcn(r.id)+" · "+esc(r.client||"Sans nom")+"</b> <span class='tag'>"+esc(r.statut)+"</span><div class='rp-muted'>"+esc(r.trottinette)+" · "+esc(r.panne)+"</div></button>"})}
+  if(rp.length){h+="<div class='rp-sec'>Prises en charge</div>";rp.forEach(function(r){h+="<button class='rp-item rp-line' data-rid='"+esc(r.id)+"'><span class='rp-t'><b>"+pcn(r.id)+"</b> · "+esc(r.client||"Sans nom")+" · <span class='rp-m'>"+esc(r.trottinette)+" · "+esc(r.panne)+"</span></span><span class='tag'>"+esc(r.statut)+"</span></button>"})}
   h+="<div class='rp-sec'>Clients</div>";var cl=d.clients||[];
   if(!cl.length)h+="<div class='rp-muted'>Aucun client.</div>";
-  else cl.forEach(function(c){h+="<button class='rp-item' data-cid='"+esc(c.id)+"'><b>"+esc(c.name||"Sans nom")+"</b><div class='rp-muted'>"+esc([c.phone,c.email].filter(Boolean).join(" · "))+"</div></button>"});
+  else cl.forEach(function(c){h+="<button class='rp-item rp-line' data-cid='"+esc(c.id)+"'><span class='rp-t'><b>"+esc(c.name||"Sans nom")+"</b> <span class='rp-m'>"+esc([c.phone,c.email].filter(Boolean).join(" · "))+"</span></span></button>"});
   h+=stockLocalHtml(d);
   h+="<div class='rp-sec'>Produits</div>";
   if(d.produitsIndisponibles)h+="<div class='rp-muted'>Produits : indisponible pour le moment</div>";
   else if(!(d.produits||[]).length)h+="<div class='rp-muted'>Aucun produit.</div>";
   else{RPROD=d.produits;d.produits.forEach(function(p,pi){
-    h+="<div class='rp-static'><b>"+esc(p.titre)+"</b> <span class='rp-muted'>"+esc(p.marque)+"</span>";
     (p.variantes||[]).forEach(function(x,vi){
-      var vt=x.titre&&x.titre!=="Default Title"?" · "+esc(x.titre):"";
-      h+="<div class='rp-var'><div class='rp-muted'>"+vt.replace(/^ · /,"")+(vt?" · ":"")+"code-barres "+esc(x.barcode||"—")+" · sku "+esc(x.sku||"—")+" · <b>"+esc(x.prix)+" €</b> · "+stockTxt(x)+"</div>"
-        +"<div class='rp-btns'>"+(FICHE?"<button data-act='rAddDevis' data-pi='"+pi+"' data-vi='"+vi+"'>+ Devis</button>":"")+"<button class='sec' data-act='rAddPanier' data-pi='"+pi+"' data-vi='"+vi+"'>+ Panier caisse</button></div></div>"});
-    h+="</div>"})}
+      var vt=x.titre&&x.titre!=="Default Title"?" - "+esc(x.titre):"";
+      h+="<div class='rp-line'><span class='rp-t'><b>"+esc(p.titre)+vt+"</b> <span class='rp-m'>code-barres "+esc(x.barcode||"—")+" · sku "+esc(x.sku||"—")+" · </span><b>"+esc(x.prix)+" €</b> <span class='rp-m'>· "+stockTxt(x)+"</span></span>"
+        +"<span class='rp-btns'>"+(FICHE?"<button data-act='rAddDevis' data-pi='"+pi+"' data-vi='"+vi+"'>+ Devis</button>":"")+"<button class='sec' data-act='rAddPanier' data-pi='"+pi+"' data-vi='"+vi+"'>+ Panier</button></span></div>"})})}
   return h}
 function rechOpen(id){
   rechHide();

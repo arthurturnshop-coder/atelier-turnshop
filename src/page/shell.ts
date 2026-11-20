@@ -24,7 +24,19 @@ button.link{background:none;color:#111;border:0;text-decoration:underline;min-he
 .grid{display:block}
 .cons{border-left:6px solid #111}
 .cons .lab{font-weight:700;margin-top:8px}
-.cons .txt{white-space:pre-wrap;margin:2px 0 6px}
+.cons-h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+.cons-h b{font-size:18px}
+.cons-e{min-height:30px!important;padding:3px 12px!important;font-size:13px!important}
+.cons-g{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.ct{border-radius:8px;padding:10px 12px;background:#f3f4f6;border-left:5px solid #888}
+.ct-l{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:#444;margin-bottom:4px}
+.ct-t{font-size:18px;font-weight:600;line-height:1.3;white-space:pre-wrap;color:#111}
+.ct textarea{width:100%;margin:0}
+.ct-upsell{background:#e8f5ec;border-color:#1f8f4e}
+.ct-offre{background:#fff4e0;border-color:#e69100}
+.ct-fidelite{background:#e8f0fb;border-color:#2f6fd0}
+.ct-autre{background:#fdeaea;border-color:#d33}
+.cons-b{margin-top:10px;display:flex;gap:8px}
 .chiffres{display:flex;flex-wrap:wrap;gap:8px}
 .chiffre{flex:1 1 140px;background:#f5f5f5;border-radius:10px;padding:10px;text-align:center}
 .chiffre b{display:block;font-size:30px}
@@ -56,6 +68,15 @@ button.link{background:none;color:#111;border:0;text-decoration:underline;min-he
 .rp-item{display:block;width:100%;margin:0;padding:8px;min-height:0;background:#fff;color:#111;border:0;border-bottom:1px solid #eee;border-radius:0;text-align:left;font-size:15px;font-weight:400;cursor:pointer}
 .rp-static{padding:8px;border-bottom:1px solid #eee}
 .rp-muted{color:#666;font-size:13px;padding:2px 8px}
+.rpanel{width:min(760px,calc(100vw - 32px))!important;padding:2px!important}
+.rp-sec{padding:4px 8px 1px!important;font-size:11px!important}
+.rp-line{display:flex!important;align-items:center;gap:8px;padding:3px 8px!important;min-height:30px;font-size:13px!important;border-bottom:1px solid #eee;background:#fff;color:#111}
+.rp-line .rp-t{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rp-line .rp-m{color:#666}
+.rp-line .tag{flex:0 0 auto;font-size:11px}
+.rp-item.rp-line:hover{background:#f1f8f3}
+.rp-btns{flex:0 0 auto;display:flex;gap:4px}
+.rp-btns button{min-height:24px!important;padding:2px 8px!important;font-size:12px!important;margin:0!important}
 .sub{display:flex;gap:8px;margin:0 0 10px;flex-wrap:wrap}
 .sub button{flex:1 1 90px;margin:0;min-height:48px}
 .vues{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px}

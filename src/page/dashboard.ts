@@ -1,15 +1,16 @@
 export const DASHBOARD = `// ---------- Dashboard ----------
+var CICO={upsell:"🛒",offre:"🏷️",fidelite:"💳",autre:"📌"};
 function blocConsignes(){
-  if(!CONS)return"<div class='card cons'><b>Consignes du jour</b><div class='muted'>Chargement…</div></div>";
+  var T="<div class='card cons'><div class='cons-h'><b>Consignes du jour</b>";
+  if(!CONS)return T+"</div><div class='muted'>Chargement…</div></div>";
   if(EDITCONS){
-    return"<div class='card cons'><b>Consignes du jour</b>"+Object.keys(CLAB).map(function(k){
-      return"<div class='lab'>"+esc(CLAB[k])+"</div><textarea id='c-"+k+"' rows='2'>"+esc(CONS[k]||"")+"</textarea>"}).join("")
-      +"<button data-act='saveCons'>Enregistrer</button><button class='sec' data-act='cancelCons'>Annuler</button></div>"}
-  var any=Object.keys(CLAB).some(function(k){return CONS[k]});
-  return"<div class='card cons'><b>Consignes du jour</b>"+(any?Object.keys(CLAB).filter(function(k){return CONS[k]}).map(function(k){
-      return"<div class='lab'>"+esc(CLAB[k])+"</div><div class='txt'>"+esc(CONS[k])+"</div>"}).join("")
-    :"<div class='muted'>Aucune consigne pour l'instant.</div>")
-    +"<button class='sec' data-act='editCons'>Modifier les consignes</button></div>"}
+    return T+"</div><div class='cons-g'>"+Object.keys(CLAB).map(function(k){
+      return"<div class='ct ct-"+k+"'><div class='ct-l'>"+CICO[k]+" "+esc(CLAB[k])+"</div><textarea id='c-"+k+"' rows='2'>"+esc(CONS[k]||"")+"</textarea></div>"}).join("")
+      +"</div><div class='cons-b'><button data-act='saveCons'>Enregistrer</button><button class='sec' data-act='cancelCons'>Annuler</button></div></div>"}
+  var ks=Object.keys(CLAB).filter(function(k){return CONS[k]});
+  return T+"<button class='sec cons-e' data-act='editCons'>Modifier</button></div>"+(ks.length?"<div class='cons-g'>"+ks.map(function(k){
+      return"<div class='ct ct-"+k+"'><div class='ct-l'>"+CICO[k]+" "+esc(CLAB[k])+"</div><div class='ct-t'>"+esc(CONS[k])+"</div></div>"}).join("")+"</div>"
+    :"<div class='muted'>Aucune consigne pour l'instant.</div>")+"</div>"}
 var TACH=null,TACHBUSY=false,TREC=null,TRECBUSY=false,TTAB="ponct";
 var TSEQ=0;
 function tacheLoad(){if(TACH===null&&!TACHBUSY){TACHBUSY=true;var s=++TSEQ;api("/taches").then(function(d){if(s!==TSEQ)return;TACH=d;TACHBUSY=false;render()}).catch(function(){if(s!==TSEQ)return;TACH=[];TACHBUSY=false;render()})}}
