@@ -46,7 +46,7 @@ ACTS.stCodeAdd=function(b){var p=stProd(+b.dataset.id);if(!p)return;
   stRun(api("/stock/code-ajouter",{id:p.id,code:c.replace(/ /g,""),fournisseur:f}))};
 ACTS.stCodeRet=function(b){if(confirm("Retirer ce code de la fiche ?"))stRun(api("/stock/code-retirer",{id:+b.dataset.id,code:b.dataset.c}))};
 ACTS.stFus=function(b){var p=stProd(+b.dataset.id);if(!p)return;
-  var a=prompt("Fusionner dans : "+p.nom+" (la quantite s ajoute, les codes sont regroupes).\nScanne le code ou tape le nom de l AUTRE fiche (le meme produit) :");if(!a)return;
+  var a=prompt("Fusionner dans : "+p.nom+" (la quantite s ajoute, les codes sont regroupes). Scanne le code ou tape le nom de l AUTRE fiche (le meme produit) :");if(!a)return;
   stRun(api("/stock/fusionner",{id:p.id,autre:a}))};
 // ----- Inventaire -----
 function vInv(){
