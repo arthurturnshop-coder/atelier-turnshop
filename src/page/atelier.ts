@@ -81,7 +81,7 @@ function vFiche(){
     +(f.enMagasin===false?"<div class='tag warn' style='margin:6px 0'>Trottinette pas en magasin</div><button data-act='arrivee' data-id='"+f.id+"' data-fiche='1'>Trottinette arrivée</button>":"")
     +"<div class='step' style='margin-top:10px'>Statut</div><div class='stbtns'>"+ST.map(function(s){return"<button class='"+(s===f.statut?"on":"")+"' data-act='setStatut' data-id='"+f.id+"' data-s='"+esc(s)+"'>"+esc(s)+"</button>"}).join("")+"</div>"
     +"<label class='muted' style='display:flex;gap:8px;align-items:center'><input type='checkbox' style='width:auto;margin:0' "+(f.sousGarantie?"checked ":"")+"data-act='setGarantie' data-id='"+f.id+"'> Sous garantie</label></div>"
-    +gardeHtml(f)+acompteHtml(f)
+    +garantieHtml(f)+gardeHtml(f)+acompteHtml(f)
     +"<div class='card'><div class='step'>Description de la panne</div><textarea id='fp' rows='3'>"+esc(f.panne)+"</textarea>"
     +"<div class='step'>Commentaire interne (visible seulement par TURN)</div><textarea id='fc' rows='3' placeholder='Ce que le client a demandé, ce qu il faudrait lui proposer...'>"+esc(f.commentaireInterne||"")+"</textarea>"
     +"<button data-act='saveFiche' data-id='"+f.id+"'>Enregistrer la description et le commentaire</button></div>"
@@ -119,4 +119,5 @@ async function recharger(id){try{FICHE=await api("/reparation?id="+id);render()}
 
 async function refresh(){if(CUR){CUR=await api("/customer?id="+CUR.id);render()}}
 async function search(){var q=v("q");if(!q)return;try{RES=await api("/search?q="+encodeURIComponent(q));SEARCHED=true}catch(e){alert(e.message);return}render()}
+
 `;

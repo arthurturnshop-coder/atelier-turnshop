@@ -30,6 +30,8 @@ export function ligneListe(r: any, journal: any[]) {
     remarques: r.remarques,
     commentaireInterne: r.commentaire_interne,
     sousGarantie: r.sous_garantie === true,
+    garantieRma: r.garantie_rma ?? "",
+    garantieDemandeLe: r.garantie_demande_le ?? null,
     dateDepot: r.date_depot,
     avisStatut: r.avis_statut,
     avisEnvoiLe: r.avis_envoi_le,

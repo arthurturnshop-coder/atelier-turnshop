@@ -18,7 +18,7 @@ function optHtml(x){
   return"<div class='muted'>Options : "+(o.length?o.map(function(y){return esc(y.nom)+" (+"+eur(y.prixCents)+") <button class='link' data-act='poSuppr' data-id='"+y.id+"'>retirer</button>"}).join(" · "):"aucune")+"</div>"
     +"<div class='dl'><input id='po-n-"+x.id+"' class='lb' placeholder='Nouvelle option (ex : valve tubeless)'><input id='po-p-"+x.id+"' class='p' placeholder='Prix €'><select id='po-t-"+x.id+"' class='t'><option value='piece'>Pièce</option><option value='main_oeuvre'>Main-d&#39;œuvre</option></select><button class='sec' data-act='poAdd' data-id='"+x.id+"'>Ajouter l'option</button></div>"}
 var PSEDIT=0,PSMSG="",PSF={nom:"",prix:"",avecPiece:false,aide:"",qs:"",qr:""};
-var TICK=null,TICKMSG="",SHOPCMD=null,SHOPRES="",PARAM=null,AVL=null,AVMSG="",AVDEC="achat",AVF={libelle:"",seuil:"",dd:"",df:"",effet:"cadeau",valeur:""};
+var TICK=null,TICKMSG="",SHOPCMD=null,SHOPRES="",PARAM=null,GARP=null,AVL=null,AVMSG="",AVDEC="achat",AVF={libelle:"",seuil:"",dd:"",df:"",effet:"cadeau",valeur:""};
 function avDesc(a){return esc(avLabel(a))+" · "+esc(avCondition(a))}
 function avForm(){
   var f=AVF,d=AVDEC,sel=function(val,cur,txt){return"<option value='"+val+"'"+(val===cur?" selected":"")+">"+txt+"</option>"};
@@ -55,6 +55,9 @@ function vParam(){
     +"<label class='muted'>Euros à dépenser pour gagner un palier</label><input id='pe1' value='"+esc(PARAM.eurosPourPalier)+"'>"
     +"<label class='muted'>Remise offerte à chaque palier (€)</label><input id='pr1' value='"+esc(PARAM.remiseEuros)+"'>"
     +"<button data-act='saveParam'>Enregistrer</button><div class='muted' id='parmsg'></div></div>";
+  if(GARP===null){GARP=undefined;api("/parametres/garantie").then(function(d){GARP=d;render()}).catch(function(){GARP={jours:7};render()})}
+  S.garantie="<div class='card'><div class='step'>Garantie fournisseur</div><div class='muted'>Quand tu cliques « Demande faite au fournisseur » dans une prise en charge, une relance revient dans la to-do tous les X jours.</div>"
+    +"<label class='muted'>Délai de relance (jours)</label><input id='gj1' value='"+esc(GARP?GARP.jours:7)+"'><button data-act='saveGarP'>Enregistrer</button><div class='muted' id='garmsg'></div></div>";
   h+="<div class='card'><div class='step'>Cadeaux et offres</div><div class='muted'>Ils apparaissent automatiquement en caisse quand les conditions sont remplies (le vendeur peut les décocher).</div>";
   if(!AVL.length)h+="<div class='muted' style='margin:8px 0'>Aucun cadeau ni offre pour l'instant.</div>";
   AVL.forEach(function(a){h+="<div class='avrow'><div><b>"+esc(a.libelle)+"</b>"+(a.actif?"":" <span class='tag'>désactivé</span>")+"<div class='muted'>"+avDesc(a)+"</div></div><div class='actions'><button class='sec' data-act='avEtat' data-id='"+a.id+"' data-v='"+(a.actif?0:1)+"'>"+(a.actif?"Désactiver":"Réactiver")+"</button><button class='sec' data-act='avSuppr' data-id='"+a.id+"'>Supprimer</button></div></div>"});
@@ -107,7 +110,7 @@ function vParam(){
   cptLoad();
   if(CPT)h+=cptCard();
   S.compta=h;
-  var SEC=[['fid','Carte de fidélité et cadeaux','Règle des points, cadeaux et offres'],['brevo','Emails et rappels automatiques','Avis Google, rappel de RDV, pièce arrivée (Brevo)'],['todo','To-do récurrente','Tâches qui reviennent toutes seules'],['modeles','Modèles de trottinettes et pièces','Pneus et pièces compatibles par modèle'],['presta','Prestations et remises','Tarifs du devis et remise plusieurs prestations'],['shopify','Connexion Shopify','Test de connexion, commandes Shopify à la facturation'],['ticket','Ticket de caisse','En-tête et liens des avis Google'],['compta','Comptabilité et export','Comptes, analytique, journal des ventes (CSV)']];
+  var SEC=[['garantie','Garanties fournisseur','Délai de relance dans la to-do'],['fid','Carte de fidélité et cadeaux','Règle des points, cadeaux et offres'],['brevo','Emails et rappels automatiques','Avis Google, rappel de RDV, pièce arrivée (Brevo)'],['todo','To-do récurrente','Tâches qui reviennent toutes seules'],['modeles','Modèles de trottinettes et pièces','Pneus et pièces compatibles par modèle'],['presta','Prestations et remises','Tarifs du devis et remise plusieurs prestations'],['shopify','Connexion Shopify','Test de connexion, commandes Shopify à la facturation'],['ticket','Ticket de caisse','En-tête et liens des avis Google'],['compta','Comptabilité et export','Comptes, analytique, journal des ventes (CSV)']];
   if(!PSEC){
     app.innerHTML="<div class='card'><div class='step'>Paramètres</div>"+SEC.map(function(x){return"<button class='sec hrow' data-act='parSec' data-s='"+x[0]+"'><b>"+x[1]+"</b><br><span class='muted'>"+x[2]+"</span></button>"}).join("")+"</div>";return}
   var cur=SEC.filter(function(x){return x[0]===PSEC})[0];

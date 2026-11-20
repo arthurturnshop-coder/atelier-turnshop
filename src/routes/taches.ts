@@ -1,5 +1,6 @@
 import { app } from "../app";
 import { sql } from "../db";
+import { genererRelancesGarantie } from "./garantie";
 // Doit passer après la protection /api/* (voir auth.ts).
 import "./auth";
 import { lireAuto, numeroSms } from "../brevo";
@@ -108,6 +109,7 @@ app.post("/api/recurrentes/supprimer", async (c) => {
 app.get("/api/taches", async (c) => {
   await genererRecurrentes();
   await genererRappels();
+  await genererRelancesGarantie();
   const rows = (await sql`SELECT k.id, k.recurrente_id, k.reparation_id, k.texte, to_char(k.echeance, 'YYYY-MM-DD') AS echeance, k.epingle, k.priorite, k.fait, k.fait_par, k.cree_par,
       cl.telephone, trim(cl.prenom || ' ' || cl.nom) AS client, t.marque || ' ' || t.modele AS trott
     FROM taches k LEFT JOIN reparations r ON r.id = k.reparation_id LEFT JOIN clients cl ON cl.id = r.client_id LEFT JOIN trottinettes t ON t.id = r.trottinette_id
