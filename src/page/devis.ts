@@ -6,7 +6,7 @@ function dvTotal(l){return l.reduce(function(t,x){return t+(x.quantite||1)*(x.pr
 function vDevis(){
   if(DV.ed){vDevisEd();return}
   if(DV.list===null){app.innerHTML=subHtml()+"<div class='card'>Chargement…</div>";api("/devis-simples").then(function(d){DV.list=d.devis;render()}).catch(function(e){DV.list=[];DV.msg=e.message;render()});return}
-  var h=subHtml()+(DV.msg?"<div class='pmsg'>"+esc(DV.msg)+"</div>":"")+"<div class='card'><div class='step'>Devis</div><div class='muted'>Un devis seul, sans prise en charge. Une prise en charge n'est créée que s'il se concrétise (bouton dans le devis).</div>";
+  var h=subHtml()+(DV.msg?"<div class='pmsg'>"+esc(DV.msg)+"</div>":"")+"<div class='card'><div class='step'>Devis</div><div class='muted'>Un devis seul, sans prise en charge. S'il se concrétise : « Facturer » (pièces vendues, passage en caisse) ou « Créer une prise en charge » (réparation).</div>";
   if(!DV.list.length)h+="<div class='muted'>Aucun devis pour l'instant.</div>";
   DV.list.forEach(function(d,i){h+="<button class='sec hrow' data-act='dvOuvre' data-i='"+i+"'><b>"+dvNum(d.id)+"</b> · "+esc(d.nom||"")+" · "+esc(d.trottinette||"")+" · <b>"+eur(d.totalCents)+"</b> · "+esc(day(d.date))+(d.reparationId?" · <span class='tag ok'>Rattaché à "+pcn(d.reparationId)+"</span>":"")+"</button>"});
   app.innerHTML=h+"</div>"}
@@ -21,7 +21,7 @@ function vDevisEd(){
   d.lignes.forEach(function(l,i){h+="<div class='dl'><input id='dl"+i+"' class='lb' placeholder='Pièce ou main d oeuvre' value='"+esc(l.libelle)+"'><input id='dq"+i+"' class='q' type='number' min='1' value='"+(l.quantite||1)+"'><input id='dp"+i+"' class='p' placeholder='Prix €' value='"+(l.prixCents?(l.prixCents/100).toFixed(2).replace(".",","):"")+"'><button class='link' data-act='dvDelL' data-i='"+i+"'>Suppr.</button></div>"});
   h+="<div class='actions'><button class='sec' data-act='dvAddL'>+ Ligne</button></div><div style='font-size:20px;margin:8px 0'><b>Total TTC : "+eur(dvTotal(d.lignes))+"</b></div>"
     +"<div class='actions'>"+(rat?"":"<button data-act='dvSave'>Enregistrer</button>")+(d.id?"<button class='sec' data-act='dvPrint'>Imprimer</button>":"")
-    +(d.id&&!rat?"<button class='sec' data-act='dvRatt'>Rattacher à une prise en charge</button>":"")+(rat?"<button class='sec' data-act='dvVoirPC'>Ouvrir "+pcn(d.reparationId)+"</button>":"")
+    +(d.id&&!rat?"<button data-act='dvFact'>Facturer (passer en caisse)</button><button class='sec' data-act='dvRatt'>Créer une prise en charge</button>":"")+(rat?"<button class='sec' data-act='dvVoirPC'>Ouvrir "+pcn(d.reparationId)+"</button>":"")
     +(d.id&&!rat?"<button class='danger' data-act='dvSuppr'>Supprimer</button>":"")+"<button class='sec' data-act='dvRetour'>Retour à la liste</button></div></div>";
   app.innerHTML=h}
 function dvLire(){
@@ -40,8 +40,16 @@ ACTS.dvSave=async function(){dvLire();try{var r=await api("/devis-simples",dvPay
 ACTS.dvSuppr=async function(){if(!confirm("Supprimer ce devis ?"))return;try{await api("/devis-simples/supprimer",{id:DV.ed.id});DV.ed=null;DV.list=null;DV.msg="Devis supprimé.";render()}catch(e){alert(e.message)}};
 ACTS.dvRatt=async function(){
   dvLire();
-  if(!confirm("Le devis se concrétise : créer la prise en charge avec ces lignes ?"))return;
+  if(!confirm("Créer une prise en charge (réparation) avec ces lignes ? Pour une vente de pièces seulement, utilise « Facturer »."))return;
   try{var s=await api("/devis-simples",dvPayload());DV.ed.id=s.id;var r=await api("/devis-simples/rattacher",{id:s.id});DV.ed=null;DV.list=null;await ouvrirFiche(r.reparationId)}catch(e){alert(e.message)}};
+ACTS.dvFact=async function(){
+  dvLire();
+  if(PAN.length&&!confirm("Le panier de la caisse n'est pas vide : le remplacer par ce devis ?"))return;
+  try{var s=await api("/devis-simples",dvPayload());DV.ed.id=s.id;var d=null;
+    if(DV.ed.clientId)d=await api("/caisse/client?id="+DV.ed.clientId);
+    PAN=DV.ed.lignes.map(function(l){return{libelle:l.libelle,quantite:l.quantite,prix:String(l.prixCents/100).replace(".",","),type:"article",variantId:"",sku:""}});
+    CCLI=d?d.client:null;CFID=d?d.fidelite:null;CUSE=false;CAVOFF=[];CREC=null;CHOPEN=0;CREP=null;CACO=0;CPAY={carte:"",especes:"",virement:""};CMSG="";
+    DV.ed=null;DV.list=null;FICHE=null;CUR=null;TAB="accueil";if(d)await chargeHisto();else render()}catch(e){alert(e.message)}};
 ACTS.dvVoirPC=function(){ouvrirFiche(DV.ed.reparationId)};
 ACTS.dvPrint=function(){
   dvLire();var d=DV.ed,nl=String.fromCharCode(10),t=dvTotal(d.lignes),ht=Math.round(t/1.2),tva=t-ht;
