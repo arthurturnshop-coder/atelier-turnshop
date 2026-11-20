@@ -64,7 +64,8 @@ function pecHtml(f){
   return h}
 function pecCss(){return"@page{size:80mm auto;margin:0}@media print{body>*:not(#impzone){display:none!important}#impzone{position:static;width:80mm;box-sizing:border-box;font-size:12px;padding:0 3mm;margin:0}}"}
 async function imprimerPEC(id){
-  try{var f=await api("/reparation?id="+id);impImprimer(pecHtml(f),"recu",pecCss())}catch(e){alert(e.message)}}
+  // Deux exemplaires d'un coup (un pour le client, un pour l'atelier), séparés par un saut de page.
+  try{var f=await api("/reparation?id="+id);var t=pecHtml(f);impImprimer(t+"<div style='break-after:page;page-break-after:always;height:0'></div>"+t,"recu",pecCss())}catch(e){alert(e.message)}}
 ACTS.pecPrint=function(b){imprimerPEC(+b.dataset.id)};
 
 // ----- Devis / facture en ticket 80 mm -----
