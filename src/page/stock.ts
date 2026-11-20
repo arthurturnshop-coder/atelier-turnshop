@@ -15,7 +15,7 @@ function vStock(){
   h+="<div class='card'><div class='head'><div class='step'>Stock "+esc(STK.magasin||"")+" : "+STK.nb+" produit"+(STK.nb>1?"s":"")+" en stock"+(STK.valeurAchatHtCents?" · valeur d'achat HT "+eur(STK.valeurAchatHtCents):"")+"</div><input id='stq' class='lb' placeholder='Chercher (nom, code, emplacement)' value='"+esc(STQ)+"'></div>";
   if(!STK.produits.length)h+="<div class='muted'>Aucun produit.</div>";
   else h+="<table class='devis' style='width:100%'><tr><th>Produit</th><th>Empl.</th><th class='n'>Achat HT</th><th class='n'>Vente</th><th class='n'>Qté</th><th class='n'>Min</th><th></th></tr>"+STK.produits.map(function(p){
-    return"<tr><td>"+esc(p.nom)+"<div class='muted'>"+esc(p.code)+"</div>"+(p.codes||[]).map(function(x){return"<div class='muted'>"+esc(x.code)+(x.fournisseur?" ("+esc(x.fournisseur)+")":"")+" <button class='link' data-act='stCodeRet' data-id='"+p.id+"' data-c='"+esc(x.code)+"'>retirer</button></div>"}).join("")+"</td><td>"+esc(p.emplacement||"-")+"</td><td class='n'>"+(p.achatHtCents==null?"-":eur(p.achatHtCents))+"</td><td class='n'>"+eur(p.prixCents)+"</td>"
+    return"<tr><td>"+esc(p.nom)+"<div class='muted'>"+esc(p.code)+"</div>"+(p.codes||[]).map(function(x){return"<div class='muted'>"+esc(x.code)+(x.fournisseur?" ("+esc(x.fournisseur)+")":"")+(x.denomination?" - "+esc(x.denomination):"")+" <button class='link' data-act='stCodeRet' data-id='"+p.id+"' data-c='"+esc(x.code)+"'>retirer</button></div>"}).join("")+"</td><td>"+esc(p.emplacement||"-")+"</td><td class='n'>"+(p.achatHtCents==null?"-":eur(p.achatHtCents))+"</td><td class='n'>"+eur(p.prixCents)+"</td>"
       +"<td class='n'><button class='sec' data-act='stDelta' data-id='"+p.id+"' data-d='-1'>-</button> <b>"+p.qte+"</b> <button class='sec' data-act='stDelta' data-id='"+p.id+"' data-d='1'>+</button></td>"
       +"<td class='n'>"+(p.min?(p.qte<p.min?"<span class='tag warn'>"+p.min+"</span>":p.min):"-")+"</td><td class='n'><button class='link' data-act='stEtq' data-id='"+p.id+"'>Étiquette</button> <button class='link' data-act='stCodeAdd' data-id='"+p.id+"'>+ Code</button> <button class='link' data-act='stFus' data-id='"+p.id+"'>Fusionner</button> <button class='link' data-act='stEdit' data-id='"+p.id+"'>Modifier</button> <button class='link' data-act='stDel' data-id='"+p.id+"'>Retirer</button></td></tr>"}).join("")+"</table>";
   app.innerHTML=h+"</div>";
@@ -43,7 +43,8 @@ ACTS.stEdit=function(b){var p=stProd(+b.dataset.id);if(!p)return;
 ACTS.stCodeAdd=function(b){var p=stProd(+b.dataset.id);if(!p)return;
   var c=prompt("Scanne le code-barres de l autre grossiste pour : "+p.nom);if(!c)return;
   var f=prompt("Grossiste (facultatif, ex : Ewheel)","");if(f===null)f="";
-  stRun(api("/stock/code-ajouter",{id:p.id,code:c.replace(/ /g,""),fournisseur:f}))};
+  var dn=prompt("Denomination de cette reference (facultatif, ex : CST 8,5x2 - sert dans les alertes de commande)","");if(dn===null)dn="";
+  stRun(api("/stock/code-ajouter",{id:p.id,code:c.replace(/ /g,""),fournisseur:f,denomination:dn}))};
 ACTS.stCodeRet=function(b){if(confirm("Retirer ce code de la fiche ?"))stRun(api("/stock/code-retirer",{id:+b.dataset.id,code:b.dataset.c}))};
 ACTS.stFus=function(b){var p=stProd(+b.dataset.id);if(!p)return;
   var a=prompt("Fusionner dans : "+p.nom+" (la quantite s ajoute, les codes sont regroupes). Scanne le code ou tape le nom de l AUTRE fiche (le meme produit) :");if(!a)return;
