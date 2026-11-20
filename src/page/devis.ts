@@ -1,0 +1,58 @@
+export const DEVIS = `// ---------- Devis simples (sans prise en charge) ----------
+var DV={list:null,ed:null,res:null,msg:""};
+function dvNum(id){return"DV-"+("0000"+id).slice(-4)}
+function dvVide(){return{id:0,clientId:0,nom:"",telephone:"",email:"",trottinette:"",objet:"",reparationId:null,lignes:[{libelle:"",quantite:1,prixCents:0}]}}
+function dvTotal(l){return l.reduce(function(t,x){return t+(x.quantite||1)*(x.prixCents||0)},0)}
+function vDevis(){
+  if(DV.ed){vDevisEd();return}
+  if(DV.list===null){app.innerHTML=subHtml()+"<div class='card'>Chargement…</div>";api("/devis-simples").then(function(d){DV.list=d.devis;render()}).catch(function(e){DV.list=[];DV.msg=e.message;render()});return}
+  var h=subHtml()+(DV.msg?"<div class='pmsg'>"+esc(DV.msg)+"</div>":"")+"<div class='card'><div class='step'>Devis</div><div class='muted'>Un devis seul, sans prise en charge. Une prise en charge n'est créée que s'il se concrétise (bouton dans le devis).</div>";
+  if(!DV.list.length)h+="<div class='muted'>Aucun devis pour l'instant.</div>";
+  DV.list.forEach(function(d,i){h+="<button class='sec hrow' data-act='dvOuvre' data-i='"+i+"'><b>"+dvNum(d.id)+"</b> · "+esc(d.nom||"")+" · "+esc(d.trottinette||"")+" · <b>"+eur(d.totalCents)+"</b> · "+esc(day(d.date))+(d.reparationId?" · <span class='tag ok'>Rattaché à "+pcn(d.reparationId)+"</span>":"")+"</button>"});
+  app.innerHTML=h+"</div>"}
+function vDevisEd(){
+  var d=DV.ed,rat=!!d.reparationId;
+  var h=subHtml()+(DV.msg?"<div class='pmsg'>"+esc(DV.msg)+"</div>":"")+"<div class='card'><div class='step'>"+(d.id?"Devis "+dvNum(d.id):"Nouveau devis")+(rat?" · rattaché à "+pcn(d.reparationId):"")+"</div>";
+  h+="<div class='dl'><input id='dq' class='lb' placeholder='Retrouver un client existant (nom, téléphone, email)'><button class='sec' data-act='dvChercher'>Chercher</button></div>";
+  if(DV.res)h+=DV.res.length?DV.res.map(function(c,i){return"<button class='sec hrow' data-act='dvChoisir' data-i='"+i+"'><b>"+esc(c.name)+"</b> <span class='muted'>"+esc(c.telephone||"")+" "+esc(c.email||"")+"</span></button>"}).join(""):"<div class='muted'>Aucun client trouvé.</div>";
+  h+="<div class='dl'><input id='dn' placeholder='Nom du client' value='"+esc(d.nom)+"'><input id='dt' placeholder='Téléphone' value='"+esc(d.telephone)+"'><input id='de' placeholder='Email' value='"+esc(d.email)+"'></div>"
+    +"<div class='dl'><input id='dtr' placeholder='Trottinette (ex : Xiaomi M365)' value='"+esc(d.trottinette)+"'><input id='dob' placeholder='Objet du devis' value='"+esc(d.objet)+"'></div>"
+    +"<div class='step' style='margin-top:10px'>Lignes (prix TTC)</div>";
+  d.lignes.forEach(function(l,i){h+="<div class='dl'><input id='dl"+i+"' class='lb' placeholder='Pièce ou main d oeuvre' value='"+esc(l.libelle)+"'><input id='dq"+i+"' class='q' type='number' min='1' value='"+(l.quantite||1)+"'><input id='dp"+i+"' class='p' placeholder='Prix €' value='"+(l.prixCents?(l.prixCents/100).toFixed(2).replace(".",","):"")+"'><button class='link' data-act='dvDelL' data-i='"+i+"'>Suppr.</button></div>"});
+  h+="<div class='actions'><button class='sec' data-act='dvAddL'>+ Ligne</button></div><div style='font-size:20px;margin:8px 0'><b>Total TTC : "+eur(dvTotal(d.lignes))+"</b></div>"
+    +"<div class='actions'>"+(rat?"":"<button data-act='dvSave'>Enregistrer</button>")+(d.id?"<button class='sec' data-act='dvPrint'>Imprimer</button>":"")
+    +(d.id&&!rat?"<button class='sec' data-act='dvRatt'>Rattacher à une prise en charge</button>":"")+(rat?"<button class='sec' data-act='dvVoirPC'>Ouvrir "+pcn(d.reparationId)+"</button>":"")
+    +(d.id&&!rat?"<button class='danger' data-act='dvSuppr'>Supprimer</button>":"")+"<button class='sec' data-act='dvRetour'>Retour à la liste</button></div></div>";
+  app.innerHTML=h}
+function dvLire(){
+  var d=DV.ed;if(!d||!document.getElementById("dn"))return;
+  d.nom=v("dn");d.telephone=v("dt");d.email=v("de");d.trottinette=v("dtr");d.objet=v("dob");
+  d.lignes=d.lignes.map(function(l,i){var p=Number(String(v("dp"+i)).replace(",","."))||0;return{libelle:v("dl"+i),quantite:Math.max(1,Number(v("dq"+i))||1),prixCents:Math.round(p*100)}})}
+function dvPayload(){var d=DV.ed;return{id:d.id,clientId:d.clientId,nom:d.nom,telephone:d.telephone,email:d.email,trottinette:d.trottinette,objet:d.objet,lignes:d.lignes.map(function(l){return{libelle:l.libelle,quantite:l.quantite,prix:(l.prixCents/100).toFixed(2)}})}}
+ACTS.dvNouveau=function(){DV.ed=dvVide();DV.res=null;DV.msg="";FICHE=null;TAB="enc";ATSUB="devis";render()};
+ACTS.dvOuvre=function(b){var d=DV.list[+b.dataset.i];DV.ed=JSON.parse(JSON.stringify(d));if(!DV.ed.lignes.length)DV.ed.lignes=dvVide().lignes;DV.res=null;DV.msg="";render()};
+ACTS.dvRetour=function(){DV.ed=null;DV.list=null;DV.msg="";render()};
+ACTS.dvAddL=function(){dvLire();DV.ed.lignes.push({libelle:"",quantite:1,prixCents:0});render()};
+ACTS.dvDelL=function(b){dvLire();DV.ed.lignes.splice(+b.dataset.i,1);if(!DV.ed.lignes.length)DV.ed.lignes=dvVide().lignes;render()};
+ACTS.dvChercher=function(){var q=v("dq");if(!q)return;dvLire();api("/search?q="+encodeURIComponent(q)).then(function(r){DV.res=r;render()}).catch(function(e){alert(e.message)})};
+ACTS.dvChoisir=function(b){var c=DV.res[+b.dataset.i];dvLire();DV.ed.clientId=c.id;DV.ed.nom=c.name;DV.ed.telephone=c.telephone||"";DV.ed.email=c.email||"";DV.res=null;render()};
+ACTS.dvSave=async function(){dvLire();try{var r=await api("/devis-simples",dvPayload());DV.ed.id=r.id;DV.msg=r.message;DV.list=null;render()}catch(e){alert(e.message)}};
+ACTS.dvSuppr=async function(){if(!confirm("Supprimer ce devis ?"))return;try{await api("/devis-simples/supprimer",{id:DV.ed.id});DV.ed=null;DV.list=null;DV.msg="Devis supprimé.";render()}catch(e){alert(e.message)}};
+ACTS.dvRatt=async function(){
+  dvLire();
+  if(!confirm("Le devis se concrétise : créer la prise en charge avec ces lignes ?"))return;
+  try{var s=await api("/devis-simples",dvPayload());DV.ed.id=s.id;var r=await api("/devis-simples/rattacher",{id:s.id});DV.ed=null;DV.list=null;await ouvrirFiche(r.reparationId)}catch(e){alert(e.message)}};
+ACTS.dvVoirPC=function(){ouvrirFiche(DV.ed.reparationId)};
+ACTS.dvPrint=function(){
+  dvLire();var d=DV.ed,nl=String.fromCharCode(10),t=dvTotal(d.lignes),ht=Math.round(t/1.2),tva=t-ht;
+  var ent=(TICKENT||"TURN SOCIETY").split(nl).map(function(x,i){return i===0?"<b>"+esc(x)+"</b>":esc(x)}).join("<br>");
+  var h="<div class='rc'>"+ent+(MAG?"<br>Boutique "+esc(MAG):"")+"</div><hr><div class='rc'><b>DEVIS</b></div><div class='rc' style='font-size:18px'><b>"+dvNum(d.id)+"</b></div>"
+    +"<div class='rl'><span>Date</span><span>"+new Date().toLocaleDateString("fr-FR")+"</span></div><hr>"
+    +"<div class='rm'>Client</div><div><b>"+esc(d.nom)+"</b></div>"+(d.telephone?"<div>"+esc(d.telephone)+"</div>":"")+(d.trottinette?"<div class='rm' style='margin-top:4px'>Trottinette</div><div><b>"+esc(d.trottinette)+"</b></div>":"")+(d.objet?"<div class='rm' style='margin-top:4px'>Objet : "+esc(d.objet)+"</div>":"")+"<hr>";
+  d.lignes.forEach(function(l){h+="<div class='rl'><span>"+l.quantite+" × "+esc(l.libelle)+"</span><span>"+eur(l.quantite*l.prixCents)+"</span></div>"});
+  h+="<hr><div class='rl rt'><span>TOTAL TTC</span><span>"+eur(t)+"</span></div><div class='rl rm'><span>Total HT</span><span>"+eur(ht)+"</span></div><div class='rl rm'><span>TVA 20 %</span><span>"+eur(tva)+"</span></div>"
+    +"<hr><div class='rc rm'>Devis valable 30 jours. Document non contractuel tant qu'il n'est pas validé par le client.</div><div class='rc rm' style='margin-top:6px'>Merci de votre confiance !</div>";
+  impImprimer(h,"recu",pecCss())};
+var TICKENT="";
+api("/reglages/ticket").then(function(d){TICKENT=d.entete||""}).catch(function(){});
+`;
