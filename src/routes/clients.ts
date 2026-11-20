@@ -94,10 +94,11 @@ app.get("/api/recherche", async (c) => {
   try {
     const mg = c.get("user")?.magasin === "Rouen" ? "Rouen" : "Amiens";
     const like = "%" + q.replace(/[%_\\]/g, "") + "%";
-    stockLocal = ((await sql`SELECT nom, code, prix_cents, qte, emplacement FROM stock_produits WHERE archive_le IS NULL AND magasin = ${mg} AND (nom ILIKE ${like} OR code ILIKE ${like} OR emplacement ILIKE ${like}) ORDER BY emplacement, nom LIMIT 8`) as any[]).map((p) => ({ nom: p.nom, code: p.code, prixCents: p.prix_cents, qte: p.qte, emplacement: p.emplacement }));
+    stockLocal = ((await sql`SELECT nom, code, prix_cents, qte, emplacement FROM stock_produits WHERE archive_le IS NULL AND magasin = ${mg} AND (nom ILIKE ${like} OR code ILIKE ${like} OR emplacement ILIKE ${like} OR id IN (SELECT produit_id FROM stock_codes WHERE code ILIKE ${like})) ORDER BY emplacement, nom LIMIT 8`) as any[]).map((p) => ({ nom: p.nom, code: p.code, prixCents: p.prix_cents, qte: p.qte, emplacement: p.emplacement }));
     const codes = [...new Set(produits.flatMap((p: any) => p.variantes.flatMap((v: any) => [v.sku, v.barcode]).filter(Boolean)))] as string[];
     if (codes.length) {
       const m = new Map(((await sql`SELECT code, emplacement FROM stock_produits WHERE archive_le IS NULL AND magasin = ${mg} AND emplacement <> '' AND code = ANY(${codes})`) as any[]).map((r) => [r.code, r.emplacement]));
+      for (const r of (await sql`SELECT sc.code, p.emplacement FROM stock_codes sc JOIN stock_produits p ON p.id = sc.produit_id WHERE p.archive_le IS NULL AND p.magasin = ${mg} AND p.emplacement <> '' AND sc.code = ANY(${codes})`) as any[]) m.set(r.code, r.emplacement);
       for (const p of produits) for (const v of p.variantes) v.emplacement = m.get(v.sku) ?? m.get(v.barcode) ?? "";
     }
   } catch { /* stock maison indisponible : la recherche continue sans */ }

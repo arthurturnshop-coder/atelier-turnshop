@@ -13,6 +13,10 @@ await sql`ALTER TABLE stock_produits DROP CONSTRAINT IF EXISTS stock_produits_co
 await sql`CREATE UNIQUE INDEX IF NOT EXISTS stock_code_mag ON stock_produits (code, magasin)`;
 await sql`CREATE TABLE IF NOT EXISTS stock_mouvements (id SERIAL PRIMARY KEY, produit_id INT NOT NULL REFERENCES stock_produits(id), delta INT NOT NULL, motif TEXT NOT NULL DEFAULT '', cree_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
 
+// Plusieurs codes-barres (EAN de grossistes différents) pour un même produit : un seul stock total.
+await sql`CREATE TABLE IF NOT EXISTS stock_codes (id SERIAL PRIMARY KEY, produit_id INT NOT NULL REFERENCES stock_produits(id), code TEXT NOT NULL, fournisseur TEXT NOT NULL DEFAULT '', cree_le TIMESTAMPTZ NOT NULL DEFAULT now(), UNIQUE (produit_id, code))`;
+await sql`CREATE INDEX IF NOT EXISTS stock_codes_code ON stock_codes (code)`;
+
 const cents = (x: any): number | null => {
   const s = String(x ?? "").replace(",", ".").replace(/[^0-9.]/g, "");
   if (!s) return null;
@@ -49,7 +53,13 @@ const cleEan = (d12: string) => { let t = 0; for (let i = 0; i < 12; i++) t += N
 export const eanValide = (c: string) => /^\d{13}$/.test(c) && cleEan(c.slice(0, 12)) === c[12];
 const eanInterne = (id: number) => { const d = "200" + String(id).padStart(9, "0"); return d + cleEan(d); };
 
-const vue = (p: any) => ({ id: p.id, code: p.code, nom: p.nom, prixCents: p.prix_cents, achatHtCents: p.achat_ht_cents, qte: p.qte, min: p.stock_min, emplacement: p.emplacement, archive: !!p.archive_le });
+// Le produit d'un code scanné : son code principal ou l'un de ses codes supplémentaires.
+async function produitParCode(code: string, magasin: string): Promise<any | undefined> {
+  if (!code) return undefined;
+  const [p] = (await sql`SELECT * FROM stock_produits WHERE magasin = ${magasin} AND (code = ${code} OR id IN (SELECT produit_id FROM stock_codes WHERE code = ${code})) ORDER BY (code = ${code}) DESC, archive_le NULLS FIRST LIMIT 1`) as any[];
+  return p;
+}
+const vue = (p: any, codes: any[] = []) => ({ id: p.id, code: p.code, nom: p.nom, prixCents: p.prix_cents, achatHtCents: p.achat_ht_cents, qte: p.qte, min: p.stock_min, emplacement: p.emplacement, archive: !!p.archive_le, codes });
 
 // Création / entrée en stock : un seul geste. Code vide = code interne généré (TS-000123).
 // Si le code existe déjà (même archivé), on ajoute la quantité et on met à jour les infos renseignées.
@@ -60,7 +70,7 @@ export async function entreeStock(b: { min?: any; code?: any; nom?: any; prix?: 
   const prix = cents(b.prix), achat = cents(b.achat), lieu = emp(b.emplacement);
   const min = b.min === undefined || String(b.min).trim() === "" ? null : Math.max(0, Math.min(9999, Math.round(Number(b.min) || 0)));
   let p: any;
-  if (code) [p] = (await sql`SELECT * FROM stock_produits WHERE code = ${code} AND magasin = ${magasin}`) as any[];
+  if (code) p = await produitParCode(code, magasin);
   if (p) {
     [p] = (await sql`UPDATE stock_produits SET qte = qte + ${qte}, archive_le = NULL, nom = ${nom || p.nom}, prix_cents = ${prix ?? p.prix_cents}, achat_ht_cents = ${achat ?? p.achat_ht_cents}, emplacement = ${lieu || p.emplacement}, stock_min = ${min ?? p.stock_min}, maj_le = now() WHERE id = ${p.id} RETURNING *`) as any[];
   } else {
@@ -76,10 +86,14 @@ app.get("/api/stock", async (c) => {
   const q = clean(c.req.query("q"), 60).toLowerCase();
   const m = mag(c);
   const rows = (await sql`SELECT * FROM stock_produits WHERE archive_le IS NULL AND magasin = ${m} ORDER BY emplacement, nom LIMIT 1000`) as any[];
-  const f = rows.filter((p) => !q || `${p.nom} ${p.code} ${p.emplacement}`.toLowerCase().includes(q)).slice(0, 300);
+  const tous = (await sql`SELECT produit_id, code FROM stock_codes WHERE produit_id = ANY(${rows.map((p) => p.id).concat([0])})`) as any[];
+  const alias = new Map<number, string[]>();
+  for (const x of tous) alias.set(x.produit_id, [...(alias.get(x.produit_id) ?? []), x.code]);
+  const f = rows.filter((p) => !q || `${p.nom} ${p.code} ${p.emplacement} ${(alias.get(p.id) ?? []).join(" ")}`.toLowerCase().includes(q)).slice(0, 300);
   const lieux = [...new Set(rows.map((p) => p.emplacement).filter(Boolean))].sort();
   const valeur = rows.reduce((t, p) => t + (p.achat_ht_cents ?? 0) * p.qte, 0);
-  return c.json({ magasin: m, produits: f.map(vue), lieux, nb: rows.length, valeurAchatHtCents: valeur });
+  const ac = f.length ? ((await sql`SELECT produit_id, code, fournisseur FROM stock_codes WHERE produit_id = ANY(${f.map((p) => p.id)}) ORDER BY id`) as any[]) : [];
+  return c.json({ magasin: m, produits: f.map((p) => vue(p, ac.filter((x) => x.produit_id === p.id).map((x) => ({ code: x.code, fournisseur: x.fournisseur })))), lieux, nb: rows.length, valeurAchatHtCents: valeur });
 });
 
 app.post("/api/stock/rapide", async (c) => {
@@ -120,7 +134,7 @@ app.post("/api/stock/archiver", async (c) => {
 app.post("/api/stock/scan", async (c) => {
   const b = await c.req.json().catch(() => ({}));
   const code = codeNet(b.code);
-  const [p] = (await sql`SELECT * FROM stock_produits WHERE code = ${code} AND magasin = ${mag(c, b)}`) as any[];
+  const p = await produitParCode(code, mag(c, b));
   if (p || b.local) return c.json({ produit: p ? vue(p) : null });
   return c.json({ produit: null, shopify: code ? await shopifyParCode(code) : null });
 });
@@ -140,8 +154,12 @@ app.post("/api/stock/inventaire", async (c) => {
   const dans = (lieu: string) => (panneau ? lieu.startsWith(zone) : lieu === zone);
   const compte = new Map<string, number>(), lieuDe = new Map<string, string>();
   let sansLieu = 0;
-  for (const s of Array.isArray(b.scans) ? b.scans.slice(0, 5000) : []) {
-    const code = codeNet(s.code);
+  const scansBruts = Array.isArray(b.scans) ? b.scans.slice(0, 5000) : [];
+  const bruts = [...new Set(scansBruts.map((s: any) => codeNet(s.code)).filter(Boolean))] as string[];
+  const canon = new Map<string, string>();
+  if (bruts.length) for (const r of (await sql`SELECT sc.code AS alias, p.code AS canon FROM stock_codes sc JOIN stock_produits p ON p.id = sc.produit_id WHERE p.magasin = ${m} AND sc.code = ANY(${bruts}) AND NOT EXISTS (SELECT 1 FROM stock_produits q WHERE q.magasin = ${m} AND q.code = sc.code)`) as any[]) canon.set(r.alias, r.canon);
+  for (const s of scansBruts) {
+    const code = canon.get(codeNet(s.code)) ?? codeNet(s.code);
     if (!code) continue;
     compte.set(code, (compte.get(code) ?? 0) + Math.max(1, Math.round(Number(s.qte) || 1)));
     let l = emp(s.emplacement);
@@ -162,9 +180,9 @@ app.post("/api/stock/inventaire", async (c) => {
   const ecarts = connus.filter((p) => !p.archive_le && p.qte !== compte.get(p.code));
   const apercu = {
     emplacement: zone, panneau, scannes: connus.length, sansLieu,
-    absents: absents.map(vue), inconnus,
+    absents: absents.map((x) => vue(x)), inconnus,
     deplaces: deplaces.map((p) => ({ ...vue(p), vers: lieuDe.get(p.code) })),
-    revenus: revenus.map(vue),
+    revenus: revenus.map((x) => vue(x)),
     ecarts: ecarts.map((p) => ({ ...vue(p), compte: compte.get(p.code) })),
   };
   if (!b.appliquer) return c.json({ apercu });
@@ -187,6 +205,55 @@ app.post("/api/stock/inventaire", async (c) => {
   }
   const reste = inconnus.length - crees;
   return c.json({ message: `Inventaire ${panneau ? "panneau " : ""}${zone} (${m}) validé : ${connus.length} produit(s) comptés, ${crees} créé(s) depuis Shopify, ${absents.length} retiré(s), ${deplaces.length} déplacé(s).${reste ? " " + reste + " code(s) inconnu(s) à créer à la main." : ""}` });
+});
+
+// Ajoute un code-barres (EAN d'un autre grossiste) à un produit : il pointe vers le même stock.
+app.post("/api/stock/code-ajouter", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const code = codeNet(b.code);
+  if (!/^\d{8,14}$/.test(code)) throw new AppError(400, "Scanne le code-barres (8 à 14 chiffres).");
+  const [p] = (await sql`SELECT * FROM stock_produits WHERE id = ${Number(b.id)}`) as any[];
+  if (!p) throw new AppError(404, "Produit introuvable.");
+  const autre = await produitParCode(code, p.magasin);
+  if (autre && autre.id !== p.id) throw new AppError(409, `Ce code est déjà sur « ${autre.nom} ». Utilise « Fusionner » si c'est le même produit.`);
+  if (autre) return c.json({ message: "Ce code est déjà sur ce produit." });
+  await sql`INSERT INTO stock_codes (produit_id, code, fournisseur) VALUES (${p.id}, ${code}, ${clean(b.fournisseur, 60)})`;
+  return c.json({ message: `Code ${code} ajouté à « ${p.nom} » : même stock (${p.qte}).` });
+});
+
+app.post("/api/stock/code-retirer", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  await sql`DELETE FROM stock_codes WHERE produit_id = ${Number(b.id)} AND code = ${codeNet(b.code)}`;
+  return c.json({ message: "Code retiré." });
+});
+
+// Fusionne deux fiches du même produit : quantités additionnées, codes regroupés, l'autre fiche disparaît du stock.
+app.post("/api/stock/fusionner", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const [k] = (await sql`SELECT * FROM stock_produits WHERE id = ${Number(b.id)}`) as any[];
+  if (!k) throw new AppError(404, "Produit introuvable.");
+  const t = clean(b.autre, 80);
+  if (!t) throw new AppError(400, "Scanne le code ou tape le nom de l'autre fiche.");
+  let a = await produitParCode(t.replace(/\s+/g, ""), k.magasin);
+  if (a && a.archive_le) a = undefined;
+  if (!a) {
+    const like = "%" + t.replace(/[%_\\]/g, "") + "%";
+    const l = (await sql`SELECT * FROM stock_produits WHERE magasin = ${k.magasin} AND archive_le IS NULL AND id <> ${k.id} AND nom ILIKE ${like} LIMIT 5`) as any[];
+    if (l.length > 1) throw new AppError(400, "Plusieurs produits correspondent : " + l.map((x) => x.nom).join(" / ") + ". Scanne plutôt son code.");
+    a = l[0];
+  }
+  if (!a) throw new AppError(404, "Aucune autre fiche trouvée.");
+  if (a.id === k.id) throw new AppError(400, "C'est déjà la même fiche.");
+  const codes = [a.code, ...((await sql`SELECT code FROM stock_codes WHERE produit_id = ${a.id}`) as any[]).map((x) => x.code)];
+  await sql`DELETE FROM stock_codes WHERE produit_id = ${a.id}`;
+  await sql`UPDATE stock_produits SET code = ${"FUS" + a.id + "-" + a.code}, archive_le = now(), qte = 0, maj_le = now() WHERE id = ${a.id}`;
+  for (const code of codes) if (code !== k.code && /^\d{8,14}$/.test(code)) await sql`INSERT INTO stock_codes (produit_id, code) VALUES (${k.id}, ${code}) ON CONFLICT DO NOTHING`;
+  await sql`UPDATE stock_produits SET qte = qte + ${a.qte}, achat_ht_cents = COALESCE(achat_ht_cents, ${a.achat_ht_cents}), emplacement = CASE WHEN emplacement = '' THEN ${a.emplacement} ELSE emplacement END, stock_min = GREATEST(stock_min, ${a.stock_min}), maj_le = now() WHERE id = ${k.id}`;
+  if (a.qte) {
+    await sql`INSERT INTO stock_mouvements (produit_id, delta, motif) VALUES (${a.id}, ${-a.qte}, ${"Fusionné dans " + k.nom})`;
+    await sql`INSERT INTO stock_mouvements (produit_id, delta, motif) VALUES (${k.id}, ${a.qte}, ${"Fusion avec " + a.nom})`;
+  }
+  return c.json({ message: `« ${a.nom} » fusionné dans « ${k.nom} » : ${k.qte + a.qte} en stock, ${codes.length} code(s) reconnu(s).` });
 });
 
 // Produits sous leur stock minimum, avec la quantité à recommander (en tenant compte de ce qui est déjà au panier ou commandé).
