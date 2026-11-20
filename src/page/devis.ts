@@ -54,5 +54,4 @@ ACTS.dvPrint=function(){
     +"<hr><div class='rc rm'>Devis valable 30 jours. Document non contractuel tant qu'il n'est pas validé par le client.</div><div class='rc rm' style='margin-top:6px'>Merci de votre confiance !</div>";
   impImprimer(h,"recu",pecCss())};
 var TICKENT="";
-api("/reglages/ticket").then(function(d){TICKENT=d.entete||""}).catch(function(){});
 `;

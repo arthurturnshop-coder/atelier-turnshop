@@ -51,8 +51,10 @@ async function loadAccueil(){
   try{CONS=await api("/consignes")}catch(e){CONS=CONS||{}}
   try{CHIF=await api("/chiffres")}catch(e){CHIF=CHIF||null}
   if(TAB==="accueil"&&!CUR&&!EDITCONS&&!NEWCLI)render()}
-function newCliForm(){
-  return"<div class='card'><b>Nouveau client</b><input id='pn' placeholder='Prénom'><input id='nm' placeholder='Nom'><input id='tel' placeholder='Téléphone'><input id='em' placeholder='Email'>"
+var NEWPRE="";
+function newPre(){var q=NEWPRE.trim(),r={pn:"",nm:"",tel:"",em:""};if(!q)return r;if(q.indexOf("@")>0)r.em=q;else if(/^[0-9 .+]{6,}$/.test(q))r.tel=q;else{var m=q.split(" ").filter(function(x){return x});if(m.length>1){r.pn=m[0];r.nm=m.slice(1).join(" ")}else r.nm=q}return r}
+function newCliForm(){var pre=newPre();
+  return"<div class='card'><b>Nouveau client</b><input id='pn' placeholder='Prénom' value='"+esc(pre.pn)+"'><input id='nm' placeholder='Nom' value='"+esc(pre.nm)+"'><input id='tel' placeholder='Téléphone' value='"+esc(pre.tel)+"'><input id='em' placeholder='Email' value='"+esc(pre.em)+"'>"
     +"<button data-act='addC'>Créer le client</button><button class='sec' data-act='cancelNew'>Annuler</button><div class='muted'>La création dans Shopify est éteinte pour l'instant.</div></div>"}
 function vAccueil(){
   if(CUR){vProfil();return}
@@ -60,7 +62,8 @@ function vAccueil(){
   var h="<div class='dash'><div class='dleft'><div class='dtop'><div class='dtl'>"+(RACC?"<div class='card avbox'><b>"+RL[RACC]+"</b><div class='muted'>Cherche le client ci-dessous (ou crée-le), puis « Créer une prise en charge ».</div><button class='link' data-act='raccFin'>Annuler</button></div>":"")+"<div class='search'><input id='q' placeholder='Rechercher un client' autofocus><button data-act='search'>Rechercher</button></div>";
   if(NEWCLI)h+=newCliForm();
   else h+="<div class='newbtn'><button class='sec' data-act='showNew'>+ Nouveau client</button></div>";
-  if(SEARCHED&&!RES.length)h+="<div class='card'>Aucun client trouvé. Utilise « + Nouveau client ».</div>";
+  if(SEARCHED&&!RES.length)h+="<div class='card'>Aucun client trouvé.</div>";
+  if(SEARCHED&&!NEWCLI)h+="<div class='actions'><button data-act='showNewPre' data-q='"+esc(v("q"))+"'>+ Créer un client « "+esc(v("q"))+" »</button></div>";
   RES.forEach(function(c,i){
     var enCours=0;c.trottinettes.forEach(function(t){enCours+=t.reparations.filter(function(r){return r.statut!=="récupéré"}).length});
     h+="<div class='card'><b>"+esc(c.name||"Sans nom")+"</b>"+(enCours?" <span class='tag'>"+enCours+" en cours</span>":"")

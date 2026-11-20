@@ -32,9 +32,21 @@ export async function fiche(id: number) {
 app.get("/api/search", async (c) => {
   const q = clean(c.req.query("q"), 100);
   if (!q) return c.json([]);
-  const like = `%${q}%`;
-  const rows = await sql`SELECT id FROM clients WHERE prenom ILIKE ${like} OR nom ILIKE ${like} OR email ILIKE ${like} OR telephone ILIKE ${like} ORDER BY nom LIMIT 8`;
-  return c.json(await Promise.all(rows.map((r: any) => fiche(r.id))));
+  // Chaque mot doit se retrouver dans le prénom, le nom, l'email ou le téléphone (chiffres seuls pour le téléphone).
+  const mots = q.toLowerCase().split(/\s+/).filter(Boolean).slice(0, 5);
+  const pool = (await sql`SELECT id, lower(prenom) AS p, lower(nom) AS n, lower(email) AS e, regexp_replace(telephone, '\\D', '', 'g') AS t FROM clients ORDER BY nom LIMIT 5000`) as any[];
+  const sc = (r: any) => {
+    let s = 0;
+    for (const m of mots) {
+      const d = m.replace(/\D/g, "");
+      const ok = r.p.includes(m) || r.n.includes(m) || r.e.includes(m) || (d.length >= 3 && d === m && r.t.includes(d));
+      if (!ok) return -1;
+      s += r.n.startsWith(m) || r.p.startsWith(m) ? 3 : (r.n === m || r.p === m ? 5 : 1);
+    }
+    return s;
+  };
+  const ids = pool.map((r) => ({ id: r.id, s: sc(r) })).filter((x) => x.s >= 0).sort((a, b) => b.s - a.s).slice(0, 5);
+  return c.json(await Promise.all(ids.map((r) => fiche(r.id))));
 });
 
 // Nom d'emplacement affiché : Amiens, Rouen, Fournisseur ou le nom Shopify tel quel.

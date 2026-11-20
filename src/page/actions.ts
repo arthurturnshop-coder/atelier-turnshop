@@ -10,7 +10,7 @@ export const ACTIONS = `var ACTS={
   open:function(b){CUR=RES[+b.dataset.i];RES=[];SEARCHED=false;ADDT=false;RECEP=null;EDITCLI=false;FID=null;FICHE=null;TAB="accueil";render()},
   priseEnCharge:function(b){var c=RES[+b.dataset.i];CUR=c;RES=[];SEARCHED=false;TAB="accueil";ADDT=false;RECEP=null;EDITCLI=false;FID=null;FICHE=null;if(!c.trottinettes.length)ADDT=true;render()},
   back:function(){CUR=null;ADDT=false;RECEP=null;EDITCLI=false;FID=null;CONS=null;CHIF=null;render()},
-  showNew:function(){NEWCLI=true;render()},cancelNew:function(){NEWCLI=false;render()},
+  showNew:function(){NEWPRE="";NEWCLI=true;render()},showNewPre:function(b){NEWPRE=b.dataset.q||"";NEWCLI=true;CUR=null;TAB="accueil";render()},cancelNew:function(){NEWCLI=false;render()},
   editCons:function(){EDITCONS=true;render()},cancelCons:function(){EDITCONS=false;render()},
   saveCons:async function(){var body={};Object.keys(CLAB).forEach(function(k){body[k]=v("c-"+k)});try{var d=await api("/consignes",body);CONS=null;EDITCONS=false;alert(d.message);render()}catch(e){alert(e.message)}},
   addC:async function(){try{var d=await api("/clients",{prenom:v("pn"),nom:v("nm"),telephone:v("tel"),email:v("em")});alert(d.message);NEWCLI=false;CUR=await api("/customer?id="+d.id);EDITCLI=false;FID=null;ADDT=true;TAB="accueil";render()}catch(e){alert(e.message)}},
