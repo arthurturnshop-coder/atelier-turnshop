@@ -62,7 +62,7 @@ function pecHtml(f){
     +"<div style='margin-top:8px'>"+code128Svg(pcn(f.id),12)+"</div><div class='rc rm'>"+pcn(f.id)+"</div>"
     +"<div class='rc rm'>Merci de votre confiance !</div>";
   return h}
-function pecCss(){return"@page{size:80mm auto;margin:0}@media print{body *{visibility:hidden}#impzone,#impzone *{visibility:visible}#impzone{position:absolute;left:0;top:0;width:74mm;font-size:12px;padding:0}}"}
+function pecCss(){return"@page{size:80mm auto;margin:0}@media print{body>*:not(#impzone){display:none!important}#impzone{position:static;width:80mm;box-sizing:border-box;font-size:12px;padding:0 3mm;margin:0}}"}
 async function imprimerPEC(id){
   try{var f=await api("/reparation?id="+id);impImprimer(pecHtml(f),"recu",pecCss())}catch(e){alert(e.message)}}
 ACTS.pecPrint=function(b){imprimerPEC(+b.dataset.id)};
@@ -212,8 +212,8 @@ function etqLabel(it,F){
     +"</div></div>"}
 function etqToutes(){var out=[];ETQ.forEach(function(it){for(var i=0;i<(it.qte||1);i++)out.push(it)});return out}
 function etqCss(F){
-  if(F.page)return"@page{size:A4;margin:0}@media print{body *{visibility:hidden}#impzone,#impzone *{visibility:visible}#impzone{position:absolute;left:0;top:0;width:210mm}.etqgrid{display:grid;grid-template-columns:repeat("+F.cols+","+F.w+"mm);grid-auto-rows:"+F.h+"mm;margin-left:0;margin-top:5mm}.etqempty{width:"+F.w+"mm;height:"+F.h+"mm}}";
-  return"@page{size:"+F.w+"mm "+F.h+"mm;margin:0}@media print{body *{visibility:hidden}#impzone,#impzone *{visibility:visible}#impzone{position:absolute;left:0;top:0;width:"+F.w+"mm}.etq{break-after:page;page-break-after:always}.etq:last-child{break-after:auto;page-break-after:auto}}"}
+  if(F.page)return"@page{size:A4;margin:0}@media print{body>*:not(#impzone){display:none!important}#impzone{position:absolute;left:0;top:0;width:210mm}.etqgrid{display:grid;grid-template-columns:repeat("+F.cols+","+F.w+"mm);grid-auto-rows:"+F.h+"mm;margin-left:0;margin-top:5mm}.etqempty{width:"+F.w+"mm;height:"+F.h+"mm}}";
+  return"@page{size:"+F.w+"mm "+F.h+"mm;margin:0}@media print{body>*:not(#impzone){display:none!important}#impzone{position:absolute;left:0;top:0;width:"+F.w+"mm}.etq{break-after:page;page-break-after:always}.etq:last-child{break-after:auto;page-break-after:auto}}"}
 function etqImprimer(){
   var F=ETQFORMATS[etqFormat()],L=etqToutes();
   if(!L.length){alert("Ajoute au moins un produit.");return}
