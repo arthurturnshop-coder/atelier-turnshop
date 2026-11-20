@@ -1,5 +1,6 @@
 export const PLANNING = `// ---------- Planning : vue semaine (ou jour), 8 h - 19 h, créneaux de 15 min ----------
 var PH0=480,PSLOT=22,PNSLOT=44,PVIEW="semaine",PTECH="",PDEF=60;
+var PFILT="tout";
 var PCOLS=["#2f6fd0","#1d8a3a","#e07b00","#7b3fc4","#0f8b8d","#c2185b"];
 var PDURS=[[15,"15 min"],[30,"30 min"],[45,"45 min"],[60,"1 h"],[90,"1 h 30"],[120,"2 h"],[180,"3 h"]];
 function p2(n){return(n<10?"0":"")+n}
@@ -74,12 +75,16 @@ function renderPlan(){
   var side="";
   var nl=P.nonPlanifiees||[];
   var er=P.enRetard||[];
-  if(er.length){side+="<div class='card pside late'><b>En retard ("+er.length+")</b><div class='muted'>Planifiées dont le créneau est passé, pas encore prêtes. Touche pour replanifier.</div>";
-    er.forEach(function(r){side+="<div class='pcard ucard late"+(PSEL===r.id?" sel":"")+"' data-id='"+r.id+"' data-pl='0'><b>"+esc(r.client)+"</b><div>"+esc(r.trottinette)+"</div><div class='muted'>"+esc(r.statut)+" · prévue le "+esc(jourNum(jourParis(r.debut),{day:"numeric",month:"short"}))+" "+esc(hm(minParis(r.debut)))+"</div></div>"});
-    side+="</div>"}
-  side+="<div class='card pside'><b>Non planifiées ("+nl.length+")</b><div class='muted'>Glisse une carte sur le planning, ou touche-la pour choisir technicien, jour et heure.</div>";
-  if(!nl.length)side+="<div class='muted' style='margin-top:8px'>Aucune réparation à planifier.</div>";
-  nl.forEach(function(r){side+="<div class='pcard ucard"+(r.enMagasin===false?" abs":"")+(PSEL===r.id?" sel":"")+"' data-id='"+r.id+"' data-pl='0'><b>"+esc(r.client)+"</b><div>"+esc(r.trottinette)+"</div><div class='muted'>"+esc(r.statut)+" · "+esc(r.panne)+(r.enMagasin===false?" · pas en magasin":"")+"</div></div>"});
+  var ft=PFILT;
+  var item=function(r,late){return"<div class='pcard ucard"+(late?" late":(r.enMagasin===false?" abs":""))+(PSEL===r.id?" sel":"")+"' data-id='"+r.id+"' data-pl='0'><b>"+esc(r.client)+"</b><div>"+esc(r.trottinette)+"</div><div class='muted'>"+esc(r.statut)+" · "+(late?"<b style='color:#d00'>En retard</b> · prévue le "+esc(jourNum(jourParis(r.debut),{day:"numeric",month:"short"}))+" "+esc(hm(minParis(r.debut))):esc(r.panne)+(r.enMagasin===false?" · pas en magasin":""))+"</div></div>"};
+  side+="<div class='card pside"+(er.length?" late":"")+"'><div class='prow' style='margin-bottom:6px'>"
+    +"<button class='"+(ft==="tout"?"":"sec")+"' data-act='pFilt' data-f='tout'>Tout ("+(er.length+nl.length)+")</button>"
+    +"<button class='"+(ft==="np"?"":"sec")+"' data-act='pFilt' data-f='np'>Non planifiées ("+nl.length+")</button>"
+    +"<button class='"+(ft==="late"?"":"sec")+"' data-act='pFilt' data-f='late'>En retard ("+er.length+")</button></div>"
+    +"<div class='muted'>Glisse une carte sur le planning, ou touche-la pour choisir technicien, jour et heure.</div>";
+  var vis=(ft!=="np"?er.map(function(r){return item(r,true)}):[]).concat(ft!=="late"?nl.map(function(r){return item(r,false)}):[]);
+  if(!vis.length)side+="<div class='muted' style='margin-top:8px'>Rien à afficher.</div>";
+  side+=vis.join("");
   side+="</div>";
   var main="";
   if(PPEND){
@@ -120,6 +125,7 @@ ACTS.dvCopier=function(b){var u=b.dataset.url;if(navigator.clipboard)navigator.c
 ACTS.subEnc=function(b){ATSUB=b.dataset.sub;FICHE=null;PSEL=null;PPEND=null;PMSG="";render()};
 ACTS.pDay=function(b){PJOUR=decaleJour(PJOUR,(+b.dataset.d)*(PVIEW==="semaine"?7:1));PSEL=null;PPEND=null;loadPlan()};
 ACTS.pToday=function(){PJOUR=aujourdhui();PSEL=null;PPEND=null;loadPlan()};
+ACTS.pFilt=function(b){PFILT=b.dataset.f;renderPlan()};
 ACTS.pView=function(b){PVIEW=b.dataset.v;PSEL=null;PPEND=null;loadPlan()};
 ACTS.pPickTech=function(b){if(!PPEND)return;var p=PPEND;enregistrer(p.id,b.dataset.t,isoParis(p.jour,p.min),p.dur,"Planifiée pour "+b.dataset.t+".")};
 ACTS.pCancelPend=function(){PPEND=null;renderPlan()};
