@@ -77,11 +77,9 @@ function renderPlan(){
   var er=P.enRetard||[];
   var ft=PFILT;
   var item=function(r,late){return"<div class='pcard ucard"+(late?" late":(r.enMagasin===false?" abs":""))+(PSEL===r.id?" sel":"")+"' data-id='"+r.id+"' data-pl='0'><b>"+esc(r.client)+"</b><div>"+esc(r.trottinette)+"</div><div class='muted'>"+esc(r.statut)+" · "+(late?"<b style='color:#d00'>En retard</b> · prévue le "+esc(jourNum(jourParis(r.debut),{day:"numeric",month:"short"}))+" "+esc(hm(minParis(r.debut))):esc(r.panne)+(r.enMagasin===false?" · pas en magasin":""))+"</div></div>"};
-  side+="<div class='card pside"+(er.length?" late":"")+"'><div class='prow' style='margin-bottom:6px'>"
-    +"<button class='"+(ft==="tout"?"":"sec")+"' data-act='pFilt' data-f='tout'>Tout ("+(er.length+nl.length)+")</button>"
-    +"<button class='"+(ft==="np"?"":"sec")+"' data-act='pFilt' data-f='np'>Non planifiées ("+nl.length+")</button>"
-    +"<button class='"+(ft==="late"?"":"sec")+"' data-act='pFilt' data-f='late'>En retard ("+er.length+")</button></div>"
-    +"<div class='muted'>Glisse une carte sur le planning, ou touche-la pour choisir technicien, jour et heure.</div>";
+  var fb=function(k,ic,n,tt){return"<button class='pf"+(ft===k?" on":"")+"' data-act='pFilt' data-f='"+k+"' title='"+tt+"'>"+ic+" <b>"+n+"</b></button>"};
+  side+="<div class='card pside"+(er.length?" late":"")+"'><div class='pfrow'>"+fb("tout","&#9776;",er.length+nl.length,"Tout")+fb("np","&#128197;",nl.length,"Non planifiées")+fb("late","&#9888;&#65039;",er.length,"En retard")+"</div>"
+    +"<div class='muted' style='font-size:12px'>Glisse une carte sur le planning ou touche-la pour la planifier.</div>";
   var vis=(ft!=="np"?er.map(function(r){return item(r,true)}):[]).concat(ft!=="late"?nl.map(function(r){return item(r,false)}):[]);
   if(!vis.length)side+="<div class='muted' style='margin-top:8px'>Rien à afficher.</div>";
   side+=vis.join("");
