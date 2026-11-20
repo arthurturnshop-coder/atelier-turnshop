@@ -12,7 +12,7 @@ function vEnc(){
   if(FICHE){vFiche();return}
   app.innerHTML=subHtml()+"<div id='vues' class='vues'></div><div id='liste'>Chargement…</div>";
   loadEnc()}
-var VUES=[["rdv","Rendez-vous"],["afaire","À faire"],["commande","En commande"],["pretes","Prêtes"],["garantie","Sous garantie"],["tout","Tout"]];
+var VUES=[["tout","Tout"],["rdv","Rendez-vous"],["afaire","À faire"],["commande","En commande"],["pretes","Prêtes"],["garantie","Sous garantie"]];
 function vuesHtml(cpt){
   return VUES.map(function(x){return"<button class='"+(VUE===x[0]?"on":"")+"' data-act='vue' data-vue='"+x[0]+"'>"+x[1]+"<b>"+(cpt?cpt[x[0]=="rdv"?"rdv":x[0]]:0)+"</b></button>"}).join("")}
 async function loadEnc(){
