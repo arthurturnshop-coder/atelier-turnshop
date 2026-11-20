@@ -1,5 +1,5 @@
 export const DEVIS = `// ---------- Devis simples (sans prise en charge) ----------
-var DV={list:null,ed:null,res:null,msg:""};
+var DV={list:null,ed:null,res:null,msg:"",hint:""};
 function dvNum(id){return"DV-"+("0000"+id).slice(-4)}
 function dvVide(){return{id:0,clientId:0,nom:"",telephone:"",email:"",trottinette:"",objet:"",reparationId:null,lignes:[{libelle:"",quantite:1,prixCents:0}]}}
 function dvTotal(l){return l.reduce(function(t,x){return t+(x.quantite||1)*(x.prixCents||0)},0)}
@@ -17,7 +17,7 @@ function vDevisEd(){
   if(DV.res)h+=DV.res.length?DV.res.map(function(c,i){return"<button class='sec hrow' data-act='dvChoisir' data-i='"+i+"'><b>"+esc(c.name)+"</b> <span class='muted'>"+esc(c.telephone||"")+" "+esc(c.email||"")+"</span></button>"}).join(""):"<div class='muted'>Aucun client trouvé.</div>";
   h+="<div class='dl'><input id='dn' placeholder='Nom du client' value='"+esc(d.nom)+"'><input id='dt' placeholder='Téléphone' value='"+esc(d.telephone)+"'><input id='de' placeholder='Email' value='"+esc(d.email)+"'></div>"
     +"<div class='dl'><input id='dtr' placeholder='Trottinette (ex : Xiaomi M365)' value='"+esc(d.trottinette)+"'><input id='dob' placeholder='Objet du devis' value='"+esc(d.objet)+"'></div>"
-    +"<div class='step' style='margin-top:10px'>Lignes (prix TTC)</div>";
+    +"<div class='step' style='margin-top:10px'>Lignes (prix TTC)</div><div class='muted'>Une pièce du catalogue turnshop.fr ? Cherche-la ou scanne-la ici :</div>"+prodBox("dvs")+(DV.hint?"<div class='pmsg'>"+esc(DV.hint)+"</div>":"");
   d.lignes.forEach(function(l,i){h+="<div class='dl'><input id='dl"+i+"' class='lb' placeholder='Pièce ou main d oeuvre' value='"+esc(l.libelle)+"'><input id='dq"+i+"' class='q' type='number' min='1' value='"+(l.quantite||1)+"'><input id='dp"+i+"' class='p' placeholder='Prix €' value='"+(l.prixCents?(l.prixCents/100).toFixed(2).replace(".",","):"")+"'><button class='link' data-act='dvDelL' data-i='"+i+"'>Suppr.</button></div>"});
   h+="<div class='actions'><button class='sec' data-act='dvAddL'>+ Ligne</button></div><div style='font-size:20px;margin:8px 0'><b>Total TTC : "+eur(dvTotal(d.lignes))+"</b></div>"
     +"<div class='actions'>"+(rat?"":"<button data-act='dvSave'>Enregistrer</button>")+(d.id?"<button class='sec' data-act='dvPrint'>Imprimer</button>":"")
@@ -29,9 +29,14 @@ function dvLire(){
   d.nom=v("dn");d.telephone=v("dt");d.email=v("de");d.trottinette=v("dtr");d.objet=v("dob");
   d.lignes=d.lignes.map(function(l,i){var p=Number(String(v("dp"+i)).replace(",","."))||0;return{libelle:v("dl"+i),quantite:Math.max(1,Number(v("dq"+i))||1),prixCents:Math.round(p*100)}})}
 function dvPayload(){var d=DV.ed;return{id:d.id,clientId:d.clientId,nom:d.nom,telephone:d.telephone,email:d.email,trottinette:d.trottinette,objet:d.objet,lignes:d.lignes.map(function(l){return{libelle:l.libelle,quantite:l.quantite,prix:(l.prixCents/100).toFixed(2)}})}}
-ACTS.dvNouveau=function(){DV.ed=dvVide();DV.res=null;DV.msg="";FICHE=null;TAB="enc";ATSUB="devis";render()};
-ACTS.dvOuvre=function(b){var d=DV.list[+b.dataset.i];DV.ed=JSON.parse(JSON.stringify(d));if(!DV.ed.lignes.length)DV.ed.lignes=dvVide().lignes;DV.res=null;DV.msg="";render()};
+ACTS.dvNouveau=function(){DV.hint="";DV.ed=dvVide();DV.res=null;DV.msg="";FICHE=null;TAB="enc";ATSUB="devis";render()};
+ACTS.dvOuvre=function(b){DV.hint="";var d=DV.list[+b.dataset.i];DV.ed=JSON.parse(JSON.stringify(d));if(!DV.ed.lignes.length)DV.ed.lignes=dvVide().lignes;DV.res=null;DV.msg="";render()};
 ACTS.dvRetour=function(){DV.ed=null;DV.list=null;DV.msg="";render()};
+async function dvAjoutProduit(p){
+  dvLire();var r=await api("/maitres/resoudre",{libelle:p.libelle,prix:String(p.prix).replace(".",","),variantId:p.variantId,sku:p.sku,barcode:p.barcode});
+  var ls=DV.ed.lignes,vide=ls.length&&!ls[ls.length-1].libelle&&!ls[ls.length-1].prixCents;
+  var nl={libelle:r.libelle,quantite:1,prixCents:r.prixCents};if(vide)ls[ls.length-1]=nl;else ls.push(nl);
+  DV.hint=r.maitre?"Produit maître mis sur le devis : "+r.maitre.nom+" (produit choisi : "+r.maitre.origine+")":"";render()}
 ACTS.dvAddL=function(){dvLire();DV.ed.lignes.push({libelle:"",quantite:1,prixCents:0});render()};
 ACTS.dvDelL=function(b){dvLire();DV.ed.lignes.splice(+b.dataset.i,1);if(!DV.ed.lignes.length)DV.ed.lignes=dvVide().lignes;render()};
 ACTS.dvChercher=function(){var q=v("dq");if(!q)return;dvLire();api("/search?q="+encodeURIComponent(q)).then(function(r){DV.res=r;render()}).catch(function(e){alert(e.message)})};

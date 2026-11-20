@@ -111,7 +111,9 @@ function caisseHtml(){
   return h}
 async function ajouterProduit(p,ctx){
   if(ctx==="etq"){ETQ.push({titre:p.libelle,prix:String(p.prix),barcode:p.barcode||"",sku:p.sku||"",qte:1});render();return}
-  if(ctx==="devis"){if(!FICHE)return;DEVHINT="";await api("/devis/ligne",{repairId:FICHE.id,type:"piece",libelle:p.libelle,quantite:1,prix:String(p.prix).replace(".",","),variantId:p.variantId,sku:p.sku,barcode:p.barcode,marque:p.marque});await recharger(FICHE.id);return}
+  if(ctx.indexOf("mait")===0){await maitLier(ctx,p);return}
+  if(ctx==="dvs"){await dvAjoutProduit(p);return}
+  if(ctx==="devis"){if(!FICHE)return;DEVHINT="";var rd=await api("/devis/ligne",{repairId:FICHE.id,type:"piece",libelle:p.libelle,quantite:1,prix:String(p.prix).replace(".",","),variantId:p.variantId,sku:p.sku,barcode:p.barcode,marque:p.marque});if(rd.maitre)DEVHINT="Produit maître mis sur le devis : "+rd.maitre.nom+" (produit choisi : "+rd.maitre.origine+")";await recharger(FICHE.id);return}
   if(ctx.indexOf("cmd")===0){var d=await api("/achats/ligne",{fournisseurId:+ctx.slice(3),libelle:p.libelle,sku:p.sku,barcode:p.barcode,variantId:p.variantId,quantite:1});CMDMSG=d.message;CMD=null;render();return}
   lirePay();CUR=null;FICHE=null;TAB="accueil";CREC=null;
   var ex=PAN.filter(function(l){return l.variantId&&l.variantId===p.variantId})[0];
