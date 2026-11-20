@@ -18,13 +18,14 @@ function trecLoad(){if(TREC===null&&!TRECBUSY){TRECBUSY=true;api("/taches/recurr
 function jourCourt(d){return d?d.slice(8,10)+"/"+d.slice(5,7):""}
 function blocTaches(){
   tacheLoad();
-  var rec=TTAB==="rec",l=(TACH||[]).filter(function(t){return rec?t.recurrente:!t.recurrente}),auj=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
-  var h="<div class='card taches'><div class='ttabs'><button class='"+(rec?"sec":"")+"' data-act='tTab' data-v='ponct'>À faire</button><button class='"+(rec?"":"sec")+"' data-act='tTab' data-v='rec'>Récurrentes</button></div>";
-  if(!rec){
+  var rec=TTAB==="rec",pec=TTAB==="pec",l=(TACH||[]).filter(function(t){return rec?t.recurrente:pec?(!t.recurrente&&t.reparationId):(!t.recurrente&&!t.reparationId)}),nPec=(TACH||[]).filter(function(t){return !t.recurrente&&t.reparationId&&!t.fait}).length,auj=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
+  var h="<div class='card taches'><div class='ttabs'><button class='"+(rec||pec?"sec":"")+"' data-act='tTab' data-v='ponct'>À faire</button><button class='"+(pec?"":"sec")+"' data-act='tTab' data-v='pec'>Prise en charge"+(nPec?" ("+nPec+")":"")+"</button><button class='"+(rec?"":"sec")+"' data-act='tTab' data-v='rec'>Récurrentes</button></div>";
+  if(pec)h+="<div class='muted' style='margin-top:8px'>Tout ce qui concerne l'atelier : rendez-vous à confirmer, relances de devis, garanties, pièces à rappeler.</div>";
+  else if(!rec){
     h+="<div class='dl' style='margin-top:8px'><input id='tt-txt' class='lb' placeholder='Nouvelle tâche (ex : commander pneus Kukirin)'><input id='tt-date' type='date' class='p'><button data-act='tAdd'>Ajouter</button></div>"
       +"<div class='muted' style='display:flex;gap:16px'><label><input type='checkbox' id='tt-prio' style='width:auto;margin:0'> Priorité</label><label><input type='checkbox' id='tt-pin' style='width:auto;margin:0'> Épingler en haut</label></div>"}
   else h+="<div class='muted' style='margin-top:8px'>Tâches qui reviennent toutes seules. Elles se modifient uniquement dans ⚙ Paramètres.</div>";
-  if(!l.length)h+="<div class='muted' style='margin-top:8px'>"+(rec?"Aucune tâche récurrente à faire pour l'instant.":"Rien à faire. Les papiers volants peuvent partir.")+"</div>";
+  if(!l.length)h+="<div class='muted' style='margin-top:8px'>"+(rec?"Aucune tâche récurrente à faire pour l'instant.":pec?"Rien à traiter côté atelier.":"Rien à faire. Les papiers volants peuvent partir.")+"</div>";
   l.forEach(function(t){
     var late=!t.fait&&t.echeance&&t.echeance<auj;
     h+="<div class='tache"+(t.fait?" fait":"")+((t.priorite||t.epingle)&&!t.fait?" top":"")+"'>"

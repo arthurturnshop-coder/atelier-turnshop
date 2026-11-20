@@ -1,4 +1,4 @@
-export const SHELL = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Atelier TURN</title>
+export const SHELL = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>FS by TURN Shop</title>
 <style>
 *{box-sizing:border-box}
 body{font-family:system-ui,sans-serif;margin:0;background:#f5f5f5;color:#111;font-size:17px}
@@ -142,14 +142,31 @@ button.link{background:none;color:#111;border:0;text-decoration:underline;min-he
 .avform{border-top:2px solid #ddd;margin-top:10px;padding-top:8px}
 /* ---- Design : carré, sobre, boutons à leur taille ---- */
 *{border-radius:0!important}
+:root{--vert:#1f8f4e;--vert2:#17713d}
+header{background:var(--vert)!important}
+button{background:var(--vert)}
+button.sec,header button,nav button{background:#fff}
+button.sec{color:var(--vert2);border:1px solid var(--vert)}
+button.link{background:none;color:var(--vert2)}
+button.danger{background:#fff;color:#b00020;border:1px solid #b00020}
+nav{border-bottom:1px solid var(--vert)}
+nav button{color:#111;border:0;border-bottom:4px solid transparent}
+nav button.on{background:#fff;color:var(--vert2);border-bottom-color:var(--vert)}
+a.btn{background:var(--vert)}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--vert)}
+.card .step{color:var(--vert2)}
+.tk{border-left-color:var(--vert)}
+.chk{border-color:var(--vert);color:var(--vert2)}
+.tache.top{border-left-color:var(--vert)}
+.pth.today{background:var(--vert)}
 body{background:#ececec;font-size:16px;letter-spacing:.005em}
-header{padding:10px 18px;border-bottom:3px solid #fff200}
+header{padding:10px 18px;border-bottom:3px solid #fff}
 header #who button{background:transparent;color:#fff;border:1px solid #fff}
 header .gear{font-size:20px;line-height:1;padding:6px 10px;background:transparent;color:#fff;border:1px solid #fff}
-header .gear.on{background:#fff200;color:#111;border-color:#fff200}
+header .gear.on{background:#fff;color:var(--vert2);border-color:#fff}
 nav{padding:0 12px;gap:0;background:#fff;border-bottom:1px solid #111}
 nav button{flex:0 0 auto;border:0;border-bottom:4px solid transparent;padding:14px 26px;font-size:15px;text-transform:uppercase;letter-spacing:.06em}
-nav button.on{background:#fff;color:#111;border-bottom-color:#111}
+
 input,select,textarea{border:1px solid #bbb;background:#fff;padding:11px}
 input:focus,select:focus,textarea:focus{outline:2px solid #111;outline-offset:0}
 button{width:auto;min-width:0;min-height:42px;padding:10px 20px;font-size:15px;font-weight:600;letter-spacing:.03em}
@@ -182,5 +199,5 @@ a.btn{display:inline-block;background:#111;color:#fff;text-decoration:none;paddi
 .presta{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:6px 0}.presta button{text-align:left}
 .tache{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid #e3e3e3}.tache.top{border-left:4px solid #111;padding-left:8px;background:#fafafa}.tache.fait .tx{text-decoration:line-through;color:#888}.tache .tx{flex:1}.tache .tbtn{white-space:nowrap}.chk{min-height:26px;width:26px;min-width:26px;padding:0;background:#fff;color:#111;border:2px solid #111;font-size:15px}.rec-ok{border-left:4px solid #1a7f37;padding:8px 12px;background:#f0faf2}.rec-ko{border-left:4px solid #b42318;padding:8px 12px;background:#fdf1f0}
 .ttabs{display:flex;gap:0}.ttabs button{min-height:36px}
-</style></head><body><header><span>Atelier TURN</span><div id="rech" class="rech" style="display:none"><input id="rq" type="search" placeholder="Chercher : n° PC, client, modèle, produit..." autocomplete="off"><div id="rpanel" class="rpanel" style="display:none"></div></div><span id="who"></span></header><nav id="nav"></nav><main id="app">Chargement…</main>
+</style></head><body><header><span>FS <small style='font-weight:400;font-size:14px;opacity:.9'>by TURN Shop</small></span><div id="rech" class="rech" style="display:none"><input id="rq" type="search" placeholder="Chercher : n° PC, client, modèle, produit..." autocomplete="off"><div id="rpanel" class="rpanel" style="display:none"></div></div><span id="who"></span></header><nav id="nav"></nav><main id="app">Chargement…</main>
 <script>`;
