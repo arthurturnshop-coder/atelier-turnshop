@@ -193,7 +193,7 @@ a.btn{display:inline-block;background:#111;color:#fff;text-decoration:none;paddi
 @page{size:80mm auto;margin:0}
 @media print{body>*:not(#impzone){display:none!important}#impzone{position:static;width:80mm;box-sizing:border-box;padding:0 3mm;margin:0;font-size:12px}#impzone .printme{max-width:none;border:0;margin:0;padding:0}}
 .qr svg{width:38mm;height:38mm;display:block;margin:6px auto}
-@media(min-width:1000px){.dtop{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;align-items:start}.dtop .cons{margin:0}}
+@media(min-width:1000px){.dtop{display:block}.dtop .cons{margin:10px 0}}
 @media(min-width:1000px){.dash{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}.dright{position:sticky;top:8px;max-height:calc(100vh - 16px);overflow-y:auto}}
 @media(min-width:800px){.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}.grid .card{margin:10px 0}}
 .presta{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:6px 0}.presta button{text-align:left}
