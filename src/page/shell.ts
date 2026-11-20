@@ -1,4 +1,4 @@
-export const SHELL = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>FS by TURN Shop</title>
+export const SHELL = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%231f8f4e'/%3E%3Cpath d='M37 6 14 36h15l-4 22 25-32H35z' fill='%23fff'/%3E%3C/svg%3E"><title>FS by TURN Shop</title>
 <style>
 *{box-sizing:border-box}
 body{font-family:system-ui,sans-serif;margin:0;background:#f5f5f5;color:#111;font-size:17px}
