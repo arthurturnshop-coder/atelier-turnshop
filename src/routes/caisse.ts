@@ -70,6 +70,27 @@ app.get("/api/caisse/scan", async (c) => {
 });
 
 // Un code scanné : code-barres / référence d'un produit Shopify, ou client (carte, QR, téléphone, email).
+// Case de rangement (A1, B12…) d'un produit Shopify : mémorisée ici, ou reprise du stock local si le produit y est.
+await sql`CREATE TABLE IF NOT EXISTS emplacements_produits (variant_id TEXT PRIMARY KEY, emplacement TEXT NOT NULL DEFAULT '', maj_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
+const caseDe = async (variantId: string, codes: string[]): Promise<string> => {
+  const [e] = (await sql`SELECT emplacement FROM emplacements_produits WHERE variant_id = ${variantId} AND emplacement <> ''`) as any[];
+  if (e) return e.emplacement;
+  const cs = codes.filter(Boolean);
+  if (!cs.length) return "";
+  const [l] = (await sql`SELECT emplacement FROM stock_produits WHERE code IN ${sql(cs)} AND archive_le IS NULL AND emplacement <> '' ORDER BY qte DESC LIMIT 1`) as any[];
+  return l?.emplacement ?? "";
+};
+app.post("/api/emplacement", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const variantId = clean(b.variantId, 80);
+  const lieu = clean(b.emplacement, 20).toUpperCase().replace(/\s+/g, "");
+  if (!variantId) throw new AppError(400, "Produit inconnu.");
+  await sql`INSERT INTO emplacements_produits (variant_id, emplacement) VALUES (${variantId}, ${lieu}) ON CONFLICT (variant_id) DO UPDATE SET emplacement = ${lieu}, maj_le = now()`;
+  const codes = [clean(b.barcode, 80), clean(b.sku, 80)].filter(Boolean);
+  if (codes.length) await sql`UPDATE stock_produits SET emplacement = ${lieu} WHERE code IN ${sql(codes)} AND archive_le IS NULL`;
+  return c.json({ emplacement: lieu });
+});
+
 app.get("/api/code", async (c) => {
   const q = clean(c.req.query("q"), 300).trim();
   if (!q) return c.json({});
@@ -85,7 +106,7 @@ app.get("/api/code", async (c) => {
         const v = (p.variants?.nodes ?? []).find((x: any) => (x.barcode ?? "").toLowerCase() === q.toLowerCase() || (x.sku ?? "").toLowerCase() === q.toLowerCase());
         if (v) {
           const vt = v.title && v.title !== "Default Title" ? ` - ${v.title}` : "";
-          return c.json({ produit: { libelle: `${p.title}${vt}`.slice(0, 200), prix: String(v.price ?? "0"), variantId: v.id, sku: v.sku ?? "", barcode: v.barcode ?? "", marque: p.vendor ?? "", stock: v.inventoryQuantity ?? null } });
+          return c.json({ produit: { libelle: `${p.title}${vt}`.slice(0, 200), prix: String(v.price ?? "0"), variantId: v.id, sku: v.sku ?? "", barcode: v.barcode ?? "", marque: p.vendor ?? "", stock: v.inventoryQuantity ?? null, emplacement: await caseDe(v.id, [v.barcode ?? "", v.sku ?? ""]) } });
         }
       }
     } catch (e: any) {
