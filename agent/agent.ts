@@ -9,7 +9,9 @@ import { writeFileSync, readFileSync } from "node:fs";
 import { PNG } from "pngjs";
 
 const PORT = Number(process.env.FS_PRINT_PORT || 9101);
-const VERSION = "2.0";
+const VERSION = "2.1";
+const LOGS: string[] = [];
+function log(m: string) { LOGS.push(new Date().toLocaleTimeString("fr-FR") + " " + m); if (LOGS.length > 60) LOGS.shift(); console.log(m); }
 const jobs = new Map<string, { page: string; proc?: ReturnType<typeof spawn>; timer?: any; data?: any }>();
 
 const CHEMINS = [
@@ -190,12 +192,14 @@ async function imprimer(id: string) {
     if (!existsSync(png)) throw new Error("capture impossible");
     let bin = escposDepuisPng(readFileSync(png));
     const bf = join(dir, "t.bin"); writeFileSync(bf, bin);
+    log("capture ok, octets=" + bin.length);
     if (process.env.FS_PRINT_DRY) return;
     const ps = join(dir, "p.ps1"); writeFileSync(ps, "\ufeff" + PS);
     const code = await run("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ps, "-Printer", process.env.FS_PRINT_PRINTER || "", "-File", bf], 30000);
+    log("powershell code " + code);
     if (code !== 0) throw new Error("envoi imprimante impossible (" + code + ")");
   } catch (e) {
-    console.log("Envoi direct impossible, impression Chrome : " + e);
+    log("ECHEC envoi direct, repli Chrome (page A4) : " + e);
     lancer(id);
     await new Promise((r) => setTimeout(r, 4000));
     return;
@@ -209,6 +213,7 @@ Bun.serve({
   async fetch(req) {
     const url = new URL(req.url);
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
+    if (url.pathname === "/log") return new Response(LOGS.join("\n") || "(vide)", { headers: { ...CORS, "content-type": "text/plain; charset=utf-8" } });
     if (url.pathname === "/ping") return json({ ok: true, version: VERSION, navigateur: !!navigateur() });
     if (url.pathname === "/print" && req.method === "POST") {
       let d: any;
