@@ -105,6 +105,9 @@ function vParam(){
     +"<label class='muted'>En-tête (une ligne par ligne : nom, adresse, SIRET...)</label><textarea id='tk-ent' rows='4'>"+esc(TICK.entete)+"</textarea>"
     +"<label class='muted'>Lien d'avis Google - Amiens</label><input id='tk-am' value='"+esc(TICK.avisAmiens)+"' placeholder='https://g.page/r/...'>"
     +"<label class='muted'>Lien d'avis Google - Rouen</label><input id='tk-ro' value='"+esc(TICK.avisRouen)+"' placeholder='https://g.page/r/...'>"
+    +"<label class='muted'>Devis : lien du QR « Prendre rendez-vous »</label><input id='tk-rdv' value='"+esc(TICK.rdvUrl||"")+"' placeholder='https://turnshop.fr/...'>"
+    +"<label class='muted'>Devis : coordonnées Amiens (adresse, téléphone...)</label><textarea id='tk-ca' rows='2'>"+esc(TICK.coordAmiens||"")+"</textarea>"
+    +"<label class='muted'>Devis : coordonnées Rouen (adresse, téléphone...)</label><textarea id='tk-cr' rows='2'>"+esc(TICK.coordRouen||"")+"</textarea>"
     +"<button data-act='tickSave'>Enregistrer le ticket</button><div class='muted'>"+esc(TICKMSG)+"</div></div>"}
   S.ticket=h;h="";
   cptLoad();

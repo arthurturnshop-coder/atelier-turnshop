@@ -88,12 +88,21 @@ async function imprimerPEC(id){
 ACTS.pecPrint=function(b){imprimerPEC(+b.dataset.id)};
 
 // ----- Devis / facture en ticket 80 mm -----
-function docTicketHtml(f,mode){
+var RDVI=null;
+async function rdvInfos(){if(!RDVI){try{RDVI=await api("/ticket/rdv")}catch(e){RDVI={}}}return RDVI}
+function devisCoord(r){
+  var c=(MAG==="Rouen"?r.coordRouen:r.coordAmiens)||"";if(!c)return"";
+  return"<div class='rc rm'>"+c.split(String.fromCharCode(10)).map(esc).join("<br>")+"</div>"}
+function devisQr(r){
+  if(!r.qrSvg)return"";
+  return"<hr><div class='rc'><b>Prendre rendez-vous</b><br>en scannant ce QR code</div><div class='qr'>"+r.qrSvg+"</div>"}
+function docTicketHtml(f,mode,r){
+  r=r||{};
   var nl=String.fromCharCode(10),fac=mode==="facture";
   var ent=(f.ticketEntete||"TURN SOCIETY").split(nl).map(function(x,i){return i===0?"<b>"+esc(x)+"</b>":esc(x)}).join("<br>");
   var d=f.devis||{lignes:[]},a=f.acompte||{},net=d.netCents==null?d.totalCents:d.netCents;
   var ttc=net,ht=Math.round(ttc/1.2),tva=ttc-ht,ver=a.verseCents||0;
-  var h="<div class='rc'>"+ent+(MAG?"<br>Boutique "+esc(MAG):"")+"</div><hr>"
+  var h="<div class='rc'>"+ent+(MAG?"<br>Boutique "+esc(MAG):"")+"</div>"+devisCoord(r)+"<hr>"
     +"<div class='rc'><b>"+(fac?"FACTURE":"DEVIS")+"</b></div>"
     +"<div class='rc' style='font-size:18px'><b>"+pcn(f.id)+"</b></div>"
     +"<div class='rl'><span>Date</span><span>"+new Date().toLocaleDateString("fr-FR")+"</span></div><hr>"
@@ -105,9 +114,10 @@ function docTicketHtml(f,mode){
     +"<div class='rl rm'><span>Total HT</span><span>"+eur(ht)+"</span></div><div class='rl rm'><span>TVA 20 %</span><span>"+eur(tva)+"</span></div>";
   if(ver>0)h+="<hr><div class='rl'><span>Acompte versé</span><span>-"+eur(ver)+"</span></div><div class='rl rt'><span>Reste à payer</span><span>"+eur(Math.max(0,ttc-ver))+"</span></div>";
   if(!fac)h+="<hr><div class='rc rm'>Devis valable 30 jours. Document non contractuel tant qu'il n'est pas validé par le client.</div>";
+  if(!fac)h+=devisQr(r);
   return h+"<div class='rc rm' style='margin-top:6px'>Merci de votre confiance !</div>"}
 async function imprimerDoc(id,mode){
-  try{var f=await api("/reparation?id="+id);impImprimer(docTicketHtml(f,mode),"recu",pecCss())}catch(e){alert(e.message)}}
+  try{var f=await api("/reparation?id="+id);var r=await rdvInfos();impImprimer(docTicketHtml(f,mode,r),"recu",pecCss())}catch(e){alert(e.message)}}
 function recuTexte(el){
   var nl=String.fromCharCode(10),out=[];
   for(var i=0;i<el.children.length;i++){var n=el.children[i];

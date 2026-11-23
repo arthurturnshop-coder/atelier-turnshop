@@ -56,15 +56,15 @@ ACTS.dvFact=async function(){
     CCLI=d?d.client:null;CFID=d?d.fidelite:null;CUSE=false;CAVOFF=[];CREC=null;CHOPEN=0;CREP=null;CACO=0;CPAY={carte:"",especes:"",virement:""};CMSG="";
     DV.ed=null;DV.list=null;FICHE=null;CUR=null;TAB="accueil";if(d)await chargeHisto();else render()}catch(e){alert(e.message)}};
 ACTS.dvVoirPC=function(){ouvrirFiche(DV.ed.reparationId)};
-ACTS.dvPrint=function(){
-  dvLire();var d=DV.ed,nl=String.fromCharCode(10),t=dvTotal(d.lignes),ht=Math.round(t/1.2),tva=t-ht;
+ACTS.dvPrint=async function(){
+  dvLire();var rv=await rdvInfos();var d=DV.ed,nl=String.fromCharCode(10),t=dvTotal(d.lignes),ht=Math.round(t/1.2),tva=t-ht;
   var ent=(TICKENT||"TURN SOCIETY").split(nl).map(function(x,i){return i===0?"<b>"+esc(x)+"</b>":esc(x)}).join("<br>");
-  var h="<div class='rc'>"+ent+(MAG?"<br>Boutique "+esc(MAG):"")+"</div><hr><div class='rc'><b>DEVIS</b></div><div class='rc' style='font-size:18px'><b>"+dvNum(d.id)+"</b></div>"
+  var h="<div class='rc'>"+ent+(MAG?"<br>Boutique "+esc(MAG):"")+"</div>"+devisCoord(rv)+"<hr><div class='rc'><b>DEVIS</b></div><div class='rc' style='font-size:18px'><b>"+dvNum(d.id)+"</b></div>"
     +"<div class='rl'><span>Date</span><span>"+new Date().toLocaleDateString("fr-FR")+"</span></div><hr>"
     +"<div class='rm'>Client</div><div><b>"+esc(d.nom)+"</b></div>"+(d.telephone?"<div>"+esc(d.telephone)+"</div>":"")+(d.trottinette?"<div class='rm' style='margin-top:4px'>Trottinette</div><div><b>"+esc(d.trottinette)+"</b></div>":"")+(d.objet?"<div class='rm' style='margin-top:4px'>Objet : "+esc(d.objet)+"</div>":"")+"<hr>";
   d.lignes.forEach(function(l){h+="<div class='rl'><span>"+l.quantite+" × "+esc(l.libelle)+"</span><span>"+eur(l.quantite*l.prixCents)+"</span></div>"});
   h+="<hr><div class='rl rt'><span>TOTAL TTC</span><span>"+eur(t)+"</span></div><div class='rl rm'><span>Total HT</span><span>"+eur(ht)+"</span></div><div class='rl rm'><span>TVA 20 %</span><span>"+eur(tva)+"</span></div>"
-    +"<hr><div class='rc rm'>Devis valable 30 jours. Document non contractuel tant qu'il n'est pas validé par le client.</div><div class='rc rm' style='margin-top:6px'>Merci de votre confiance !</div>";
+    +"<hr><div class='rc rm'>Devis valable 30 jours. Document non contractuel tant qu'il n'est pas validé par le client.</div>"+devisQr(rv)+"<div class='rc rm' style='margin-top:6px'>Merci de votre confiance !</div>";
   impImprimer(h,"recu",pecCss())};
 var TICKENT="";
 `;
