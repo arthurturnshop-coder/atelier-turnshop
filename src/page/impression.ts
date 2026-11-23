@@ -96,6 +96,11 @@ function devisCoord(r){
 function devisQr(r){
   if(!r.qrSvg)return"";
   return"<hr><div class='rc'><b>Prendre rendez-vous</b><br>en scannant ce QR code</div><div class='qr'>"+r.qrSvg+"</div>"}
+function factureQr(r){
+  var av=MAG==="Rouen"?r.avisQrRouen:r.avisQrAmiens,h="";
+  if(av)h+="<hr><div class='rc'><b>Laissez-nous un avis</b><br>et recevez une récompense !</div><div class='qr'>"+av+"</div>";
+  if(r.siteQrSvg)h+="<hr><div class='rc'><b>Notre site</b><br>Retrouvez votre carte de fidélité</div><div class='qr'>"+r.siteQrSvg+"</div>";
+  return h}
 function docTicketHtml(f,mode,r){
   r=r||{};
   var nl=String.fromCharCode(10),fac=mode==="facture";
@@ -114,7 +119,7 @@ function docTicketHtml(f,mode,r){
     +"<div class='rl rm'><span>Total HT</span><span>"+eur(ht)+"</span></div><div class='rl rm'><span>TVA 20 %</span><span>"+eur(tva)+"</span></div>";
   if(ver>0)h+="<hr><div class='rl'><span>Acompte versé</span><span>-"+eur(ver)+"</span></div><div class='rl rt'><span>Reste à payer</span><span>"+eur(Math.max(0,ttc-ver))+"</span></div>";
   if(!fac)h+="<hr><div class='rc rm'>Devis valable 30 jours. Document non contractuel tant qu'il n'est pas validé par le client.</div>";
-  if(!fac)h+=devisQr(r);
+  if(!fac)h+=devisQr(r);else h+=factureQr(r);
   return h+"<div class='rc rm' style='margin-top:6px'>Merci de votre confiance !</div>"}
 async function imprimerDoc(id,mode){
   try{var f=await api("/reparation?id="+id);var r=await rdvInfos();impImprimer(docTicketHtml(f,mode,r),"recu",pecCss())}catch(e){alert(e.message)}}
