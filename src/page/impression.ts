@@ -23,6 +23,12 @@ function code128Svg(text,hMm){
     if(bits.charAt(i)==="1"){run++}else if(run){p+="M"+(q+i-run)+" 0h"+run+"v10h-"+run+"z";run=0}}
   return"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 "+(bits.length+2*q)+" 10' preserveAspectRatio='none' style='width:100%;height:"+hMm+"mm;display:block'><path d='"+p+"' fill='#000'/></svg>"}
 
+function entSplit(txt){
+  var nl=String.fromCharCode(10),haut=[],bas=[];
+  (txt||"TURN SOCIETY").split(nl).forEach(function(x){if(/merci|bient[oô]t/i.test(x))bas.push(x);else if(x.trim())haut.push(x)});
+  if(!haut.length)haut=["TURN SOCIETY"];
+  return{haut:haut.map(function(x,i){return i===0?"<b>"+esc(x)+"</b>":esc(x)}).join("<br>"),bas:bas.map(esc).join(" ")}}
+function entBas(es,defaut){return"<div class='rc rm' style='margin-top:6px'>"+(es.bas||defaut)+"</div>"}
 var IMPSTYLE=null;
 function impStyle(css){
   if(!IMPSTYLE){IMPSTYLE=document.createElement("style");IMPSTYLE.id="impstyle";document.head.appendChild(IMPSTYLE)}
@@ -57,7 +63,7 @@ impStyle("");
 // ----- Ticket de prise en charge (80 mm, comme le ticket de caisse) -----
 function pecHtml(f){
   var nl=String.fromCharCode(10);
-  var ent=(f.ticketEntete||"TURN SOCIETY").split(nl).map(function(x,i){return i===0?"<b>"+esc(x)+"</b>":esc(x)}).join("<br>");
+  var es=entSplit(f.ticketEntete),ent=es.haut;
   var g=f.gardeInfo||{};
   var h="<div class='rc'>"+ent+(MAG?"<br>Boutique "+esc(MAG):"")+"</div><hr>"
     +"<div class='rc'><b>TICKET DE PRISE EN CHARGE</b></div>"
@@ -79,7 +85,7 @@ function pecHtml(f){
   h+="<hr><div class='rm'>Gardiennage : gratuit "+(g.franchiseJours||5)+" jours après l'appel ou le mail indiquant que la trottinette est prête, puis "+((g.prixCents||500)/100).toString().replace(".",",")+" € par jour. Sans récupération au bout de "+(g.abandonJour||30)+" jours, la trottinette est considérée comme abandonnée.</div>"
     +"<div style='margin-top:10px;border:1px solid #000;height:16mm;padding:2px'><span class='rm'>Signature du client</span></div>"
     +"<div style='margin-top:8px'>"+code128Svg(pcn(f.id),12)+"</div><div class='rc rm'>"+pcn(f.id)+"</div>"
-    +"<div class='rc rm'>Merci de votre confiance !</div>";
+    +entBas(es,"Merci de votre confiance !");
   return h}
 function pecCss(){return"@page{size:80mm auto;margin:0}@media print{body>*:not(#impzone){display:none!important}#impzone{position:static;width:80mm;box-sizing:border-box;font-size:12px;padding:0 3mm;margin:0}}"}
 async function imprimerPEC(id){
@@ -97,14 +103,14 @@ function devisQr(r){
   if(!r.qrSvg)return"";
   return"<hr><div class='rc'><b>Prendre rendez-vous</b><br>en scannant ce QR code</div><div class='qr'>"+r.qrSvg+"</div>"}
 function factureQr(r){
-  var av=MAG==="Rouen"?r.avisQrRouen:r.avisQrAmiens,h="";
-  if(av)h+="<hr><div class='rc'><b>Laissez-nous un avis</b><br>et recevez une récompense !</div><div class='qr'>"+av+"</div>";
-  if(r.siteQrSvg)h+="<hr><div class='rc'><b>Notre site</b><br>Retrouvez votre carte de fidélité</div><div class='qr'>"+r.siteQrSvg+"</div>";
-  return h}
+  var av=MAG==="Rouen"?r.avisQrRouen:r.avisQrAmiens,c1="",c2="";
+  if(av)c1="<div class='qc'><b>Un avis ?</b><br>et une récompense !<div class='qr'>"+av+"</div></div>";
+  if(r.siteQrSvg)c2="<div class='qc'><b>Notre site</b><br>et carte de fidélité<div class='qr'>"+r.siteQrSvg+"</div></div>";
+  return(c1||c2)?"<hr><div class='qrow'>"+c1+c2+"</div>":""}
 function docTicketHtml(f,mode,r){
   r=r||{};
   var nl=String.fromCharCode(10),fac=mode==="facture";
-  var ent=(f.ticketEntete||"TURN SOCIETY").split(nl).map(function(x,i){return i===0?"<b>"+esc(x)+"</b>":esc(x)}).join("<br>");
+  var es=entSplit(f.ticketEntete),ent=es.haut;
   var d=f.devis||{lignes:[]},a=f.acompte||{},net=d.netCents==null?d.totalCents:d.netCents;
   var ttc=net,ht=Math.round(ttc/1.2),tva=ttc-ht,ver=a.verseCents||0;
   var h="<div class='rc'>"+ent+(MAG?"<br>Boutique "+esc(MAG):"")+"</div>"+devisCoord(r)+"<hr>"
@@ -120,7 +126,7 @@ function docTicketHtml(f,mode,r){
   if(ver>0)h+="<hr><div class='rl'><span>Acompte versé</span><span>-"+eur(ver)+"</span></div><div class='rl rt'><span>Reste à payer</span><span>"+eur(Math.max(0,ttc-ver))+"</span></div>";
   if(!fac)h+="<hr><div class='rc rm'>Devis valable 30 jours. Document non contractuel tant qu'il n'est pas validé par le client.</div>";
   if(!fac)h+=devisQr(r);else h+=factureQr(r);
-  return h+"<div class='rc rm' style='margin-top:6px'>Merci de votre confiance !</div>"}
+  return h+entBas(es,"Merci de votre confiance !")}
 async function imprimerDoc(id,mode){
   try{var f=await api("/reparation?id="+id);var r=await rdvInfos();impImprimer(docTicketHtml(f,mode,r),"recu",pecCss())}catch(e){alert(e.message)}}
 function recuTexte(el){

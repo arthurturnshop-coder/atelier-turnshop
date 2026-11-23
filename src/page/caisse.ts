@@ -33,7 +33,7 @@ function lirePay(){CPAY={carte:v("pc"),especes:v("pe"),virement:v("pv")}}
 function dateLongue(d){try{return new Date(d).toLocaleString("fr-FR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit",timeZone:"Europe/Paris"})}catch(e){return d||""}}
 function recuHtml(r){
   var ttc=r.totalCents,ht=Math.round(ttc/1.2),tva=ttc-ht,t=r.ticket||{},nl=String.fromCharCode(10);
-  var ent=(t.entete||"TURN SOCIETY").split(nl).map(function(x,i){return i===0?"<b>"+esc(x)+"</b>":esc(x)}).join("<br>");
+  var es=entSplit(t.entete),ent=es.haut;
   var h="<div class='recu' data-recu='"+r.id+"'><div class='rc'>"+ent+(r.magasin?"<br>Boutique "+esc(r.magasin):"")+"</div><hr>"
     +"<div class='rl'><span>"+(r.shopify&&r.shopify.nom?"Facture "+esc(r.shopify.nom):"Ticket n° "+r.id)+"</span><span>"+esc(dateLongue(r.date))+"</span></div>"
     +"<div class='rm'>Vendeur : "+esc(r.vendeur||"")+(r.client?" · Client : "+esc(r.client):"")+"</div><hr>";
@@ -47,7 +47,7 @@ function recuHtml(r){
   if(acd)h+="<div class='rl'><span>Acompte déjà versé</span><span>-"+eur(acd)+"</span></div><div class='rl'><span>Reste payé aujourd'hui</span><span>"+eur(r.totalCents)+"</span></div>";
   r.paiements.forEach(function(p){h+="<div class='rl'><span>Payé en "+esc((MOY[p.moyen]||p.moyen).toLowerCase())+"</span><span>"+eur(p.cents)+"</span></div>"});
   if(t.qrSvg)h+="<hr><div class='rc'><b>Laissez-nous un avis</b><br>et recevez une récompense !</div><div class='qr'>"+t.qrSvg+"</div>";
-  return h+"<div class='rc rm'>Merci de votre visite !</div></div>"}
+  return h+entBas(es,"Merci de votre visite !")+"</div>"}
 function avisBtns(r){
   var c=r.contact,u=r.ticket&&r.ticket.avisUrl;
   if(!u||!c||(!c.tel&&!c.email))return"";
