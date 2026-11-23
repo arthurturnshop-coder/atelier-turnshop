@@ -1,4 +1,5 @@
 export const MAITRES = `// ---------- Paramètres > Produit maître ----------
+var JUM=0;
 var MAIT=null,MAITBUSY=false,MAITMSG="",MAITOPEN=0;
 function maitLoad(){if(MAIT===null&&!MAITBUSY){MAITBUSY=true;api("/maitres").then(function(d){MAIT=d;MAITBUSY=false;render()}).catch(function(){MAIT={maitres:[]};MAITBUSY=false;render()})}}
 function maitRun(p){return p.then(function(d){MAITMSG=(d&&d.message)||"";MAIT=null;render()}).catch(function(e){MAITMSG=e.message;render()})}
@@ -25,4 +26,6 @@ ACTS.maitEdit=function(b){var m=MAIT.maitres.filter(function(x){return x.id===+b
   maitRun(api("/maitres/modifier",{id:m.id,nom:n,prix:p}))};
 ACTS.maitSuppr=function(b){if(confirm("Supprimer ce produit maître et ses associations ? Les devis déjà faits ne changent pas."))maitRun(api("/maitres/supprimer",{id:+b.dataset.id}))};
 ACTS.maitLienSuppr=function(b){if(confirm("Retirer ce produit du produit maître ?"))maitRun(api("/maitres/lien/supprimer",{id:+b.dataset.id}))};
+ACTS.jumOpen=function(b){JUM=JUM===+b.dataset.id?0:+b.dataset.id;render()};
+async function jumLier(ctx,x){try{var d=await api("/maitres/jumeau",{ligneId:+ctx.slice(3),libelle:x.libelle,sku:x.sku||"",barcode:x.barcode||"",variantId:x.variantId||""});JUM=0;DEVHINT=d.message;MAIT=null;await recharger(FICHE.id)}catch(e){alert(e.message)}}
 `;

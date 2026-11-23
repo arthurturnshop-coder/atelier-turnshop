@@ -85,6 +85,7 @@ ACTS.psAdd=async function(b){
   var l={libelle:(p.titre+vt).slice(0,200),prix:String(x.prix||"0").replace(".",","),variantId:x.id,sku:x.sku||"",barcode:x.barcode||"",marque:p.marque||""};
   if(ctx==="assoc"){ACTS.stAssocie(x);return}
   if(ctx.indexOf("mait")===0){maitLier(ctx,l);return}
+  if(ctx.indexOf("jum")===0){jumLier(ctx,l);return}
   if(ctx==="dvs"){try{await dvAjoutProduit(l)}catch(err){alert(err.message)}return}
   if(ctx==="etq"){ETQ.push({titre:l.libelle,prix:String(x.prix||"0"),barcode:l.barcode,sku:l.sku,qte:1});render();return}
   if(ctx.indexOf("mod")===0){try{await api("/modeles/piece",{modeleId:+ctx.slice(3),libelle:l.libelle,sku:l.sku,variantId:l.variantId,categorie:"pneu"});MODS=null;render()}catch(err){alert(err.message)}return}

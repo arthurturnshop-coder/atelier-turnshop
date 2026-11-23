@@ -102,3 +102,35 @@ app.post("/api/maitres/lien/supprimer", async (c) => {
   await sql`DELETE FROM maitre_liens WHERE id = ${Number(b.id)}`;
   return c.json({ message: "Produit retiré du produit maître." });
 });
+
+// Raccourci « référence sœur » sur une ligne de devis : la pièce montée (autre référence fournisseur) est reliée
+// au même produit maître que la ligne. Si la ligne n'a pas encore de maître, il est créé à partir d'elle.
+app.post("/api/maitres/jumeau", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const [l] = (await sql`SELECT id, libelle, prix_unitaire_cents, shopify_variant_id, sku, barcode, maitre_id, libelle_origine FROM devis_lignes WHERE id = ${Number(b.ligneId)} AND type = 'piece'`) as any[];
+  if (!l) throw new AppError(404, "Ligne introuvable.");
+  const nv = { variantId: clean(b.variantId, 80), sku: clean(b.sku, 80), barcode: clean(b.barcode, 80), libelle: clean(b.libelle, 200) };
+  if (!nv.variantId && !nv.sku && !nv.barcode) throw new AppError(400, "Ce produit n'a ni variante, ni référence, ni code-barres.");
+  const orig = { variantId: l.shopify_variant_id ?? "", sku: l.sku ?? "", barcode: l.barcode ?? "" };
+  let maitre: { id: number; nom: string } | undefined = l.maitre_id
+    ? ((await sql`SELECT id, nom FROM maitre_produits WHERE id = ${l.maitre_id}`) as any[])[0]
+    : await trouverMaitre(orig);
+  if (!maitre) {
+    // Pas encore de maître : on le crée avec le libellé de la ligne (et on y relie la référence d'origine).
+    let nom = clean(l.libelle, 200) || "Produit";
+    const [dej] = await sql`SELECT id FROM maitre_produits WHERE lower(nom) = lower(${nom})`;
+    if (dej) nom = clean(nom + " (" + (orig.sku || orig.barcode || l.id) + ")", 200);
+    const [m] = (await sql`INSERT INTO maitre_produits (nom, prix_cents) VALUES (${nom}, ${null}) RETURNING id, nom`) as any[];
+    maitre = m;
+    if (orig.variantId || orig.sku || orig.barcode) {
+      await sql`INSERT INTO maitre_liens (maitre_id, variant_id, sku, barcode, libelle) VALUES (${m.id}, ${orig.variantId}, ${orig.sku}, ${orig.barcode}, ${clean(l.libelle_origine || l.libelle, 200)})`;
+    }
+  }
+  const autre = await trouverMaitre(nv);
+  if (autre && autre.id !== maitre!.id) throw new AppError(409, `Cette référence est déjà associée à « ${autre.nom} ».`);
+  if (!autre) await sql`INSERT INTO maitre_liens (maitre_id, variant_id, sku, barcode, libelle) VALUES (${maitre!.id}, ${nv.variantId}, ${nv.sku}, ${nv.barcode}, ${nv.libelle})`;
+  // La ligne garde le nom du maître, mais pointe sur la pièce réellement montée (pour le stock et les commandes).
+  await sql`UPDATE devis_lignes SET maitre_id = ${maitre!.id}, libelle = ${maitre!.nom}, libelle_origine = ${nv.libelle},
+    shopify_variant_id = ${nv.variantId || null}, sku = ${nv.sku || null}, barcode = ${nv.barcode || null} WHERE id = ${l.id}`;
+  return c.json({ message: `Référence sœur reliée à « ${maitre!.nom} ».` });
+});
