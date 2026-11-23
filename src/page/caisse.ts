@@ -124,7 +124,7 @@ async function ajouterProduit(p,ctx){
   var ex=PAN.filter(function(l){return l.variantId&&l.variantId===p.variantId})[0];
   if(ex)ex.quantite++;else PAN.push({libelle:p.libelle,quantite:1,prix:String(p.prix).replace(".",","),type:"piece",variantId:p.variantId,sku:p.sku,barcode:p.barcode||"",emplacement:p.emplacement||""});
   CMSG="Ajouté : "+p.libelle+(p.stock==null?"":" (stock "+p.stock+")")+(p.emplacement?" · 📍 CASE "+p.emplacement:" · pas de case, clique sur 📍 Case");render()}
-ACTS.cCase=async function(b){var l=PAN[+b.dataset.i];if(!l||!l.variantId)return;
+async function cCaseFn(b){var l=PAN[+b.dataset.i];if(!l||!l.variantId)return;
   var c=prompt("Case de rangement pour : "+l.libelle+" (ex : A1, B12 — vide pour effacer)",l.emplacement||"");if(c===null)return;
   try{var d=await api("/emplacement",{variantId:l.variantId,barcode:l.barcode||"",sku:l.sku||"",emplacement:c});PAN.forEach(function(x){if(x.variantId===l.variantId)x.emplacement=d.emplacement});lirePay();render()}catch(e){alert(e.message)}};
 async function scanCode(q,ctx,silent){
