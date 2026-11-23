@@ -83,6 +83,7 @@ function pecHtml(f){
   var a=f.acompte||{};
   if(a.verseCents>0)h+="<div class='rl'><span>Acompte versé</span><span>"+eur(a.verseCents)+"</span></div>";
   h+="<hr><div class='rm'>Gardiennage : gratuit "+(g.franchiseJours||5)+" jours après l'appel ou le mail indiquant que la trottinette est prête, puis "+((g.prixCents||500)/100).toString().replace(".",",")+" € par jour. Sans récupération au bout de "+(g.abandonJour||30)+" jours, la trottinette est considérée comme abandonnée.</div>"
+    +"<div class='rm' style='margin-top:4px'>Nos CGV (conditions générales de vente) et CGR (conditions générales de réparation) sont disponibles sur turnshop.fr</div>"
     +"<div style='margin-top:10px;border:1px solid #000;height:16mm;padding:2px'><span class='rm'>Signature du client</span></div>"
     +"<div style='margin-top:8px'>"+code128Svg(pcn(f.id),12)+"</div><div class='rc rm'>"+pcn(f.id)+"</div>"
     +entBas(es,"Merci de votre confiance !");
