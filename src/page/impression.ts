@@ -266,6 +266,12 @@ function etqImprimer(){
   var h="";
   if(F.page){h="<div class='etqgrid'>";for(var s=0;s<ETQSKIP;s++)h+="<div class='etqempty'></div>";L.forEach(function(it){h+=etqLabel(it,F)});h+="</div>"}
   else L.forEach(function(it){h+=etqLabel(it,F)});
+  if(!F.page&&etqFormat()==="62x29"){
+    var hs=L.map(function(it){return etqLabel(it,F)}).join("<!--etq-->");
+    agentPing().then(function(ok){
+      if(!ok){impImprimer(h,"",etqCss(F));return}
+      fetch(AGENT_URL+"/print-label",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({html:hs,w:F.w,h:F.h,n:L.length})}).then(function(r){return r.json()}).then(function(d){if(!d.ok)impImprimer(h,"",etqCss(F))}).catch(function(){impImprimer(h,"",etqCss(F))})});
+    return}
   impImprimer(h,"",etqCss(F))}
 function etqEmpl(){
   var todo=ETQ.filter(function(it){return it.empl===undefined&&(it.barcode||it.sku)});

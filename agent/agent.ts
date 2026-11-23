@@ -9,7 +9,7 @@ import { writeFileSync, readFileSync } from "node:fs";
 import { PNG } from "pngjs";
 
 const PORT = Number(process.env.FS_PRINT_PORT || 9101);
-const VERSION = "2.1";
+const VERSION = "2.2";
 const LOGS: string[] = [];
 function log(m: string) { LOGS.push(new Date().toLocaleTimeString("fr-FR") + " " + m); if (LOGS.length > 60) LOGS.shift(); console.log(m); }
 const jobs = new Map<string, { page: string; proc?: ReturnType<typeof spawn>; timer?: any; data?: any }>();
@@ -207,6 +207,73 @@ async function imprimer(id: string) {
   setTimeout(() => { jobs.delete(id); try { rmSync(dir, { recursive: true, force: true }); } catch {} }, 5000);
 }
 
+
+// ---------- Etiquettes (Brother QL) : capture puis impression Windows avec taille de papier personnalisee ----------
+const PS_ETQ = `param([string]$Printer,[string]$File,[double]$W,[double]$H,[int]$N)
+Add-Type -AssemblyName System.Drawing
+$img = [System.Drawing.Image]::FromFile($File)
+$pd = New-Object System.Drawing.Printing.PrintDocument
+if([string]::IsNullOrEmpty($Printer)){
+  foreach($p in [System.Drawing.Printing.PrinterSettings]::InstalledPrinters){ if($p -match 'brother|QL-'){ $Printer = $p; break } }
+}
+if(-not [string]::IsNullOrEmpty($Printer)){ $pd.PrinterSettings.PrinterName = $Printer }
+if(-not $pd.PrinterSettings.IsValid){ Write-Output "IMPRIMANTE INTROUVABLE"; exit 2 }
+$pd.DefaultPageSettings.PaperSize = New-Object System.Drawing.Printing.PaperSize("Etiquette", [int]($W / 25.4 * 100), [int]($H / 25.4 * 100))
+$pd.DefaultPageSettings.Margins = New-Object System.Drawing.Printing.Margins(0,0,0,0)
+$pd.OriginAtMargins = $false
+$script:i = 0
+$ph = $img.Height / $N
+$pd.add_PrintPage({
+  param($s, $e)
+  $src = New-Object System.Drawing.RectangleF(0, ($script:i * $ph), $img.Width, $ph)
+  $dst = New-Object System.Drawing.RectangleF(0, 0, $e.PageBounds.Width, $e.PageBounds.Height)
+  $e.Graphics.DrawImage($img, $dst, $src, [System.Drawing.GraphicsUnit]::Pixel)
+  $script:i++
+  $e.HasMorePages = ($script:i -lt $N)
+})
+$pd.Print()
+$img.Dispose()
+Write-Output "OK"
+`;
+
+async function imprimerEtiquettes(d: { html: string; w: number; h: number; n: number; printer?: string }) {
+  const id = crypto.randomUUID().slice(0, 8);
+  const dir = join(tmpdir(), "fsetq-" + id);
+  mkdirSync(dir, { recursive: true });
+  try {
+    const nav = navigateur();
+    if (!nav) throw new Error("aucun navigateur");
+    const dpi = 300, scale = dpi / 96;
+    const pxCssW = Math.ceil((d.w * 96) / 25.4), pxCssH = Math.ceil((d.n * d.h * 96) / 25.4);
+    const page = "<!doctype html><html><head><meta charset='utf-8'><style>html,body{margin:0;padding:0;background:#fff}#z{width:" + d.w + "mm}</style></head><body><div id='z'>" + d.html + "</div></body></html>";
+    jobs.set(id, { page, data: {} });
+    const png = join(dir, "e.png");
+    await run(nav, [
+      "--headless=new", "--disable-gpu", "--hide-scrollbars", ...(process.platform === "win32" ? [] : ["--no-sandbox"]),
+      "--no-first-run", "--user-data-dir=" + join(dir, "p"), "--screenshot=" + png,
+      "--window-size=" + Math.max(pxCssW + 40, 500) + "," + (pxCssH + 40), "--force-device-scale-factor=" + scale,
+      "--virtual-time-budget=2000", "http://127.0.0.1:" + PORT + "/job/" + id,
+    ], 25000);
+    if (!existsSync(png)) throw new Error("capture impossible");
+    // recadrage : largeur de l'etiquette x n etiquettes, depuis le coin haut gauche
+    const src = PNG.sync.read(readFileSync(png));
+    const cw = Math.min(src.width, Math.round((d.w / 25.4) * dpi)), ch = Math.min(src.height, Math.round((d.n * d.h / 25.4) * dpi));
+    const out = new PNG({ width: cw, height: ch });
+    PNG.bitblt(src, out, 0, 0, cw, ch, 0, 0);
+    const crop = join(dir, "c.png"); writeFileSync(crop, PNG.sync.write(out));
+    log("etiquettes : " + d.n + " x " + d.w + "x" + d.h + " mm, image " + cw + "x" + ch);
+    if (process.env.FS_PRINT_DRY) return;
+    const ps = join(dir, "e.ps1"); writeFileSync(ps, "\ufeff" + PS_ETQ);
+    const code = await run("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ps, "-Printer", d.printer || process.env.FS_LABEL_PRINTER || "", "-File", crop, "-W", String(d.w), "-H", String(d.h), "-N", String(d.n)], 60000);
+    log("etiquettes powershell code " + code);
+    if (code !== 0) throw new Error("envoi imprimante etiquettes impossible (" + code + ")");
+    return true;
+  } finally {
+    jobs.delete(id);
+    if (!process.env.FS_PRINT_DRY) setTimeout(() => { try { rmSync(dir, { recursive: true, force: true }); } catch {} }, 5000);
+  }
+}
+
 Bun.serve({
   hostname: "127.0.0.1",
   port: PORT,
@@ -224,6 +291,23 @@ Bun.serve({
       if (!navigateur()) { jobs.delete(id); return json({ ok: false, error: "Aucun navigateur trouve (Chrome ou Edge)" }, 500); }
       file = file.then(() => imprimer(id)).catch(() => {});
       return json({ ok: true, id });
+    }
+    if (url.pathname === "/print-label" && req.method === "POST") {
+      let d: any;
+      try { d = await req.json(); } catch { return json({ ok: false, error: "json invalide" }, 400); }
+      if (!d || typeof d.html !== "string" || !d.html || !(d.w > 10 && d.w < 120) || !(d.h > 10 && d.h < 200) || !(d.n >= 1)) return json({ ok: false, error: "etiquettes invalides" }, 400);
+      // lots de 20 etiquettes maximum par capture
+      const par = 20, blocs: string[] = d.html.split("<!--etq-->").filter((x: string) => x.trim());
+      try {
+        for (let i = 0; i < blocs.length; i += par) {
+          const lot = blocs.slice(i, i + par);
+          await imprimerEtiquettes({ html: lot.join(""), w: d.w, h: d.h, n: lot.length, printer: d.printer });
+        }
+        return json({ ok: true });
+      } catch (e) {
+        log("ECHEC etiquettes : " + e);
+        return json({ ok: false, error: String(e) }, 500);
+      }
     }
     let m = url.pathname.match(/^\/job\/(\w+)$/);
     if (m) {
