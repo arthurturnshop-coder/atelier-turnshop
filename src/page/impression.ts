@@ -239,7 +239,7 @@ document.addEventListener("input",function(e){
 
 // ----- Étiquettes produits : nom, prix, code-barres -----
 var ETQ=[],ETQF=null,ETQSKIP=0;
-var ETQFORMATS={"50x30":{l:"Rouleau 50 × 30 mm",w:50,h:30},"40x25":{l:"Rouleau 40 × 25 mm",w:40,h:25},"62x29":{l:"Rouleau 62 × 29 mm (Brother)",w:62,h:29},"a4":{l:"Planche A4 3 × 8 (70 × 37 mm)",w:70,h:37,page:"A4",cols:3,rows:8}};
+var ETQFORMATS={"50x30":{l:"Rouleau 50 × 30 mm",w:50,h:30},"40x25":{l:"Rouleau 40 × 25 mm",w:40,h:25},"62x29":{l:"Ruban Brother 62 × 40 mm",w:62,h:40},"a4":{l:"Planche A4 3 × 8 (70 × 37 mm)",w:70,h:37,page:"A4",cols:3,rows:8}};
 function etqFormat(){
   if(!ETQF){try{ETQF=localStorage.getItem("etqf")||""}catch(e){ETQF=""}}
   if(!ETQFORMATS[ETQF])ETQF="62x29";return ETQF}
@@ -250,7 +250,7 @@ function etqLabel(it,F){
   var tf=Math.round(F.h*0.4*10)/10,pf=Math.round(Math.min(F.h*0.85,(A-(em?11:0))/(0.2*pr.length))*10)/10,ef=Math.round(F.h*0.36*10)/10;
   return"<div class='etq' style='width:"+F.w+"mm;height:"+F.h+"mm;box-sizing:border-box;padding:1.5mm 2mm;overflow:hidden;font-family:Arial,Helvetica,sans-serif;color:#000;background:#fff;display:flex;gap:1.5mm'>"
     +"<div style='flex:1;min-width:0;display:flex;flex-direction:column;justify-content:space-between'>"
-    +"<div style='font-size:"+tf+"pt;font-weight:800;line-height:1.1;max-height:"+(tf*0.353*2.25)+"mm;overflow:hidden'>"+esc(it.titre)+"</div>"
+    +"<div style='font-size:"+tf+"pt;font-weight:800;line-height:1.1;max-height:"+(tf*0.353*(F.h>=36?3.4:2.25))+"mm;overflow:hidden'>"+esc(it.titre)+"</div>"
     +"<div style='display:flex;align-items:flex-end;justify-content:space-between;gap:1mm'><div style='font-size:"+pf+"pt;font-weight:900;line-height:1;white-space:nowrap'>"+esc(pr)+"</div>"
     +(em?"<div style='font-size:"+ef+"pt;font-weight:800;line-height:1;border:0.4mm solid #000;padding:0.6mm 1mm;white-space:nowrap'>"+esc(em)+"</div>":"")+"</div></div>"
     +"<div style='width:9mm;flex:none;position:relative'>"
