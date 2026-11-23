@@ -39,13 +39,20 @@ function esc(s: string) {
 }
 
 function pageTicket(id: string, d: { html: string; css?: string; cls?: string; styles?: string }) {
+  // Chrome ne gere pas "size:80mm auto" : on mesure le ticket et on fixe la hauteur exacte de la page,
+  // ce qui fait que le papier est coupe juste apres le ticket.
+  const script =
+    "window.addEventListener('load',function(){setTimeout(function(){" +
+    "try{var z=document.getElementById('impzone');var h=Math.ceil(z.getBoundingClientRect().height*25.4/96)+3;" +
+    "var st=document.createElement('style');st.textContent='@page{size:80mm '+h+'mm;margin:0}html,body{margin:0;padding:0}';document.head.appendChild(st)}catch(e){}" +
+    "setTimeout(function(){try{window.print()}catch(e){}" +
+    "setTimeout(function(){fetch('/done/" + id + "').catch(function(){});setTimeout(function(){window.close()},300)},2000)},200)},400)})";
   return (
     "<!doctype html><html><head><meta charset='utf-8'><title>Ticket</title><style>" +
     esc(d.styles || "") + esc(d.css || "") +
+    "#impzone{display:block!important;position:static!important;width:80mm;box-sizing:border-box;padding:0 3mm;margin:0;font-size:12px}html,body{margin:0;padding:0}" +
     "</style></head><body><div id='impzone' class='" + (d.cls || "").replace(/[^\w -]/g, "") + "'>" + d.html + "</div>" +
-    "<script>window.addEventListener('load',function(){setTimeout(function(){try{window.print()}catch(e){}" +
-    "setTimeout(function(){fetch('/done/" + id + "').catch(function(){});setTimeout(function(){window.close()},300)},1500)},400)})</script>" +
-    "</body></html>"
+    "<script>" + script + "</script></body></html>"
   );
 }
 

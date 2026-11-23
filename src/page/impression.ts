@@ -41,11 +41,17 @@ function impNavigateur(html,cls,css){
   impStyle(css);
   window.print();
   setTimeout(function(){z.remove();impStyle("")},800)}
-function impImprimer(html,cls,css,silencieux){
-  if(!silencieux&&cls!=="recu"){impNavigateur(html,cls,css);return}
+function impImprimer(html,cls,css,silencieux,copies){
+  var n=copies||1;
+  function repli(){
+    var h=html,i;for(i=1;i<n;i++)h+="<div style='break-after:page;page-break-after:always;height:0'></div>"+html;
+    impNavigateur(h,cls,css)}
+  if(!silencieux&&cls!=="recu"){repli();return}
   agentPing().then(function(ok){
-    if(!ok){impNavigateur(html,cls,css);return}
-    impAgent(html,cls,css).then(function(done){if(!done)impNavigateur(html,cls,css)})})}
+    if(!ok){repli();return}
+    var i,p=Promise.resolve(true);
+    for(i=0;i<n;i++)p=p.then(function(prev){if(!prev)return false;return impAgent(html,cls,css)}).then(function(r){return new Promise(function(res){setTimeout(function(){res(r)},400)})});
+    p.then(function(done){if(!done)repli()})})}
 impStyle("");
 
 // ----- Ticket de prise en charge (80 mm, comme le ticket de caisse) -----
@@ -78,7 +84,7 @@ function pecHtml(f){
 function pecCss(){return"@page{size:80mm auto;margin:0}@media print{body>*:not(#impzone){display:none!important}#impzone{position:static;width:80mm;box-sizing:border-box;font-size:12px;padding:0 3mm;margin:0}}"}
 async function imprimerPEC(id){
   // Deux exemplaires d'un coup (un pour le client, un pour l'atelier), séparés par un saut de page.
-  try{var f=await api("/reparation?id="+id);var t=pecHtml(f);impImprimer(t+"<div style='break-after:page;page-break-after:always;height:0'></div>"+t,"recu",pecCss())}catch(e){alert(e.message)}}
+  try{var f=await api("/reparation?id="+id);var t=pecHtml(f);impImprimer(t,"recu",pecCss(),false,2)}catch(e){alert(e.message)}}
 ACTS.pecPrint=function(b){imprimerPEC(+b.dataset.id)};
 
 // ----- Devis / facture en ticket 80 mm -----
