@@ -6,10 +6,10 @@ function vCreer(){
   if(CRE.msg)h+="<div class='pmsg'>"+esc(CRE.msg)+"</div>";
   h+="<div class='lab'>1. Client</div>";
   if(CRE.cli){
-    h+="<div class='tk' style='border-left-color:var(--vert)'><b>"+esc(CRE.cli.name)+"</b> <span class='muted'>"+esc(CRE.cli.telephone||"")+" "+esc(CRE.cli.email||"")+"</span> <button class='link' data-act='creAutreCli'>Changer</button></div>"}
+    h+="<div class='tk' style='border-left-color:var(--vert)'><b>"+esc(CRE.cli.name)+"</b> <span class='muted'>"+esc((CRE.cli.phone||CRE.cli.telephone||""))+" "+esc(CRE.cli.email||"")+"</span> <button class='link' data-act='creAutreCli'>Changer</button></div>"}
   else{
     h+="<div class='dl'><input id='cre-q' class='lb' placeholder='Chercher un client (nom, téléphone, email)' value='"+esc(CRE.q)+"'><button data-act='creChercher'>Chercher</button></div>";
-    if(CRE.res)h+=(CRE.res.length?CRE.res.map(function(c,i){return"<button class='sec hrow' data-act='creChoisir' data-i='"+i+"'><b>"+esc(c.name)+"</b> <span class='muted'>"+esc(c.telephone||"")+" "+esc(c.email||"")+"</span></button>"}).join(""):"<div class='muted'>Aucun client trouvé : remplis le nouveau client ci-dessous.</div>");
+    if(CRE.res)h+=(CRE.res.length?CRE.res.map(function(c,i){return"<button class='sec hrow' data-act='creChoisir' data-i='"+i+"'><b>"+esc(c.name)+"</b> <span class='muted'>"+esc((c.phone||c.telephone||""))+" "+esc(c.email||"")+"</span></button>"}).join(""):"<div class='muted'>Aucun client trouvé : remplis le nouveau client ci-dessous.</div>");
     h+="<div class='muted' style='margin-top:8px'>Ou nouveau client :</div><div class='dl'><input id='cn-pn' placeholder='Prénom'><input id='cn-nm' placeholder='Nom'><input id='cn-tel' placeholder='Téléphone'><input id='cn-em' placeholder='Email'></div>"}
   h+="<div class='lab'>2. Trottinette</div>";
   var ts=(CRE.cli&&CRE.cli.trottinettes)||[];
