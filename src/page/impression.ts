@@ -245,10 +245,10 @@ function etqFormat(){
   if(!ETQFORMATS[ETQF])ETQF="62x29";return ETQF}
 function etqLabel(it,F){
   var code=it.barcode||it.sku||"";
-  var L=F.h-3,A=F.w-4-9-1.5;
+  var L=F.h-(F.h>=36?5:3),A=F.w-4-9-1.5;
   var pr=String(it.prix).replace(".",",")+" €",em=it.empl||"";
   var tf=Math.round(F.h*0.4*10)/10,pf=Math.round(Math.min(F.h*0.85,(A-(em?11:0))/(0.2*pr.length))*10)/10,ef=Math.round(F.h*0.36*10)/10;
-  return"<div class='etq' style='width:"+F.w+"mm;height:"+F.h+"mm;box-sizing:border-box;padding:1.5mm 2mm;overflow:hidden;font-family:Arial,Helvetica,sans-serif;color:#000;background:#fff;display:flex;gap:1.5mm'>"
+  return"<div class='etq' style='width:"+F.w+"mm;height:"+F.h+"mm;box-sizing:border-box;padding:"+(F.h>=36?3.5:1.5)+"mm 2mm 1.5mm;overflow:hidden;font-family:Arial,Helvetica,sans-serif;color:#000;background:#fff;display:flex;gap:1.5mm'>"
     +"<div style='flex:1;min-width:0;display:flex;flex-direction:column;justify-content:space-between'>"
     +"<div style='font-size:"+tf+"pt;font-weight:800;line-height:1.1;max-height:"+(tf*0.353*(F.h>=36?3.4:2.25))+"mm;overflow:hidden'>"+esc(it.titre)+"</div>"
     +"<div style='display:flex;align-items:flex-end;justify-content:space-between;gap:1mm'><div style='font-size:"+pf+"pt;font-weight:900;line-height:1;white-space:nowrap'>"+esc(pr)+"</div>"
