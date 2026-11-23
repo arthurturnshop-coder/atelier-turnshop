@@ -31,16 +31,32 @@ app.post("/api/devis-simples", async (c) => {
   })).filter((l: any) => l.libelle);
   if (!lignes.length) throw new AppError(400, "Ajoute au moins une ligne au devis.");
   const nom = clean(b.nom, 120);
-  if (!nom && !Number(b.clientId)) throw new AppError(400, "Indique le nom du client.");
+  // Soit un devis anonyme (rien de renseigne), soit rattache a une fiche client complete (existante ou creee ici).
+  let cid = Number(b.clientId) || 0;
+  if (!cid) {
+    const tel = clean(b.telephone, 40), mail = clean(b.email, 120);
+    const chiffres = tel.replace(/\D/g, "");
+    if (nom || chiffres || mail) {
+      if (!nom || (!chiffres && !mail)) throw new AppError(400, "Soit tu laisses le client vide (devis sans nom), soit tu choisis un client existant, soit tu renseignes son nom ET son téléphone ou son email pour créer sa fiche.");
+      const [ex] = (await sql`SELECT id FROM clients WHERE (${chiffres} <> '' AND regexp_replace(telephone, '\\D', '', 'g') = ${chiffres}) OR (${mail} <> '' AND lower(email) = lower(${mail})) ORDER BY id LIMIT 1`) as any[];
+      if (ex) cid = ex.id;
+      else {
+        const mots = nom.split(" ").filter(Boolean);
+        const prenom = mots.length > 1 ? mots[0] : "";
+        const nomF = mots.length > 1 ? mots.slice(1).join(" ") : nom;
+        [{ id: cid }] = (await sql`INSERT INTO clients (prenom, nom, telephone, email) VALUES (${prenom}, ${nomF}, ${tel}, ${mail}) RETURNING id`) as any[];
+      }
+    }
+  }
   let id = Number(b.id) || 0;
   if (id) {
     const [d] = (await sql`SELECT * FROM devis_simples WHERE id = ${id} AND supprime_le IS NULL`) as any[];
     if (!d) throw new AppError(404, "Devis introuvable.");
     if (d.reparation_id) throw new AppError(400, "Ce devis est déjà rattaché à une prise en charge : modifie-le depuis la fiche.");
-    await sql`UPDATE devis_simples SET client_id = ${Number(b.clientId) || null}, nom = ${nom}, telephone = ${clean(b.telephone, 40)}, email = ${clean(b.email, 120)}, trottinette = ${clean(b.trottinette, 120)}, objet = ${clean(b.objet, 300)}, maj_le = now() WHERE id = ${id}`;
+    await sql`UPDATE devis_simples SET client_id = ${cid || null}, nom = ${nom}, telephone = ${clean(b.telephone, 40)}, email = ${clean(b.email, 120)}, trottinette = ${clean(b.trottinette, 120)}, objet = ${clean(b.objet, 300)}, maj_le = now() WHERE id = ${id}`;
     await sql`DELETE FROM devis_simples_lignes WHERE devis_id = ${id}`;
   } else {
-    [{ id }] = (await sql`INSERT INTO devis_simples (client_id, nom, telephone, email, trottinette, objet, magasin, cree_par) VALUES (${Number(b.clientId) || null}, ${nom}, ${clean(b.telephone, 40)}, ${clean(b.email, 120)}, ${clean(b.trottinette, 120)}, ${clean(b.objet, 300)}, ${u?.magasin === "Rouen" ? "Rouen" : "Amiens"}, ${u?.prenom ?? ""}) RETURNING id`) as any[];
+    [{ id }] = (await sql`INSERT INTO devis_simples (client_id, nom, telephone, email, trottinette, objet, magasin, cree_par) VALUES (${cid || null}, ${nom}, ${clean(b.telephone, 40)}, ${clean(b.email, 120)}, ${clean(b.trottinette, 120)}, ${clean(b.objet, 300)}, ${u?.magasin === "Rouen" ? "Rouen" : "Amiens"}, ${u?.prenom ?? ""}) RETURNING id`) as any[];
   }
   for (const l of lignes) await sql`INSERT INTO devis_simples_lignes (devis_id, type, libelle, quantite, prix_unitaire_cents) VALUES (${id}, ${l.type}, ${l.libelle}, ${l.quantite}, ${l.prix})`;
   return c.json({ id, message: "Devis enregistré." });
@@ -58,6 +74,7 @@ app.post("/api/devis-simples/rattacher", async (c) => {
   const [d] = (await sql`SELECT * FROM devis_simples WHERE id = ${Number(b.id)} AND supprime_le IS NULL`) as any[];
   if (!d) throw new AppError(404, "Devis introuvable.");
   if (d.reparation_id) return c.json({ reparationId: d.reparation_id, message: "Déjà rattaché." });
+  if (!d.client_id && !d.nom) throw new AppError(400, "Ce devis est sans nom : renseigne le client (existant ou nouveau avec téléphone/email) avant de créer une prise en charge.");
   let clientId = d.client_id;
   if (!clientId) {
     const parts = d.nom.trim().split(/\s+/);
