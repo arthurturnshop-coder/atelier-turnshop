@@ -70,6 +70,9 @@ app.get("/api/caisse/scan", async (c) => {
 });
 
 // Un code scanné : code-barres / référence d'un produit Shopify, ou client (carte, QR, téléphone, email).
+// Numéro de facture continu (F-2026-00001…) donné à chaque vente encaissée.
+await sql`CREATE SEQUENCE IF NOT EXISTS facture_seq`;
+await sql`ALTER TABLE ventes ADD COLUMN IF NOT EXISTS numero_facture TEXT`;
 // Case de rangement (A1, B12…) d'un produit Shopify : mémorisée ici, ou reprise du stock local si le produit y est.
 await sql`CREATE TABLE IF NOT EXISTS emplacements_produits (variant_id TEXT PRIMARY KEY, emplacement TEXT NOT NULL DEFAULT '', maj_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
 const caseDe = async (variantId: string, codes: string[]): Promise<string> => {
@@ -146,6 +149,7 @@ export async function detailVente(v: any) {
   return {
     contact: { prenom: co?.prenom ?? "", tel: co?.telephone ?? "", email: co?.email ?? "" },
     type: v.type ?? "vente", acompteDeduitCents: v.acompte_deduit_cents ?? 0,
+    numero: v.numero_facture ?? null,
     id: v.id, date: v.cree_le, magasin: v.magasin, vendeur: v.vendeur, client: v.client_nom || null,
     totalCents: v.total_cents, fideliteCents: v.remise_cents, brutCents: brut,
     lignes: lignes.map((l) => ({ libelle: l.libelle, quantite: l.quantite, prixCents: l.prix_unitaire_cents })),
@@ -153,7 +157,7 @@ export async function detailVente(v: any) {
     avantages: avs.map((x) => ({ libelle: x.libelle, effet: x.effet, remiseCents: x.remise_cents })),
     ticket: await infosTicket(v.magasin ?? null),
     reparationId: v.reparation_id ?? null,
-    shopify: { nom: v.shopify_order_name ?? null, erreur: v.shopify_erreur ?? null, eligible: !!(v.reparation_id && v.client_id) },
+    shopify: { nom: v.shopify_order_name ?? null, erreur: v.shopify_erreur ?? null, eligible: (v.type ?? "vente") === "vente" },
   };
 }
 
@@ -240,6 +244,7 @@ app.post("/api/caisse/encaisser", async (c) => {
   const p = await lireParametres();
   const pointsGagnes = Math.floor((totalCents + acompteDeduit) / 100 / p.eurosPourPalier);
   const [v] = (await sql`INSERT INTO ventes (client_id, reparation_id, magasin, vendeur, total_cents, remise_cents, points_gagnes, points_utilises, acompte_deduit_cents) VALUES (${clientId}, ${reparationId}, ${u.magasin ?? null}, ${u.prenom}, ${totalCents}, ${remiseCents}, ${pointsGagnes}, ${remiseCents > 0 ? 1 : 0}, ${acompteDeduit}) RETURNING id`) as any[];
+  await sql`UPDATE ventes SET numero_facture = 'F-' || to_char(now(), 'YYYY') || '-' || lpad(nextval('facture_seq')::text, 5, '0') WHERE id = ${v.id}`;
   for (const l of nettoyees) {
     await sql`INSERT INTO vente_lignes (vente_id, libelle, quantite, prix_unitaire_cents, type, shopify_variant_id, sku) VALUES (${v.id}, ${l.libelle}, ${l.quantite}, ${l.prixCents}, ${l.type}, ${l.variantId}, ${l.sku})`;
   }
@@ -256,7 +261,7 @@ app.post("/api/caisse/encaisser", async (c) => {
   if (reparationId) {
     await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${reparationId}, 'caisse', ${`Encaissement de ${(totalCents / 100).toFixed(2)} €${signature(c)}`})`;
   }
-  if (reparationId && clientId && (await commandesActives())) await creerCommandeShopify(v.id);
+  if (await commandesActives()) await creerCommandeShopify(v.id);
   if (clientId) void envoyerAvis(v.id);
   const [vv] = (await sql`SELECT v.*, trim(cl.prenom || ' ' || cl.nom) AS client_nom FROM ventes v LEFT JOIN clients cl ON cl.id = v.client_id WHERE v.id = ${v.id}`) as any[];
   return c.json({ id: v.id, message: "Vente enregistrée.", totalCents, remiseCents, vente: await detailVente(vv) });
