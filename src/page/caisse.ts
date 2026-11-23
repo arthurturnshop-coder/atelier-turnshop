@@ -121,19 +121,26 @@ async function ajouterProduit(p,ctx){
   if(ex)ex.quantite++;else PAN.push({libelle:p.libelle,quantite:1,prix:String(p.prix).replace(".",","),type:"piece",variantId:p.variantId,sku:p.sku,barcode:p.barcode||""});
   CMSG="Ajouté : "+p.libelle+(p.stock==null?"":" (stock "+p.stock+")");render()}
 async function scanCode(q,ctx,silent){
+  var el=document.activeElement,id=el&&el.id,ps=el&&el.dataset&&el.dataset.ps;
+  var ok=await scanCode0(q,ctx,silent);
+  if(ok===true)bipOk();else if(ok===false)bipKo();
+  if(ok!==undefined)refocus(id,ps,ok)}
+function refocus(id,ps,ok){setTimeout(function(){var e=id?document.getElementById(id):(ps?document.querySelector("[data-ps='"+ps+"']"):null);if(!e)return;if(ok&&ps)e.value="";e.focus();if(!ok&&e.select)e.select()},60)}
+async function scanCode0(q,ctx,silent){
   q=(q||"").trim();if(!q)return;
-  var mpc=q.match(/^pc[^0-9a-z]*0*([0-9]+)$/i);if(mpc){ouvrirFiche(Number(mpc[1]));return}
+  var mpc=q.match(/^pc[^0-9a-z]*0*([0-9]+)$/i);if(mpc){ouvrirFiche(Number(mpc[1]));return true}
   try{
     var r=await api("/code?q="+encodeURIComponent(q));
-    if(r.produit){await ajouterProduit(r.produit,ctx);return}
-    if(ctx==="etq"){var lc=await api("/stock/scan",{magasin:MAG||"",code:q,local:true});if(lc.produit){ETQ.push({empl:lc.produit.emplacement||"",titre:lc.produit.nom,prix:(lc.produit.prixCents/100).toFixed(2),barcode:lc.produit.code,sku:"",qte:Math.max(1,lc.produit.qte)});render();return}}
-    if(ctx!=="caisse"){if(!silent)alert("Code inconnu : "+q);return}
+    if(r.produit){await ajouterProduit(r.produit,ctx);return true}
+    if(ctx==="etq"){var lc=await api("/stock/scan",{magasin:MAG||"",code:q,local:true});if(lc.produit){ETQ.push({empl:lc.produit.emplacement||"",titre:lc.produit.nom,prix:(lc.produit.prixCents/100).toFixed(2),barcode:lc.produit.code,sku:"",qte:Math.max(1,lc.produit.qte)});render();return true}}
+    if(ctx!=="caisse"){if(!silent)alert("Code inconnu : "+q);return false}
     var cid=r.clientId;
     if(!cid){var s=await api("/caisse/scan?q="+encodeURIComponent(q));cid=s.clientId}
-    if(!cid){if(silent)return;CMSG=(r.erreurProduit?"Catalogue indisponible. ":"")+"Code inconnu : "+q+" (ni produit, ni client).";lirePay();render();return}
+    if(!cid){if(silent)return false;CMSG=(r.erreurProduit?"Catalogue indisponible. ":"")+"Code inconnu : "+q+" (ni produit, ni client).";lirePay();render();return false}
     var d=await api("/caisse/client?id="+cid);
     CUR=null;FICHE=null;TAB="accueil";CCLI=d.client;CFID=d.fidelite;CUSE=false;CMSG="";CAVOFF=[];CHOPEN=0;lirePay();await chargeHisto()
-  }catch(e){if(!silent)alert(e.message)}}
+  return true
+  }catch(e){if(!silent)alert(e.message);return false}}
 var SCBUF="",SCLAST=0;
 document.addEventListener("keydown",function(e){
   var t=e.target,tag=t&&t.tagName?t.tagName:"";

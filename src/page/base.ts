@@ -50,4 +50,11 @@ function render(){
   if(!TOK&&!PW){vLogin();return}
   nav.innerHTML=TABS.filter(function(t){return t[0]!=="param"||ROLE==="admin"}).map(function(t){return"<button data-act='tab' data-tab='"+t[0]+"'"+(TAB===t[0]?" class='on'":"")+">"+t[1]+"</button>"}).join("");
   ({accueil:vAccueil,enc:vEnc,cmd:vCmd,stock:vStock,etq:vEtq,param:vParam,stats:vStats,retours:vRetours,cli:function(){CLV.ventes=CLV.ventes;vClient();clCharge()}})[TAB]();viewSave()}
+
+// Bips de scan : aigu et court = OK, grave et long = code inconnu
+var AUDIOCTX=null;
+function bip(f,d,n){try{var A=window.AudioContext||window.webkitAudioContext;if(!A)return;if(!AUDIOCTX)AUDIOCTX=new A();var c=AUDIOCTX;if(c.state==="suspended")c.resume();
+  for(var k=0;k<n;k++){var o=c.createOscillator(),g=c.createGain();o.type="square";o.frequency.value=f;o.connect(g);g.connect(c.destination);var t=c.currentTime+k*(d+0.07);g.gain.setValueAtTime(0.15,t);g.gain.exponentialRampToValueAtTime(0.001,t+d);o.start(t);o.stop(t+d)}}catch(e){}}
+function bipOk(){bip(1800,0.09,1)}
+function bipKo(){bip(300,0.22,2)}
 `;

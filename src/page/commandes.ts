@@ -98,8 +98,8 @@ async function recepScan(code){
   if(!ligne){
     try{var r=await api("/code?q="+encodeURIComponent(code));
       if(r.produit)ligne=f.commandees.filter(function(l){return l.variantId&&l.variantId===r.produit.variantId})[0]}catch(e){}}
-  if(ligne){REC.scans[ligne.id]=(REC.scans[ligne.id]||0)+1;REC.msg="✓ "+ligne.libelle}
-  else{REC.bad.push(code);REC.msg="✗ Code "+code+" : pas dans cette commande"}
+  if(ligne){bipOk();REC.scans[ligne.id]=(REC.scans[ligne.id]||0)+1;REC.msg="✓ "+ligne.libelle}
+  else{bipKo();REC.bad.push(code);REC.msg="✗ Code "+code+" : pas dans cette commande"}
   render();setTimeout(function(){var i=document.getElementById("rc");if(i)i.focus()},50)}
 var ECMD={fid:0,sel:null,msg:""};
 function ecHtml(f){
