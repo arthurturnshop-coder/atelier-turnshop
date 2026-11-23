@@ -108,9 +108,10 @@ ACTS.stAssocie=async function(x,force){
     if(d.conflit){if(confirm(d.message))return ACTS.stAssocie(x,true);return}
     STMSG=d.message;STAS="";render()}catch(err){alert(err.message)}};
 ACTS.stCodesFourn=function(){
-  if(!confirm("Ecrire dans Shopify les vrais codes-barres fournisseurs (Ewheel) pour les produits qui n en ont pas ? 100 a la fois."))return;
-  STMSG="Recuperation des codes-barres fournisseurs... (peut prendre une minute)";render();
-  api("/stock/codes-fournisseurs",{}).then(function(d){STMSG=d.faits+" code(s) fournisseur ecrit(s) dans Shopify. "+(d.restant>0?"Il en reste "+d.restant+" : clique encore.":"Tout est fait.")+" ("+d.sansCode+" produits sans code fournisseur"+(d.doublons?", "+d.doublons+" doublons ignores":"")+")";render()}).catch(function(e){STMSG=e.message;render()})};
+  if(!confirm("Copier les vrais codes-barres Ewheel dans Shopify pour tous les produits qui n en ont pas ? Ca tourne en arriere-plan : tu peux laisser la page ouverte."))return;
+  function aff(d){STMSG=(d.enCours?"⏳ ":"")+d.phase+" · lus "+d.lus+" · a ecrire "+d.aFaire+" · ecrits "+d.faits+(d.erreurs?" · erreurs "+d.erreurs+(d.derniereErreur?" ("+d.derniereErreur+")":""):"")+(d.fini?" · doublons ignores "+d.doublons+" · sans code fournisseur "+d.sansCode:"");render()}
+  function suite(){api("/stock/codes-fournisseurs").then(function(d){aff(d);if(d.enCours)setTimeout(suite,2500)}).catch(function(e){STMSG=e.message;render()})}
+  api("/stock/codes-fournisseurs",{}).then(function(d){aff(d);if(d.enCours)setTimeout(suite,2500)}).catch(function(e){STMSG=e.message;render()})};
 ACTS.stCodesShopify=function(){
   if(!confirm("Donner un code-barres EAN-13 a tous les produits Shopify qui n en ont pas ? (ecrit dans Shopify, 100 produits a la fois)"))return;
   STMSG="Creation des codes-barres Shopify...";render();

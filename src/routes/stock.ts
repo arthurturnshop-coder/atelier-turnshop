@@ -375,38 +375,67 @@ const gs1Ok = (c: string) => {
   for (let i = 0; i < c.length - 1; i++) t += Number(c[c.length - 2 - i]) * (i % 2 ? 1 : 3);
   return (10 - (t % 10)) % 10 === Number(c[c.length - 1]);
 };
+// Travail de fond : on lit tout le catalogue, puis on écrit les codes par produit, avec réessais. Une seule exécution à la fois.
+type EtatCodes = { enCours: boolean; phase: string; lus: number; aFaire: number; faits: number; doublons: number; sansCode: number; erreurs: number; derniereErreur: string; fini: boolean };
+let ETAT_CODES: EtatCodes = { enCours: false, phase: "", lus: 0, aFaire: 0, faits: 0, doublons: 0, sansCode: 0, erreurs: 0, derniereErreur: "", fini: false };
+const attendre = (ms: number) => new Promise((r) => setTimeout(r, ms));
+async function avecReessais<T>(f: () => Promise<T>): Promise<T> {
+  let derniere: any;
+  for (let i = 0; i < 5; i++) {
+    try { return await f(); } catch (e) { derniere = e; await attendre(1500 * (i + 1)); }
+  }
+  throw derniere;
+}
+async function importerCodesFournisseurs() {
+  const E = ETAT_CODES;
+  try {
+    const pris = new Set<string>();
+    const aFaire: { id: string; productId: string; code: string }[] = [];
+    let after: string | null = null;
+    E.phase = "Lecture du catalogue Shopify…";
+    for (let i = 0; i < 400; i++) {
+      const d: any = await avecReessais(() => shopifyRead(`query($after:String){productVariants(first:100,after:$after){pageInfo{hasNextPage endCursor} nodes{id barcode product{id a:metafield(namespace:"custom",key:"codigo-alternativo"){value} b:metafield(namespace:"custom",key:"codigo-alternativo-2"){value}}}}}`, { after }));
+      const pv = d.productVariants;
+      for (const v of pv.nodes) {
+        E.lus++;
+        if (v.barcode) { pris.add(String(v.barcode)); continue; }
+        const code = [v.product?.a?.value, v.product?.b?.value].map((x: any) => String(x ?? "").trim()).find(gs1Ok);
+        if (code) aFaire.push({ id: v.id, productId: v.product.id, code }); else E.sansCode++;
+      }
+      if (!pv.pageInfo.hasNextPage) break;
+      after = pv.pageInfo.endCursor;
+    }
+    const parProduit = new Map<string, { id: string; barcode: string }[]>();
+    for (const v of aFaire) {
+      if (pris.has(v.code)) { E.doublons++; continue; }
+      pris.add(v.code);
+      if (!parProduit.has(v.productId)) parProduit.set(v.productId, []);
+      parProduit.get(v.productId)!.push({ id: v.id, barcode: v.code });
+    }
+    E.aFaire = [...parProduit.values()].reduce((n, l) => n + l.length, 0);
+    E.phase = "Écriture des codes dans Shopify…";
+    for (const [productId, variants] of parProduit) {
+      try {
+        const r: any = await avecReessais(() => shopifyMutate(`mutation($productId:ID!,$variants:[ProductVariantsBulkInput!]!){productVariantsBulkUpdate(productId:$productId,variants:$variants){productVariants{id} userErrors{message}}}`, { productId, variants }));
+        const errs = r?.productVariantsBulkUpdate?.userErrors || [];
+        if (errs.length) { E.erreurs += variants.length; E.derniereErreur = String(errs[0].message).slice(0, 200); }
+        else E.faits += variants.length;
+      } catch (e: any) { E.erreurs += variants.length; E.derniereErreur = String(e?.message ?? e).slice(0, 200); }
+      await attendre(120);
+    }
+    E.phase = "Terminé";
+  } catch (e: any) {
+    E.derniereErreur = String(e?.message ?? e).slice(0, 200);
+    E.phase = "Arrêté : " + E.derniereErreur;
+  } finally { E.enCours = false; E.fini = true; }
+}
 app.post("/api/stock/codes-fournisseurs", async (c) => {
   const user = c.get("user") as any;
   if (user?.role !== "admin" && user?.role !== "responsable") throw new AppError(403, "Réservé au responsable.");
-  const pris = new Set<string>();
-  const aFaire: { id: string; productId: string; code: string }[] = [];
-  let after: string | null = null, sans = 0;
-  for (let i = 0; i < 120; i++) {
-    const d: any = await shopifyRead(`query($after:String){productVariants(first:100,after:$after){pageInfo{hasNextPage endCursor} nodes{id barcode product{id a:metafield(namespace:"custom",key:"codigo-alternativo"){value} b:metafield(namespace:"custom",key:"codigo-alternativo-2"){value}}}}}`, { after });
-    const pv = d.productVariants;
-    for (const v of pv.nodes) {
-      if (v.barcode) { pris.add(String(v.barcode)); continue; }
-      const code = [v.product?.a?.value, v.product?.b?.value].map((x: any) => String(x ?? "").trim()).find(gs1Ok);
-      if (code) aFaire.push({ id: v.id, productId: v.product.id, code }); else sans++;
-    }
-    if (!pv.pageInfo.hasNextPage) break;
-    after = pv.pageInfo.endCursor;
+  if (!ETAT_CODES.enCours) {
+    ETAT_CODES = { enCours: true, phase: "Démarrage…", lus: 0, aFaire: 0, faits: 0, doublons: 0, sansCode: 0, erreurs: 0, derniereErreur: "", fini: false };
+    void importerCodesFournisseurs();
   }
-  const lot: typeof aFaire = [];
-  let doublons = 0;
-  for (const v of aFaire) {
-    if (pris.has(v.code)) { doublons++; continue; }
-    pris.add(v.code);
-    if (lot.length < 100) lot.push(v);
-  }
-  const parProduit = new Map<string, { id: string; barcode: string }[]>();
-  for (const v of lot) { if (!parProduit.has(v.productId)) parProduit.set(v.productId, []); parProduit.get(v.productId)!.push({ id: v.id, barcode: v.code }); }
-  let faits = 0;
-  for (const [productId, variants] of parProduit) {
-    const r: any = await shopifyMutate(`mutation($productId:ID!,$variants:[ProductVariantsBulkInput!]!){productVariantsBulkUpdate(productId:$productId,variants:$variants){productVariants{id} userErrors{message}}}`, { productId, variants });
-    const errs = r?.productVariantsBulkUpdate?.userErrors || [];
-    if (errs.length) throw new AppError(502, "Shopify : " + errs[0].message);
-    faits += variants.length;
-  }
-  return c.json({ faits, restant: aFaire.length - doublons - faits, doublons, sansCode: sans });
+  return c.json(ETAT_CODES);
 });
+app.get("/api/stock/codes-fournisseurs", async (c) => c.json(ETAT_CODES));
