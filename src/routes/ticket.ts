@@ -6,8 +6,8 @@ import "./auth";
 import { clean, exigeAdmin } from "../util";
 
 const ENTETE_DEFAUT = "TURN SOCIETY\nSIRET 912 779 352 00026";
-const COORD_AMIENS = "6 rue de la 2e DB, Amiens";
-const COORD_ROUEN = "5 bis rue d'Harcourt, 76000 Rouen";
+const COORD_AMIENS = "6 rue de la 2e DB, Amiens\nTél : 06 83 61 08 77";
+const COORD_ROUEN = "5 bis rue d'Harcourt, 76000 Rouen\nTél : 06 43 77 57 37";
 const RDV_DEFAUT = "https://turnshop.fr/pages/prendre-rendez-vous";
 const CLES = ["ticket_entete", "avis_url_Amiens", "avis_url_Rouen", "rdv_url", "coord_Amiens", "coord_Rouen"];
 
