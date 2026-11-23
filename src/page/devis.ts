@@ -41,7 +41,7 @@ ACTS.dvAddL=function(){dvLire();DV.ed.lignes.push({libelle:"",quantite:1,prixCen
 ACTS.dvDelL=function(b){dvLire();DV.ed.lignes.splice(+b.dataset.i,1);if(!DV.ed.lignes.length)DV.ed.lignes=dvVide().lignes;render()};
 ACTS.dvChercher=function(){var q=v("dq");if(!q)return;dvLire();api("/search?q="+encodeURIComponent(q)).then(function(r){DV.res=r;render()}).catch(function(e){alert(e.message)})};
 ACTS.dvChoisir=function(b){var c=DV.res[+b.dataset.i];dvLire();DV.ed.clientId=c.id;DV.ed.nom=c.name;DV.ed.telephone=c.telephone||"";DV.ed.email=c.email||"";DV.res=null;render()};
-ACTS.dvSave=async function(){dvLire();try{var r=await api("/devis-simples",dvPayload());DV.ed.id=r.id;DV.msg=r.message;DV.list=null;render()}catch(e){alert(e.message)}};
+ACTS.dvSave=async function(b){dvLire();if(b)btnFlash(b,"Enregistrement…");try{var r=await api("/devis-simples",dvPayload());DV.ed.id=r.id;DV.msg=r.message;DV.list=null;render();var nb=document.querySelector("[data-act=dvSave]");if(nb)btnFlash(nb,"✓ Devis enregistré")}catch(e){render();alert(e.message)}};
 ACTS.dvSuppr=async function(){if(!confirm("Supprimer ce devis ?"))return;try{await api("/devis-simples/supprimer",{id:DV.ed.id});DV.ed=null;DV.list=null;DV.msg="Devis supprimé.";render()}catch(e){alert(e.message)}};
 ACTS.dvRatt=async function(){
   dvLire();
