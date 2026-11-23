@@ -29,6 +29,10 @@ function entSplit(txt){
   if(!haut.length)haut=["TURN SOCIETY"];
   return{haut:haut.map(function(x,i){return i===0?"<b>"+esc(x)+"</b>":esc(x)}).join("<br>"),bas:bas.map(esc).join(" ")}}
 function entBas(es,defaut){return"<div class='rc rm' style='margin-top:6px'>"+(es.bas||defaut)+"</div>"}
+function btnFlash(b,txt){
+  if(!b||!b.tagName)return;
+  var old=b.textContent;b.textContent=txt||"✓ Impression envoyée";b.disabled=true;b.style.background="#1f8f4e";b.style.color="#fff";
+  setTimeout(function(){b.textContent=old;b.disabled=false;b.style.background="";b.style.color=""},2000)}
 var IMPSTYLE=null;
 function impStyle(css){
   if(!IMPSTYLE){IMPSTYLE=document.createElement("style");IMPSTYLE.id="impstyle";document.head.appendChild(IMPSTYLE)}
@@ -92,7 +96,7 @@ function pecCss(){return"@page{size:80mm auto;margin:0}@media print{body>*:not(#
 async function imprimerPEC(id){
   // Deux exemplaires d'un coup (un pour le client, un pour l'atelier), séparés par un saut de page.
   try{var f=await api("/reparation?id="+id);var t=pecHtml(f);impImprimer(t,"recu",pecCss(),false,2)}catch(e){alert(e.message)}}
-ACTS.pecPrint=function(b){imprimerPEC(+b.dataset.id)};
+ACTS.pecPrint=function(b){btnFlash(b);imprimerPEC(+b.dataset.id)};
 
 // ----- Devis / facture en ticket 80 mm -----
 var RDVI=null;
@@ -144,7 +148,7 @@ ACTS.cEmail=function(b){
   function go(a){api("/caisse/email",{venteId:id,texte:texte,a:a||""}).then(function(d){alert(d.message)}).catch(function(e){
     if(!a&&/^Pas d/.test(e.message)){var x=prompt("Email du client :");if(x)go(x)}else alert(e.message)})}
   go("")};
-ACTS.docPrint=function(b){imprimerDoc(+b.dataset.id,b.dataset.mode)};
+ACTS.docPrint=function(b){btnFlash(b);imprimerDoc(+b.dataset.id,b.dataset.mode)};
 
 
 // ----- Caisse : ouverture / fermeture (ticket Z) -----

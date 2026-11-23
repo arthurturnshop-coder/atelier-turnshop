@@ -69,8 +69,8 @@ ACTS.cEnPec=async function(){
   if(!confirm("Créer une prise en charge (réparation en boutique) avec ce panier ?"))return;
   try{var r=await cartVersDevis();if(!r)return;var p=await api("/devis-simples/rattacher",{id:r.id});cartVide();DV.list=null;await ouvrirFiche(p.reparationId)}catch(e){alert(e.message)}};
 ACTS.dvVoirPC=function(){ouvrirFiche(DV.ed.reparationId)};
-ACTS.dvPrint=async function(){
-  dvLire();var rv=await rdvInfos();var d=DV.ed,nl=String.fromCharCode(10),t=dvTotal(d.lignes),ht=Math.round(t/1.2),tva=t-ht;
+ACTS.dvPrint=async function(b){
+  btnFlash(b);dvLire();var rv=await rdvInfos();var d=DV.ed,nl=String.fromCharCode(10),t=dvTotal(d.lignes),ht=Math.round(t/1.2),tva=t-ht;
   var es=entSplit(TICKENT),ent=es.haut;
   var h="<div class='rc'>"+ent+(MAG?"<br>Boutique "+esc(MAG):"")+"</div>"+devisCoord(rv)+"<hr><div class='rc'><b>DEVIS</b></div><div class='rc' style='font-size:18px'><b>"+dvNum(d.id)+"</b></div>"
     +"<div class='rl'><span>Date</span><span>"+new Date().toLocaleDateString("fr-FR")+"</span></div><hr>"
