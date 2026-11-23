@@ -55,6 +55,19 @@ ACTS.dvFact=async function(){
     PAN=DV.ed.lignes.map(function(l){return{libelle:l.libelle,quantite:l.quantite,prix:String(l.prixCents/100).replace(".",","),type:"article",variantId:"",sku:""}});
     CCLI=d?d.client:null;CFID=d?d.fidelite:null;CUSE=false;CAVOFF=[];CREC=null;CHOPEN=0;CREP=null;CACO=0;CPAY={carte:"",especes:"",virement:""};CMSG="";
     DV.ed=null;DV.list=null;FICHE=null;CUR=null;TAB="accueil";if(d)await chargeHisto();else render()}catch(e){alert(e.message)}};
+async function cartVersDevis(){
+  if(!PAN.length){alert("Le panier est vide.");return null}
+  var nom=CCLI?CCLI.name:(prompt("Nom du client ?")||"").trim();
+  if(!nom)return null;
+  var r=await api("/devis-simples",{clientId:CCLI?CCLI.id:0,nom:nom,telephone:CCLI?(CCLI.phone||""):"",email:CCLI?(CCLI.email||""):"",lignes:PAN.map(function(l){return{libelle:l.libelle,quantite:l.quantite,prix:l.prix}})});
+  return r}
+function cartVide(){PAN=[];CPAY={carte:"",especes:"",virement:""};CMSG="";CCLI=null;CFID=null;CUSE=false;CAVOFF=[];CREP=null;CACO=0}
+ACTS.cEnDevis=async function(){
+  try{var r=await cartVersDevis();if(!r)return;cartVide();DV.list=null;DV.ed=null;DV.res=null;DV.hint="";DV.msg="Devis "+dvNum(r.id)+" enregistré. Ouvre-le pour le facturer ou créer une prise en charge.";FICHE=null;CUR=null;TAB="enc";ATSUB="devis";render()}catch(e){alert(e.message)}};
+ACTS.cEnPec=async function(){
+  if(!PAN.length){alert("Le panier est vide.");return}
+  if(!confirm("Créer une prise en charge (réparation en boutique) avec ce panier ?"))return;
+  try{var r=await cartVersDevis();if(!r)return;var p=await api("/devis-simples/rattacher",{id:r.id});cartVide();DV.list=null;await ouvrirFiche(p.reparationId)}catch(e){alert(e.message)}};
 ACTS.dvVoirPC=function(){ouvrirFiche(DV.ed.reparationId)};
 ACTS.dvPrint=async function(){
   dvLire();var rv=await rdvInfos();var d=DV.ed,nl=String.fromCharCode(10),t=dvTotal(d.lignes),ht=Math.round(t/1.2),tva=t-ht;
