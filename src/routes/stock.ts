@@ -439,3 +439,20 @@ app.post("/api/stock/codes-fournisseurs", async (c) => {
   return c.json(ETAT_CODES);
 });
 app.get("/api/stock/codes-fournisseurs", async (c) => c.json(ETAT_CODES));
+
+// Automatique : une fois par nuit (entre 2 h et 5 h), et une première fois peu après le démarrage si jamais lancé.
+async function codesAuto() {
+  try {
+    if (ETAT_CODES.enCours) return;
+    const [r] = (await sql`SELECT valeur FROM reglages WHERE cle = 'codes_ewheel_dernier'`) as any[];
+    const dernier = r ? Number(r.valeur) : 0;
+    const heure = Number(new Intl.DateTimeFormat("fr-FR", { hour: "numeric", hour12: false, timeZone: "Europe/Paris" }).format(new Date()));
+    const dû = !dernier || (Date.now() - dernier > 23 * 3600 * 1000 && heure >= 2 && heure < 5);
+    if (!dû) return;
+    await sql`INSERT INTO reglages (cle, valeur) VALUES ('codes_ewheel_dernier', ${String(Date.now())}) ON CONFLICT (cle) DO UPDATE SET valeur = EXCLUDED.valeur`;
+    ETAT_CODES = { enCours: true, phase: "Démarrage automatique…", lus: 0, aFaire: 0, faits: 0, doublons: 0, sansCode: 0, erreurs: 0, derniereErreur: "", fini: false };
+    void importerCodesFournisseurs();
+  } catch (e) { console.log(JSON.stringify({ event: "codes-ewheel-auto", message: String((e as any)?.message ?? e).slice(0, 200) })); }
+}
+setInterval(codesAuto, 30 * 60 * 1000);
+setTimeout(codesAuto, 2 * 60 * 1000);
