@@ -25,14 +25,27 @@ function code128Svg(text,hMm){
 
 var IMPSTYLE=null;
 function impStyle(css){
-  if(!IMPSTYLE){IMPSTYLE=document.createElement("style");document.head.appendChild(IMPSTYLE)}
+  if(!IMPSTYLE){IMPSTYLE=document.createElement("style");IMPSTYLE.id="impstyle";document.head.appendChild(IMPSTYLE)}
   IMPSTYLE.textContent=css}
-function impImprimer(html,cls,css){
+var AGENT_URL="http://127.0.0.1:9101",AGENT_OK=null;
+function agentPing(){
+  if(AGENT_OK!==null)return Promise.resolve(AGENT_OK);
+  var c=new AbortController();setTimeout(function(){c.abort()},700);
+  return fetch(AGENT_URL+"/ping",{signal:c.signal}).then(function(r){return r.json()}).then(function(d){AGENT_OK=!!(d&&d.ok&&d.navigateur);setTimeout(function(){AGENT_OK=null},30000);return AGENT_OK}).catch(function(){AGENT_OK=false;setTimeout(function(){AGENT_OK=null},15000);return false})}
+function impAgent(html,cls,css){
+  var st=Array.prototype.map.call(document.querySelectorAll("style"),function(x){return x.id==="impstyle"?"":x.textContent}).join(" ");
+  return fetch(AGENT_URL+"/print",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({html:html,cls:cls,css:css,styles:st})}).then(function(r){return r.json()}).then(function(d){return !!(d&&d.ok)}).catch(function(){return false})}
+function impNavigateur(html,cls,css){
   var old=document.getElementById("impzone");if(old)old.remove();
   var z=document.createElement("div");z.id="impzone";z.className=cls;z.innerHTML=html;document.body.appendChild(z);
   impStyle(css);
   window.print();
   setTimeout(function(){z.remove();impStyle("")},800)}
+function impImprimer(html,cls,css,silencieux){
+  if(!silencieux&&cls!=="recu"){impNavigateur(html,cls,css);return}
+  agentPing().then(function(ok){
+    if(!ok){impNavigateur(html,cls,css);return}
+    impAgent(html,cls,css).then(function(done){if(!done)impNavigateur(html,cls,css)})})}
 impStyle("");
 
 // ----- Ticket de prise en charge (80 mm, comme le ticket de caisse) -----
