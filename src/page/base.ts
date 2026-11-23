@@ -16,7 +16,7 @@ function today(){return new Date().toISOString().slice(0,10)}
 function initiales(c){var s=((c.prenom||"").charAt(0)+(c.nom||"").charAt(0)).toUpperCase();return s||"?"}
 function estResp(){return ROLE==="admin"||ROLE==="responsable"}
 function saveSession(){var m={atelierToken:TOK,atelierPrenom:PRENOM,atelierRole:ROLE,atelierMagasin:MAG,atelierPw:PW};Object.keys(m).forEach(function(k){if(m[k])sessionStorage.setItem(k,m[k]);else sessionStorage.removeItem(k)})}
-function clearSession(){TOK="";PW="";PRENOM="";ROLE="";MAG="";CUR=null;RES=[];SEARCHED=false;CONS=null;CHIF=null;TAB="accueil";ADDT=false;RECEP=null;EDITCLI=false;FID=null;EDITCONS=false;NEWCLI=false;ATSUB="liste";VUE="tout";LST=null;FICHE=null;PJOUR="";PMAG="";PLAN=null;PSEL=null;PPEND=null;PMSG="";saveSession()}
+function clearSession(){try{sessionStorage.removeItem("atelierView")}catch(e){}TOK="";PW="";PRENOM="";ROLE="";MAG="";CUR=null;RES=[];SEARCHED=false;CONS=null;CHIF=null;TAB="accueil";ADDT=false;RECEP=null;EDITCLI=false;FID=null;EDITCONS=false;NEWCLI=false;ATSUB="liste";VUE="tout";LST=null;FICHE=null;PJOUR="";PMAG="";PLAN=null;PSEL=null;PPEND=null;PMSG="";saveSession()}
 async function api(path,body){
   var h={"Content-Type":"application/json"};if(TOK)h["x-atelier-token"]=TOK;else h["x-atelier-password"]=PW;
   var o={headers:h};if(body!==undefined){o.method="POST";o.body=JSON.stringify(body)}
@@ -29,9 +29,25 @@ function renderWho(){
   if(!on){var rq=document.getElementById("rq");if(rq)rq.value="";rechHide()}
   var el=document.getElementById("who");if(!el)return;
   el.innerHTML=on?"<span>"+esc(PRENOM)+" · "+esc(MAG||"Secours")+"</span><button class='gear"+(TAB==="retours"?" on":"")+"' data-act='tab' data-tab='retours' title='Signaler un bug ou une idée'>&#128161;</button>"+((ROLE==="admin"||ROLE==="responsable")?"<button class='gear"+(TAB==="stats"?" on":"")+"' data-act='tab' data-tab='stats' title='Statistiques'>&#128202;</button>":"")+(ROLE==="admin"?"<button class='gear"+(TAB==="param"?" on":"")+"' data-act='tab' data-tab='param' title='Paramètres'>&#9881;</button>":"")+"<button class='sec' data-act='logout'>Changer de profil</button>":""}
+var VIEWF=0,VIEWC=0;
+function viewSave(){
+  if(!TOK&&!PW)return;
+  try{sessionStorage.setItem("atelierView",JSON.stringify({t:TAB,a:ATSUB,v:VUE,f:(FICHE&&FICHE.id)||0,c:(CUR&&CUR.id)||0}))}catch(e){}}
+function viewRestore(){
+  if(!TOK&&!PW)return;
+  var s=null;try{s=JSON.parse(sessionStorage.getItem("atelierView")||"null")}catch(e){}
+  if(!s)return;
+  var ok=TABS.some(function(t){return t[0]===s.t})||s.t==="stats"||s.t==="retours"||(s.t==="param"&&ROLE==="admin");
+  if(ok)TAB=s.t;
+  if(["liste","planning","creer","devis"].indexOf(s.a)>=0)ATSUB=s.a;
+  if(s.v)VUE=s.v;
+  VIEWF=s.f||0;VIEWC=s.c||0}
+function viewRestoreOpen(){
+  if(VIEWF){var f=VIEWF;VIEWF=0;VIEWC=0;ouvrirFiche(f);return}
+  if(VIEWC){var c=VIEWC;VIEWC=0;rechOpen(c)}}
 function render(){
   renderWho();
   if(!TOK&&!PW){vLogin();return}
   nav.innerHTML=TABS.filter(function(t){return t[0]!=="param"||ROLE==="admin"}).map(function(t){return"<button data-act='tab' data-tab='"+t[0]+"'"+(TAB===t[0]?" class='on'":"")+">"+t[1]+"</button>"}).join("");
-  ({accueil:vAccueil,enc:vEnc,cmd:vCmd,stock:vStock,etq:vEtq,param:vParam,stats:vStats,retours:vRetours,cli:function(){CLV.ventes=CLV.ventes;vClient();clCharge()}})[TAB]()}
+  ({accueil:vAccueil,enc:vEnc,cmd:vCmd,stock:vStock,etq:vEtq,param:vParam,stats:vStats,retours:vRetours,cli:function(){CLV.ventes=CLV.ventes;vClient();clCharge()}})[TAB]();viewSave()}
 `;
