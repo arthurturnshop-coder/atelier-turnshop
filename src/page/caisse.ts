@@ -126,9 +126,9 @@ ACTS.cCase=async function(b){var l=PAN[+b.dataset.i];if(!l||!l.variantId)return;
 async function scanCode(q,ctx,silent){
   var el=document.activeElement,id=el&&el.id,ps=el&&el.dataset&&el.dataset.ps;
   var ok=await scanCode0(q,ctx,silent);
-  if(ok===true)bipOk();else if(ok===false)bipKo();
+  if(ok===true)bipOk();else if(ok===false){bipKo();if(silent)toastKo("Code inconnu : "+(q||"").trim()+" (pas trouvé dans Shopify)")}
   if(ok!==undefined)refocus(id,ps,ok)}
-function refocus(id,ps,ok){setTimeout(function(){var e=id?document.getElementById(id):(ps?document.querySelector("[data-ps='"+ps+"']"):null);if(!e)return;if(ok&&ps)e.value="";e.focus();if(!ok&&e.select)e.select()},60)}
+function refocus(id,ps,ok){setTimeout(function(){var e=id?document.getElementById(id):(ps?document.querySelector("[data-ps='"+ps+"']"):null);if(!e)return;if(ps||id==="cq")e.value="";e.focus()},60)}
 async function scanCode0(q,ctx,silent){
   q=(q||"").trim();if(!q)return;
   var mpc=q.match(/^pc[^0-9a-z]*0*([0-9]+)$/i);if(mpc){ouvrirFiche(Number(mpc[1]));return true}
