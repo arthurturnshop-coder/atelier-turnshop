@@ -4,6 +4,8 @@ export const SHOP_CLIENT_SECRET = Bun.env.SHOPIFY_CLIENT_SECRET ?? "";
 export const SHOP_API = "2025-10";
 let shopCache: { token: string; expires: number } | null = null;
 
+export function oublierJetonShopify() { shopCache = null; }
+
 export async function shopifyToken(): Promise<string> {
   if (shopCache && shopCache.expires > Date.now() + 60_000) return shopCache.token;
   const res = await fetch(`https://${SHOP}/admin/oauth/access_token`, {
