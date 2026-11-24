@@ -46,7 +46,13 @@ function viewRestore(){
 function viewRestoreOpen(){
   if(VIEWF){var f=VIEWF;VIEWF=0;VIEWC=0;ouvrirFiche(f);return}
   if(VIEWC){var c=VIEWC;VIEWC=0;rechOpen(c)}}
+var CMDP="";
+document.addEventListener("input",function(e){if(e.target&&e.target.id==="c-mdp")CMDP=e.target.value});
 function render(){
+  var dr0=document.querySelector(".dright"),st0=dr0?dr0.scrollTop:0;
+  render0();
+  if(st0){var dr1=document.querySelector(".dright");if(dr1)dr1.scrollTop=st0}}
+function render0(){
   if(TAB==="compta"&&ROLE!=="admin")TAB="accueil";
   renderWho();
   if(!TOK&&!PW){vLogin();return}

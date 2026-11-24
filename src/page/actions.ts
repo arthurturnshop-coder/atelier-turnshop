@@ -102,13 +102,13 @@ export const ACTIONS = `var ACTS={
   cFermeRecu:function(){CREC=null;lirePay();render()},
   cPrint:function(b){btnFlash(b);var r=document.querySelector("[data-recu='"+b.dataset.id+"']");if(!r)return;var c=r.cloneNode(true);c.className="printme";impImprimer(c.outerHTML,"","",true)},
   cCase:function(b){return cCaseFn(b)},
-  cEncaisser:async function(){await rdvInfos();lirePay();var mdpE=document.getElementById("c-mdp"),mdpC=mdpE?mdpE.value:"";if(!mdpC){CMSG="Tape ton mot de passe (celui qui encaisse) avant d'encaisser.";render();return}var pay=["carte","especes","virement","bon_achat"].map(function(m){return{moyen:m,montant:CPAY[m]}}).filter(function(p){return p.montant});
+  cEncaisser:async function(){await rdvInfos();lirePay();var mdpE=document.getElementById("c-mdp"),mdpC=mdpE?mdpE.value:CMDP;CMDP=mdpC;if(!mdpC){CMSG="Tape ton mot de passe (celui qui encaisse) avant d'encaisser.";render();return}var pay=["carte","especes","virement","bon_achat"].map(function(m){return{moyen:m,montant:CPAY[m]}}).filter(function(p){return p.montant});
     var brut=panierTotal(),ids=avChoisis(brut).map(function(a){return a.id});
     if(!CREP){try{var need=await api("/caisse/series-requises",{lignes:PAN});need.indices.forEach(function(i){PAN[i].trott=true;PAN[i].series=PAN[i].series||[]})}catch(e){}}
     if(!CREP&&PAN.some(function(l){return l.trott})){
       if(!PAN.every(serieOk)){CMSG="Trottinette : saisis le numéro de série (un par trottinette) avant d encaisser.";render();return}
       if(!CCLI){CMSG="Trottinette : choisis le client (sa garantie est liée à son compte).";render();return}}
-    try{var d=await api("/caisse/encaisser",{lignes:PAN,paiements:pay,clientId:CCLI?CCLI.id:null,utiliserFidelite:CUSE,avantageIds:ids,repairId:CREP,mdpCaissier:mdpC});CREP=null;CACO=0;PAN=[];CPAY={carte:"",especes:"",virement:"",bon_achat:""};CUSE=false;CAVOFF=[];CREC=d.vente;CMSG="";CHOPEN=0;CCLI=null;CFID=null;await chargeHisto()}catch(e){CMSG=e.message;render()}},
+    try{var d=await api("/caisse/encaisser",{lignes:PAN,paiements:pay,clientId:CCLI?CCLI.id:null,utiliserFidelite:CUSE,avantageIds:ids,repairId:CREP,mdpCaissier:mdpC});CMDP="";CREP=null;CACO=0;PAN=[];CPAY={carte:"",especes:"",virement:"",bon_achat:""};CUSE=false;CAVOFF=[];CREC=d.vente;CMSG="";CHOPEN=0;CCLI=null;CFID=null;await chargeHisto()}catch(e){CMSG=e.message;render()}},
   shopTest:async function(){SHOPRES="<div class='muted'>Test en cours…</div>";render();try{var d=await api("/shopify/diagnostic");SHOPRES=d.etapes.map(function(e){return"<div>"+(e.ok?"✅ ":"❌ ")+"<b>"+esc(e.nom)+"</b><div class='muted'>"+esc(e.detail)+"</div></div>"}).join("")}catch(e){SHOPRES=esc(e.message)}render()},
   addPresta:async function(b){var x=(PRESTA?PRESTA.prestations:[]).filter(function(p){return p.id===+b.dataset.id})[0];if(!x||!FICHE)return;
     try{await api("/devis/ligne",{repairId:FICHE.id,type:"main_oeuvre",libelle:x.nom,quantite:1,prix:String(x.prixCents/100).replace(".",",")});
