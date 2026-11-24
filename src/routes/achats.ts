@@ -160,12 +160,12 @@ app.post("/api/achats/recevoir", async (c) => {
     const [reste] = (await sql`SELECT count(*)::int AS n FROM commande_lignes WHERE reparation_id = ${rid} AND statut <> 'recue'`) as any[];
     if (reste.n > 0) continue;
     await sql`UPDATE reparations SET piece_a_valider = true, maj_le = now() WHERE id = ${rid}`;
-    await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${rid}, 'note', ${`📦 Pièce arrivée : à valider dans l'atelier pour passer en réparation${signature(c)}`})`;
+    await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${rid}, 'note', ${`📦 Pièce arrivée : à valider dans l'atelier pour passer dans « À faire »${signature(c)}`})`;
     prets++;
   }
   // Les tâches « toujours pas arrivé » de ces lignes n'ont plus lieu d'être.
   await sql`UPDATE taches SET fait = true, fait_le = now(), fait_par = 'Réception' WHERE fait = false AND ligne_id = ANY(${ids})`;
-  return c.json({ message: prets ? `${prets} réparation(s) ont une pièce arrivée : à valider dans l'atelier pour passer en réparation.` : "Réception enregistrée." });
+  return c.json({ message: prets ? `${prets} réparation(s) ont une pièce arrivée : à valider dans l'atelier pour passer dans « À faire ».` : "Réception enregistrée." });
 });
 
 app.post("/api/reparations/client-prevenu", async (c) => {
@@ -182,8 +182,8 @@ app.post("/api/reparations/valider-piece", async (c) => {
   const id = Number(b.repairId);
   const [r] = (await sql`SELECT statut, piece_a_valider FROM reparations WHERE id = ${id} AND supprime_le IS NULL`) as any[];
   if (!r) throw new AppError(404, "Prise en charge introuvable.");
-  await sql`UPDATE reparations SET statut = 'en réparation', piece_a_valider = false, piece_arrivee = true, maj_le = now() WHERE id = ${id}`;
-  await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${id}, 'statut', ${`Pièce validée : ${r.statut} → en réparation. Client à prévenir${signature(c)}`})`;
+  await sql`UPDATE reparations SET statut = 'à faire', piece_a_valider = false, piece_arrivee = true, maj_le = now() WHERE id = ${id}`;
+  await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${id}, 'statut', ${`Pièce validée : ${r.statut} → à faire. Client à prévenir${signature(c)}`})`;
   void envoyerPieceArrivee(id);
-  return c.json({ message: "Pièce validée : la réparation passe en cours." });
+  return c.json({ message: "Pièce validée : la réparation passe dans « À faire »." });
 });

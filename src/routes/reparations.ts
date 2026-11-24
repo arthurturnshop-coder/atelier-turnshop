@@ -58,7 +58,7 @@ app.get("/api/reparations", async (c) => {
   const rows = (await sql`SELECT r.*, c.prenom, c.nom, c.telephone, c.email, t.marque, t.modele, t.serie FROM reparations r JOIN clients c ON c.id = r.client_id JOIN trottinettes t ON t.id = r.trottinette_id WHERE r.supprime_le IS NULL AND r.statut <> 'récupéré' ORDER BY r.maj_le DESC, r.id DESC LIMIT 300`) as any[];
   const compteurs = {
     rdv: rows.filter((r) => r.en_magasin === false).length,
-    afaire: rows.filter((r) => r.en_magasin !== false && ["reçu", "diagnostic", "devis envoyé", "en réparation"].includes(r.statut)).length,
+    afaire: rows.filter((r) => r.en_magasin !== false && ["reçu", "diagnostic", "devis envoyé", "à faire", "en réparation"].includes(r.statut)).length,
     commande: rows.filter((r) => r.statut === "en attente de pièce").length,
     pretes: rows.filter((r) => r.statut === "prêt").length,
     garantie: rows.filter((r) => r.sous_garantie === true).length,
@@ -66,7 +66,7 @@ app.get("/api/reparations", async (c) => {
   };
   const filtre = (r: any) => {
     if (vue === "rdv") return r.en_magasin === false;
-    if (vue === "afaire") return r.en_magasin !== false && ["reçu", "diagnostic", "devis envoyé", "en réparation"].includes(r.statut);
+    if (vue === "afaire") return r.en_magasin !== false && ["reçu", "diagnostic", "devis envoyé", "à faire", "en réparation"].includes(r.statut);
     if (vue === "commande") return r.statut === "en attente de pièce";
     if (vue === "pretes") return r.statut === "prêt";
     if (vue === "garantie") return r.sous_garantie === true;

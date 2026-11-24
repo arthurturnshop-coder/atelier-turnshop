@@ -119,6 +119,7 @@ export function etatClient(r: any) {
   else if (web && rs === "propose") { etape = "demande"; libelle = "L'atelier te propose un autre créneau : à toi de répondre"; }
   else if (r.statut === "devis envoyé") { etape = "validation"; libelle = "Devis à valider : on attend ta réponse"; }
   else if (r.statut === "en attente de pièce") { etape = "commande"; libelle = "Pièce en commande"; }
+  else if (r.statut === "à faire") { etape = "planifie"; libelle = "Pièce arrivée : ta réparation va démarrer"; }
   else if (r.statut === "diagnostic" || r.statut === "en réparation") { etape = "en_cours"; libelle = r.statut === "diagnostic" ? "Diagnostic en cours" : "En cours de réparation"; }
   else if (web && r.en_magasin === false) { etape = "rdv"; libelle = "Rendez-vous confirmé : apporte ta trottinette à l'atelier"; }
   else if (r.debut) { etape = "planifie"; libelle = "Réparation planifiée"; }
