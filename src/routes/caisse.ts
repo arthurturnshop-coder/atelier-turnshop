@@ -225,6 +225,8 @@ app.post("/api/caisse/encaisser", async (c) => {
   for (const l of nettoyees as any[]) {
     l.trott = l.trott || (l.variantId && auto.has(l.variantId));
     if (!l.trott) { l.series = []; continue; }
+    // Prise en charge client (facturation d'une réparation) : le n° de série n'est pas exigé.
+    if (Number(b.repairId) > 0 && l.series.every((x: string) => !x)) { l.trott = false; l.series = []; continue; }
     if (l.series.length !== l.quantite || l.series.some((x: string) => x.length < 3)) throw new AppError(400, `Numéro de série obligatoire pour « ${l.libelle} » (${l.quantite} à saisir).`);
     toutesSeries.push(...l.series);
   }

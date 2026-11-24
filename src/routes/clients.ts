@@ -192,6 +192,26 @@ app.post("/api/clients/fusionner", async (c) => {
   return c.json({ message: "Fiches fusionnées.", id: vers });
 });
 
+// Changer une trottinette de propriétaire (le client la récupère d'un autre). L'historique reste sur l'ancienne fiche.
+await sql`CREATE TABLE IF NOT EXISTS trott_transferts (id SERIAL PRIMARY KEY, trottinette_id INT NOT NULL, de_client INT, vers_client INT NOT NULL, par TEXT NOT NULL DEFAULT '', cree_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
+app.post("/api/trottinettes/transferer", async (c) => {
+  exigeResponsable(c);
+  const b = await c.req.json().catch(() => ({}));
+  const tid = Number(b.trottinetteId), vers = Number(b.versClientId);
+  const [t] = (await sql`SELECT id, client_id, serie FROM trottinettes WHERE id = ${tid}`) as any[];
+  if (!t) throw new AppError(404, "Trottinette introuvable.");
+  const [cl] = (await sql`SELECT id, prenom, nom FROM clients WHERE id = ${vers}`) as any[];
+  if (!cl) throw new AppError(404, "Nouveau propriétaire introuvable.");
+  if (t.client_id === vers) throw new AppError(400, "Elle est déjà sur cette fiche.");
+  const [enCours] = (await sql`SELECT id FROM reparations WHERE trottinette_id = ${tid} AND statut <> 'récupéré' AND supprime_le IS NULL LIMIT 1`) as any[];
+  if (enCours) throw new AppError(409, "Une réparation est en cours sur cette trottinette : termine-la avant de changer de propriétaire.");
+  const [meme] = (await sql`SELECT id FROM trottinettes WHERE client_id = ${vers} AND serie = ${t.serie}`) as any[];
+  if (meme) throw new AppError(409, "Ce client a déjà cette trottinette sur sa fiche.");
+  await sql`UPDATE trottinettes SET client_id = ${vers} WHERE id = ${tid}`;
+  await sql`INSERT INTO trott_transferts (trottinette_id, de_client, vers_client, par) VALUES (${tid}, ${t.client_id}, ${vers}, ${String((c.get("user") as any)?.prenom ?? "")})`;
+  return c.json({ message: `Trottinette transférée à ${cl.prenom} ${cl.nom}.` });
+});
+
 app.post("/api/trottinettes", async (c) => {
   const b = await c.req.json().catch(() => ({}));
   const marque = clean(b.marque, 60), modele = clean(b.modele, 60), serie = clean(b.serie, 60);

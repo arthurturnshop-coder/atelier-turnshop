@@ -1,4 +1,5 @@
-export const PROFIL = `// ---------- Profil client ----------
+export const PROFIL = `var TRF=null;
+// ---------- Profil client ----------
 function blocAvisRep(r){
   if(r.statut!=="récupéré")return"";
   if(r.avis_statut==="programme")return"<div class='avis'><b>Avis Google</b><div>Demande programmée pour le "+esc(dayHour(r.avis_envoi_le))+".</div><div class='muted'>L'envoi automatique n'est pas encore branché : rien ne part pour l'instant.</div></div>";
@@ -64,6 +65,11 @@ function vProfil(){
     var open=t.reparations.filter(function(r){return r.statut!=="récupéré"}).length;
     h+="<div class='card scoot'><div class='head'><div><b>"+esc(t.marque)+" "+esc(t.modele)+"</b> <span class='tag'>N° "+esc(t.serie)+"</span></div>"
       +(open?"<span class='tag'>"+open+" en cours</span>":"")+"</div>";
+    if(typeof TRF!=="undefined"&&TRF&&TRF.t===t.id){
+      h+="<div class='card'><b>Nouveau propriétaire</b><div class='dl'><input id='trf-q' value='"+esc(TRF.q||"")+"' placeholder='Nom, téléphone ou email'><button data-act='trfCherche'>Chercher</button><button class='link' data-act='trfNon'>Annuler</button></div>";
+      if(TRF.res)h+=TRF.res.length?TRF.res.map(function(x,i){return"<div><button class='sec' data-act='trfOk' data-i='"+i+"'>"+esc(x.prenom+" "+x.nom)+(x.telephone?" · "+esc(x.telephone):"")+"</button></div>"}).join(""):"<div class='muted'>Aucun client trouvé.</div>";
+      h+="</div>"}
+    else h+="<div><button class='link' data-act='trfOpen' data-t='"+t.id+"' style='font-size:12px;opacity:.7'>↔ Changer de propriétaire</button></div>";
     if(RECEP===t.id)h+=recepForm(t);
     else h+="<button data-act='openRecep' data-t='"+t.id+"'>Réception</button>";
     if(!t.reparations.length)h+="<div class='muted' style='margin-top:8px'>Aucun passage à l'atelier.</div>";

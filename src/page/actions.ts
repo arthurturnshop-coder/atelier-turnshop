@@ -69,6 +69,11 @@ export const ACTIONS = `var ACTS={
   cClient0:function(){CREP=null;CACO=0;CCLI=null;CFID=null;CUSE=false;CHIST=null;CHOPEN=0;CAVOFF=[];lirePay();render()},
   cUse:function(b){CUSE=b.dataset.v==="1";lirePay();var sy=window.scrollY;render();window.scrollTo(0,sy)},
   cAdd:function(){var l=v("cl");if(!l){alert("Donne un libellé.");return}PAN.push({libelle:l,quantite:Math.max(1,Number(v("cq2"))||1),prix:v("cp")||"0"});lirePay();render()},
+  trfOpen:function(b){TRF={t:+b.dataset.t,q:"",res:null};render()},
+  trfNon:function(){TRF=null;render()},
+  trfCherche:async function(){var q=v("trf-q");TRF.q=q;try{TRF.res=await api("/search?q="+encodeURIComponent(q))}catch(e){TRF.res=[]}render()},
+  trfOk:async function(b){var c=TRF&&TRF.res&&TRF.res[+b.dataset.i];if(!c)return;if(!confirm("Transférer cette trottinette à "+c.prenom+" "+c.nom+" ? Son historique reste sur l ancienne fiche."))return;
+    try{var d=await api("/trottinettes/transferer",{trottinetteId:TRF.t,versClientId:c.id});TRF=null;alert(d.message);await refresh()}catch(e){alert(e.message)}},
   cVehOpen:function(){lirePay();CVEH=true;render()},
   cVehNon:function(){lirePay();CVEH=false;render()},
   cVehOk:function(){lirePay();var e=document.getElementById("cveh-l"),l=e?PAN[+e.value]:null;if(l){l.trott=true;l.series=l.series||[]}CVEH=false;render()},
@@ -99,8 +104,8 @@ export const ACTIONS = `var ACTS={
   cCase:function(b){return cCaseFn(b)},
   cEncaisser:async function(){await rdvInfos();lirePay();var pay=["carte","especes","virement","bon_achat"].map(function(m){return{moyen:m,montant:CPAY[m]}}).filter(function(p){return p.montant});
     var brut=panierTotal(),ids=avChoisis(brut).map(function(a){return a.id});
-    try{var need=await api("/caisse/series-requises",{lignes:PAN});need.indices.forEach(function(i){PAN[i].trott=true;PAN[i].series=PAN[i].series||[]})}catch(e){}
-    if(PAN.some(function(l){return l.trott})){
+    if(!CREP){try{var need=await api("/caisse/series-requises",{lignes:PAN});need.indices.forEach(function(i){PAN[i].trott=true;PAN[i].series=PAN[i].series||[]})}catch(e){}}
+    if(!CREP&&PAN.some(function(l){return l.trott})){
       if(!PAN.every(serieOk)){CMSG="Trottinette : saisis le numéro de série (un par trottinette) avant d encaisser.";render();return}
       if(!CCLI){CMSG="Trottinette : choisis le client (sa garantie est liée à son compte).";render();return}}
     try{var d=await api("/caisse/encaisser",{lignes:PAN,paiements:pay,clientId:CCLI?CCLI.id:null,utiliserFidelite:CUSE,avantageIds:ids,repairId:CREP});CREP=null;CACO=0;PAN=[];CPAY={carte:"",especes:"",virement:"",bon_achat:""};CUSE=false;CAVOFF=[];CREC=d.vente;CMSG="";CHOPEN=0;CCLI=null;CFID=null;await chargeHisto()}catch(e){CMSG=e.message;render()}},
