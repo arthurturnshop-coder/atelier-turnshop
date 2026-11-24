@@ -65,16 +65,21 @@ function shopHtml(r){
   if(s.nom)return"<div class='muted'>Commande Shopify "+esc(s.nom)+" créée (visible sur le compte du client).</div>";
   return"<div class='muted'>"+(s.erreur?"Pas partie vers Shopify : "+esc(s.erreur):"Pas envoyée à Shopify.")+"</div><div class='actions'><button class='sec' data-act='cShopRetry' data-id='"+r.id+"'>Envoyer vers Shopify</button></div>"}
 var VJ=null,VJOPEN=0;
+function vjSync(){
+  var o=document.getElementById("vj");
+  if(!VJ){if(o)o.remove();return}
+  if(!o){o=document.createElement("div");o.id="vj";o.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:99999;overflow:auto;padding:20px";document.body.appendChild(o)}
+  o.innerHTML=vjHtml()}
 function vjHtml(){
   if(!VJ)return"";
   var tot=0;VJ.forEach(function(r){tot+=r.totalCents});
-  var h="<div style='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000;overflow:auto;padding:20px'><div class='card' style='max-width:720px;margin:0 auto;background:#fff'><div class='step'>Ventes du jour · "+VJ.length+" vente(s) · "+eur(tot)+"</div>";
+  var h="<div class='card' style='max-width:720px;margin:0 auto;background:#fff'><div class='step'>Ventes du jour · "+VJ.length+" vente(s) · "+eur(tot)+"</div>";
   if(!VJ.length)h+="<div class='muted'>Aucune vente aujourd hui.</div>";
   VJ.forEach(function(r){
     var res=r.lignes.slice(0,3).map(function(l){return esc(l.libelle)}).join(", ")+(r.lignes.length>3?"…":"");
     h+="<button class='sec hrow' data-act='cVjRecu' data-id='"+r.id+"'><b>"+esc(dateLongue(r.date))+"</b> · "+eur(r.totalCents)+" · "+esc(r.client||"sans client")+(r.numero?" · "+esc(r.numero):"")+"<br><span class='muted'>"+res+"</span></button>";
     if(VJOPEN===r.id)h+=recuHtml(r)+"<div class='actions'><button class='sec' data-act='cPrint' data-id='"+r.id+"'>Imprimer le reçu</button><button class='sec' data-act='cEmail' data-id='"+r.id+"'>✉ Envoyer par email</button></div>"});
-  return h+"<div class='actions'><button data-act='cVjFerme'>Fermer</button></div></div></div>"}
+  return h+"<div class='actions'><button data-act='cVjFerme'>Fermer</button></div></div>"}
 function histoHtml(){
   if(!CHIST)return"";
   var h="<div class='card'><div class='step'>"+(CCLI?"Achats de "+esc(CCLI.name):"Ventes du jour")+"</div>";
@@ -93,7 +98,7 @@ function caisseHtml(){
     var hb="<div class='caisse'><h3>Caisse <button class='sec' data-act='cVjOuvre' style='float:right'>📋 Ventes du jour</button></h3>";
     if(CREC)hb+="<div class='card'><b>Vente enregistrée</b>"+recuHtml(CREC)+"<div class='actions'><button data-act='cPrint' data-id='"+CREC.id+"'>Imprimer le reçu</button><button class='sec' data-act='cFermeRecu'>Fermer</button></div></div>";
     hb+="<div class='card' style='text-align:center'><div style='font-size:28px;font-weight:700;color:#b00'>🔒 CAISSE FERMÉE</div><div class='muted'>"+(CLO.d.ouverte?"Ferme la caisse de la veille pour continuer.":"Ouvre la caisse pour accéder aux ventes.")+"</div></div>";
-    return hb+histoHtml()+cloHtml()+vjHtml()+"</div>"}
+    return hb+histoHtml()+cloHtml()+"</div>"}
   var brut=panierTotal(),av=avRemTotal(brut),rem=remiseCents(),aco=acoDeduit(brut-av-rem),net=brut-av-rem-aco;
   var h="<div class='caisse'><h3>Caisse <button class='sec' data-act='cVjOuvre' style='float:right'>📋 Ventes du jour</button></h3>";
   if(CREC)h+="<div class='card'><b>Vente enregistrée</b>"+recuHtml(CREC)+shopHtml(CREC)+avisBtns(CREC)+"<div class='actions'><button data-act='cPrint' data-id='"+CREC.id+"'>Imprimer le reçu</button><button class='sec' data-act='cEmail' data-id='"+CREC.id+"'>✉ Envoyer par email</button><button class='sec' data-act='cFermeRecu'>Fermer</button></div></div>";
@@ -130,7 +135,7 @@ function caisseHtml(){
     +"<div class='actions'><button class='sec' data-act='cTout' data-m='carte'>Tout en carte</button><button class='sec' data-act='cTout' data-m='especes'>Tout en espèces</button><button class='sec' data-act='cTout' data-m='virement'>Tout en virement</button></div>"
     +"<button data-act='cEncaisser' style='width:100%;margin-top:10px;padding:14px;font-size:17px'>Encaisser</button><div class='muted'>"+esc(CMSG)+"</div>"
     +"<div class='muted' style='margin-top:10px'>Le client ne se décide pas maintenant ?</div><div class='actions'><button class='sec' data-act='cEnDevis'>Mettre en devis</button><button class='sec' data-act='cEnPec'>Faire réparer en boutique</button></div></div>";
-  h+=histoHtml()+cloHtml()+vjHtml()+"</div>";
+  h+=histoHtml()+cloHtml()+"</div>";
   return h}
 async function ajouterProduit(p,ctx){
   if(ctx==="etq"){ETQ.push({titre:p.libelle,prix:String(p.prix),barcode:p.barcode||"",sku:p.sku||"",qte:1});render();return}
