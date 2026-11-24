@@ -13,7 +13,7 @@ function repHtml(r){
     +"<button class='sec' data-act='ouvrirFiche' data-id='"+r.id+"'>Ouvrir la fiche</button>"+blocAvisRep(r)+"</div>"}
 function recepForm(t){
   return"<div class='rep'><div class='step'>Nouvelle prise en charge pour "+esc(t.marque+" "+t.modele)+"</div>"
-    +"<textarea id='p' rows='3' placeholder='Panne décrite par le client'></textarea><input id='e' placeholder='État à l arrivée'><textarea id='r' rows='2' placeholder='Remarques'></textarea>"+boiteSelect("b")+"<input id='d' type='date' value='"+today()+"'>"
+    +"<textarea id='p' rows='3' placeholder='Panne décrite par le client'></textarea><input id='e' placeholder='État à l arrivée'><textarea id='r' rows='2' placeholder='Remarques'></textarea>"+boiteSelect("b")+"<input id='k' placeholder='🔑 Code / mot de passe de la trottinette (facultatif)'><input id='d' type='date' value='"+today()+"'>"
     +"<label class='muted' style='display:flex;gap:8px;align-items:center'><input id='abs' type='checkbox' style='width:auto;margin:0'"+(RACC==="rdv"||RACC==="devis"?" checked":"")+"> La trottinette n'est pas encore en magasin (rendez-vous)</label>"
     +"<label class='muted' style='display:flex;gap:8px;align-items:center'><input id='gar' type='checkbox' style='width:auto;margin:0'> Sous garantie</label>"
     +"<label class='muted' style='display:flex;gap:8px;align-items:center'><input id='pec' type='checkbox' checked style='width:auto;margin:0'> Imprimer le ticket de prise en charge</label>"
@@ -64,7 +64,7 @@ function vProfil(){
   c.trottinettes.forEach(function(t){
     var open=t.reparations.filter(function(r){return r.statut!=="récupéré"}).length;
     h+="<div class='card scoot'><div class='head'><div><b>"+esc(t.marque)+" "+esc(t.modele)+"</b> <span class='tag'>N° "+esc(t.serie)+"</span></div>"
-      +(open?"<span class='tag'>"+open+" en cours</span>":"")+"</div>";
+      +(open?"<span class='tag'>"+open+" en cours</span>":"")+"</div><div class='muted'>🔑 "+(t.code_acces?"Code : <b>"+esc(t.code_acces)+"</b> ":"Pas de code enregistré ")+"<button class='link' data-act='codeProfil' data-t='"+t.id+"' data-c='"+esc(t.code_acces||"")+"' style='font-size:12px'>"+(t.code_acces?"modifier":"ajouter")+"</button></div>";
     if(typeof TRF!=="undefined"&&TRF&&TRF.t===t.id){
       h+="<div class='card'><b>Nouveau propriétaire</b><div class='dl'><input id='trf-q' value='"+esc(TRF.q||"")+"' placeholder='Nom, téléphone ou email'><button data-act='trfCherche'>Chercher</button><button class='link' data-act='trfNon'>Annuler</button></div>";
       if(TRF.res)h+=TRF.res.length?TRF.res.map(function(x,i){return"<div><button class='sec' data-act='trfOk' data-i='"+i+"'>"+esc(x.prenom+" "+x.nom)+(x.telephone?" · "+esc(x.telephone):"")+"</button></div>"}).join(""):"<div class='muted'>Aucun client trouvé.</div>";

@@ -220,6 +220,15 @@ app.post("/api/trottinettes/transferer", async (c) => {
   return c.json({ message: `Trottinette transférée à ${cl.prenom} ${cl.nom}.` });
 });
 
+await sql`ALTER TABLE trottinettes ADD COLUMN IF NOT EXISTS code_acces TEXT`;
+// Code de déverrouillage / mot de passe de la trottinette (facultatif), pour ne pas rappeler le client à chaque fois.
+app.post("/api/trottinettes/code", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const [t] = (await sql`UPDATE trottinettes SET code_acces = ${clean(b.code, 60) || null} WHERE id = ${Number(b.trottinetteId)} RETURNING id`) as any[];
+  if (!t) throw new AppError(404, "Trottinette introuvable.");
+  return c.json({ message: "Code enregistré." });
+});
+
 app.post("/api/trottinettes", async (c) => {
   const b = await c.req.json().catch(() => ({}));
   const marque = clean(b.marque, 60), modele = clean(b.modele, 60), serie = clean(b.serie, 60);

@@ -89,7 +89,7 @@ function vFiche(){
     +(f.enMagasin===false?"<div class='tag warn' style='margin:6px 0'>Trottinette pas en magasin</div><button data-act='arrivee' data-id='"+f.id+"' data-fiche='1'>Trottinette arrivée</button>":"")
     +"<div class='step' style='margin-top:10px'>Statut</div><div class='stbtns'>"+ST.map(function(s){if(s==="devis envoyé"&&s!==f.statut)return"<button class='dis' disabled title='Se met tout seul quand tu envoies le devis au client'>"+esc(s)+" (auto)</button>";return"<button class='"+(s===f.statut?"on":"")+"' data-act='setStatut' data-id='"+f.id+"' data-s='"+esc(s)+"'>"+esc(s)+"</button>"}).join("")+"</div>"
     +"<label class='muted' style='display:flex;gap:8px;align-items:center'><input type='checkbox' style='width:auto;margin:0' "+(f.sousGarantie?"checked ":"")+"data-act='setGarantie' data-id='"+f.id+"'> Sous garantie</label></div>"
-    +boiteCard(f)+garantieHtml(f)+gardeHtml(f)+acompteHtml(f)
+    +codeCard(f)+boiteCard(f)+garantieHtml(f)+gardeHtml(f)+acompteHtml(f)
     +"<div class='card'><div class='step'>Description de la panne</div><textarea id='fp' rows='3'>"+esc(f.panne)+"</textarea>"
     +"<div class='step'>Commentaire interne (visible seulement par TURN)</div><textarea id='fc' rows='3' placeholder='Ce que le client a demandé, ce qu il faudrait lui proposer...'>"+esc(f.commentaireInterne||"")+"</textarea>"
     +"<button data-act='saveFiche' data-id='"+f.id+"'>Enregistrer la description et le commentaire</button></div>"
@@ -97,6 +97,7 @@ function vFiche(){
     +"<div class='card'><div class='step'>Historique</div>"+(f.journal||[]).slice().reverse().map(function(j){return"<div class='hist'>"+esc(dayHour(j.date))+" · "+esc(j.texte)+"</div>"}).join("")
     +"<input id='fn' placeholder='Ajouter une note à l historique'><button class='sec' data-act='addNote' data-id='"+f.id+"'>Ajouter la note</button></div>";
   app.innerHTML=h}
+function codeCard(f){return"<div class='card'><div class='step'>🔑 Code / mot de passe de la trottinette</div><div class='dl'><input id='fk' value='"+esc(f.codeAcces||"")+"' placeholder='Facultatif : code de déverrouillage, mot de passe de l app...'><button class='sec' data-act='codeSave' data-t='"+f.trottinetteId+"' data-id='"+f.id+"'>Enregistrer</button></div><div class='muted'>Gardé sur la trottinette du client : pas besoin de le redemander la prochaine fois.</div></div>"}
 var BXOC=null;
 function boitesCharge(){if(BXOC===null){BXOC=undefined;api("/boites").then(function(d){BXOC=d.boites;if(TAB==="enc")render()}).catch(function(){BXOC=[]})}}
 function boiteSelect(id){

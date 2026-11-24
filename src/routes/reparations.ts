@@ -83,7 +83,8 @@ app.get("/api/reparation", async (c) => {
   const [r] = (await sql`SELECT r.*, c.prenom, c.nom, c.telephone, c.email, t.marque, t.modele, t.serie FROM reparations r JOIN clients c ON c.id = r.client_id JOIN trottinettes t ON t.id = r.trottinette_id WHERE r.id = ${id} AND r.supprime_le IS NULL`) as any[];
   if (!r) throw new AppError(404, "Réparation introuvable.");
   const journal = (await sql`SELECT reparation_id, date, type, texte FROM journal WHERE reparation_id = ${id} ORDER BY id`) as any[];
-  return c.json({ ...ligneListe(r, journal), devis: await devisDe(id), acompte: await acomptesDe(id), statuts: STATUTS, ticketEntete: (await lireTicket()).entete, gardeInfo: { franchiseJours: GARDE.franchiseJours, prixCents: GARDE.prixCents, abandonJour: GARDE.abandonJour } });
+  const [tc] = (await sql`SELECT code_acces FROM trottinettes WHERE id = ${r.trottinette_id}`) as any[];
+  return c.json({ ...ligneListe(r, journal), trottinetteId: r.trottinette_id, codeAcces: tc?.code_acces ?? "", devis: await devisDe(id), acompte: await acomptesDe(id), statuts: STATUTS, ticketEntete: (await lireTicket()).entete, gardeInfo: { franchiseJours: GARDE.franchiseJours, prixCents: GARDE.prixCents, abandonJour: GARDE.abandonJour } });
 });
 
 // Nouvelle prise en charge. enMagasin:false = rendez-vous, sousGarantie:true = garantie.
@@ -98,6 +99,7 @@ app.post("/api/reparations", async (c) => {
   const enMagasin = b.enMagasin !== false;
   const garantie = b.sousGarantie === true;
   const [r] = await sql`INSERT INTO reparations (client_id, trottinette_id, panne, etat, remarques, date_depot, en_magasin, sous_garantie) VALUES (${clientId}, ${trottId}, ${panne}, ${clean(b.etat, 500)}, ${clean(b.remarques, 1000)}, ${date}, ${enMagasin}, ${garantie}) RETURNING id`;
+  if (clean(b.codeAcces, 60)) await sql`UPDATE trottinettes SET code_acces = ${clean(b.codeAcces, 60)} WHERE id = ${trottId}`;
   const boiteNouv = clean(b.boite, 10).toUpperCase();
   if (boiteNouv) {
     const [pris] = (await sql`SELECT id FROM reparations WHERE boite = ${boiteNouv} AND supprime_le IS NULL AND statut <> 'récupéré' AND id <> ${r.id}`) as any[];
