@@ -32,7 +32,10 @@ async function calcul(m: string, de: Date | string, a: Date | string | null) {
   for (const p of pay) par[p.moyen] = p.n;
   const rem: Record<string, number> = {};
   for (const r of remb) rem[r.moyen] = r.n;
-  return { encaisse: par, rembourse: rem, nbVentes: nb.n, nbAcomptes: ac.n, caCents: nb.total, especesNettes: par.especes - (rem.especes ?? 0) };
+  const tr = (await sql`SELECT v.numero_facture, vl.libelle, vl.series, trim(cl.prenom || ' ' || cl.nom) AS client FROM vente_lignes vl JOIN ventes v ON v.id = vl.vente_id LEFT JOIN clients cl ON cl.id = v.client_id
+    WHERE v.magasin = ${m} AND v.cree_le >= ${de} AND v.cree_le <= ${fin} AND jsonb_array_length(vl.series) > 0 ORDER BY v.id`) as any[];
+  const trottinettes = tr.flatMap((r: any) => (r.series as string[]).map((serie) => ({ facture: r.numero_facture ?? "", libelle: r.libelle, serie, client: r.client ?? "" })));
+  return { trottinettes, encaisse: par, rembourse: rem, nbVentes: nb.n, nbAcomptes: ac.n, caCents: nb.total, especesNettes: par.especes - (rem.especes ?? 0) };
 }
 
 const vue = (s: any) => s && ({

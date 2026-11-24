@@ -31,6 +31,12 @@ function avCondition(a){
 function remiseCents(){var brut=panierTotal();return CUSE&&CFID?Math.min(Math.round(CFID.disponibleEuros*100),brut-avRemTotal(brut)):0}
 function lirePay(){CPAY={carte:v("pc"),especes:v("pe"),virement:v("pv"),bon_achat:v("pb")}}
 function dateLongue(d){try{return new Date(d).toLocaleString("fr-FR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit",timeZone:"Europe/Paris"})}catch(e){return d||""}}
+function serieHtml(l,i){
+  if(l.trott){var q=Math.max(1,l.quantite|0),h="<div style='margin-top:6px'><b>🛴 N° de série (obligatoire)</b>";
+    for(var k=0;k<q;k++)h+="<input data-act='cSerie' data-i='"+i+"' data-k='"+k+"' value='"+esc((l.series||[])[k]||"")+"' placeholder='N° de série"+(q>1?" "+(k+1):"")+"' style='display:block;margin-top:4px;width:100%;max-width:260px'>";
+    return h+"</div>"}
+  return"<div><button class='link' data-act='cTrott' data-i='"+i+"'>🛴 Trottinette : saisir le n° de série</button></div>"}
+function serieOk(l){if(!l.trott)return true;var q=Math.max(1,l.quantite|0);for(var k=0;k<q;k++){if(String((l.series||[])[k]||"").trim().length<3)return false}return true}
 function recuHtml(r){
   var ttc=r.totalCents,ht=Math.round(ttc/1.2),tva=ttc-ht,t=r.ticket||{};
   var es=entSplit(t.entete),ent=es.haut,ri=RDVI||{};
@@ -40,7 +46,7 @@ function recuHtml(r){
     +"<div class='rl'><span>Date</span><span>"+esc(dateLongue(r.date))+"</span></div>"
     +"<div class='rm'>Vendeur : "+esc(r.vendeur||"")+"</div><hr>"
     +(r.client?"<div class='rm'>Client</div><div><b>"+esc(r.client)+"</b></div>"+(r.contact&&r.contact.tel?"<div>"+esc(r.contact.tel)+"</div>":"")+"<hr>":"");
-  r.lignes.forEach(function(l){h+="<div class='rl'><span>"+l.quantite+" × "+esc(l.libelle)+"</span><span>"+eur(l.quantite*l.prixCents)+"</span></div>"});
+  r.lignes.forEach(function(l){h+="<div class='rl'><span>"+l.quantite+" × "+esc(l.libelle)+"</span><span>"+eur(l.quantite*l.prixCents)+"</span></div>"+((l.series||[]).length?"<div style='font-size:12px'>N° de série : "+l.series.map(esc).join(", ")+"</div>":"")});
   h+="<hr><div class='rl'><span>Sous-total</span><span>"+eur(r.brutCents)+"</span></div>";
   r.avantages.forEach(function(a){h+="<div class='rl'><span>"+(a.effet==="cadeau"?"Cadeau : ":"Offre : ")+esc(a.libelle)+"</span><span>"+(a.remiseCents?"-"+eur(a.remiseCents):"offert")+"</span></div>"});
   if(r.fideliteCents)h+="<div class='rl'><span>Fidélité</span><span>-"+eur(r.fideliteCents)+"</span></div>";
@@ -125,7 +131,7 @@ function caisseHtml(){
   h+="</div>";
   h+="<div class='card'><div class='step'>Panier</div>";
   if(!PAN.length)h+="<div class='muted'>Panier vide. Ajoute un article ci-dessous.</div>";
-  else h+="<table class='panier' style='width:100%;border-collapse:collapse'><tr><th style='text-align:left'>Article</th><th>Qté</th><th>Prix €</th><th></th></tr>"+PAN.map(function(l,i){return"<tr><td>"+esc(l.libelle)+((l.barcode||l.sku)?"<div class='muted' style='font-size:12px'>"+(l.barcode?"EAN "+esc(l.barcode):"")+(l.barcode&&l.sku?" · ":"")+(l.sku?"sku "+esc(l.sku):"")+"</div>":"")+(l.emplacement?"<div style='font-size:13px'><b>📍 "+esc(l.emplacement)+"</b></div>":"")+"</td><td><input type='number' min='1' value='"+l.quantite+"' data-act='cQte' data-i='"+i+"'></td><td><input value='"+esc(l.prix)+"' data-act='cPrix' data-i='"+i+"'></td><td><button class='link' data-act='cDel' data-i='"+i+"'>Retirer</button></td></tr>"}).join("")+"</table>";
+  else h+="<table class='panier' style='width:100%;border-collapse:collapse'><tr><th style='text-align:left'>Article</th><th>Qté</th><th>Prix €</th><th></th></tr>"+PAN.map(function(l,i){return"<tr><td>"+esc(l.libelle)+((l.barcode||l.sku)?"<div class='muted' style='font-size:12px'>"+(l.barcode?"EAN "+esc(l.barcode):"")+(l.barcode&&l.sku?" · ":"")+(l.sku?"sku "+esc(l.sku):"")+"</div>":"")+(l.emplacement?"<div style='font-size:13px'><b>📍 "+esc(l.emplacement)+"</b></div>":"")+serieHtml(l,i)+"</td><td><input type='number' min='1' value='"+l.quantite+"' data-act='cQte' data-i='"+i+"'></td><td><input value='"+esc(l.prix)+"' data-act='cPrix' data-i='"+i+"'></td><td><button class='link' data-act='cDel' data-i='"+i+"'>Retirer</button></td></tr>"}).join("")+"</table>";
   h+="<div style='margin-top:8px'>"+prodBox("caisse")+"</div>";
   h+="<div class='dl' style='margin-top:8px'><input id='cl' class='lb' placeholder='Article (libellé)'><input id='cq2' class='q' type='number' min='1' value='1'><input id='cp' class='p' placeholder='Prix €'><button data-act='cAdd'>Ajouter</button></div></div>";
   var dispo=(CAV||[]).filter(function(a){return avApplicable(a,brut)});

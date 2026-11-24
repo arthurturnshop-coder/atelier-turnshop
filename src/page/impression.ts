@@ -159,7 +159,9 @@ function cloHeure(x){var t=new Date(x);return t.toLocaleDateString("fr-FR")+" "+
 function cloTotaux(t){
   var e=t.encaisse,r=t.rembourse||{},h="<table class='devis' style='width:100%'>"+cloLigne("Carte",e.carte)+cloLigne("Espèces encaissées",e.especes)+cloLigne("Virement",e.virement)+(e.bon_achat?cloLigne("Bon d achat",e.bon_achat):"")+cloLigne("En ligne (Shopify)",e.en_ligne);
   Object.keys(r).forEach(function(k){h+=cloLigne("Remboursé ("+esc(k)+")",-r[k])});
-  return h+"</table><div class='muted'>"+t.nbVentes+" vente(s) · "+t.nbAcomptes+" acompte(s) · CA ventes "+eur(t.caCents)+"</div>"}
+  h+="</table><div class='muted'>"+t.nbVentes+" vente(s) · "+t.nbAcomptes+" acompte(s) · CA ventes "+eur(t.caCents)+"</div>";
+  if((t.trottinettes||[]).length){h+="<div class='step' style='margin-top:8px'>🛴 Trottinettes vendues (n° de série)</div>"+t.trottinettes.map(function(x){return"<div class='muted'>"+esc(x.serie)+" · "+esc(x.libelle)+(x.client?" · "+esc(x.client):"")+(x.facture?" · "+esc(x.facture):"")+"</div>"}).join("")}
+  return h}
 function cloEcartTxt(c){return(c>0?"+":"")+eur(c)}
 function cloOuvreForm(d){
   var sug=d.fondConseilleCents?(d.fondConseilleCents/100).toFixed(2).split(".").join(","):"";
@@ -238,6 +240,7 @@ function cloImprimeZ(z){
     +"<div class='rl'><span>Carte</span><span>"+eur(e.carte)+"</span></div><div class='rl'><span>Espèces</span><span>"+eur(e.especes)+"</span></div><div class='rl'><span>Virement</span><span>"+eur(e.virement)+"</span></div>"+(e.bon_achat?"<div class='rl'><span>Bon d achat</span><span>"+eur(e.bon_achat)+"</span></div>":"")+"<div class='rl'><span>En ligne</span><span>"+eur(e.en_ligne)+"</span></div>";
   Object.keys(t.rembourse||{}).forEach(function(k){h+="<div class='rl'><span>Remboursé "+esc(k)+"</span><span>-"+eur(t.rembourse[k])+"</span></div>"});
   h+="<hr><div class='rl'><span>Ventes</span><span>"+t.nbVentes+"</span></div><div class='rl'><span>CA ventes</span><span>"+eur(t.caCents)+"</span></div><hr>"
+  if((t.trottinettes||[]).length){h+="<div class='rc'><b>TROTTINETTES VENDUES</b></div>"+t.trottinettes.map(function(x){return"<div style='font-size:12px'>"+esc(x.serie)+" - "+esc(x.libelle)+(x.client?" - "+esc(x.client):"")+(x.facture?" - "+esc(x.facture):"")+"</div>"}).join("")+"<hr>"}
     +"<div class='rl'><span>Tiroir à l ouverture</span><span>"+eur(z.fondCents)+"</span></div><div class='rl'><span>Espèces attendues</span><span>"+eur(z.attenduCents)+"</span></div><div class='rl'><span>Espèces comptées</span><span>"+eur(z.compteCents)+"</span></div><div class='rl rt'><span>ÉCART</span><span>"+cloEcartTxt(z.ecartCents)+"</span></div>"
     +(z.note?"<div class='rm'>"+esc(z.note)+"</div>":"")+"<div class='rc rm'>Ouverte par "+esc(z.ouvertPar||"")+" · fermée par "+esc(z.fermePar||"")+"</div>";
   var aj=z.ajouts||[];

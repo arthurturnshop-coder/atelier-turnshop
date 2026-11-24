@@ -133,16 +133,35 @@ app.get("/api/ventes/recherche", async (c) => {
     WHERE (${du} = '' OR (v.cree_le AT TIME ZONE 'Europe/Paris')::date = NULLIF(${du}, '')::date)
     AND (${q} = '' OR trim(cl.prenom || ' ' || cl.nom) ILIKE ${like} OR cl.email ILIKE ${like} OR cl.telephone ILIKE ${like}
       OR v.id = ${Number.isFinite(num) && Number.isInteger(num) ? num : -1} OR v.total_cents = ${cts}
-      OR EXISTS (SELECT 1 FROM vente_lignes vl WHERE vl.vente_id = v.id AND vl.libelle ILIKE ${like}))
+      OR EXISTS (SELECT 1 FROM vente_lignes vl WHERE vl.vente_id = v.id AND (vl.libelle ILIKE ${like} OR vl.series::text ILIKE ${like})))
     ORDER BY v.id DESC LIMIT 40`) as any[];
   const ventes = [];
   for (const r of rows) ventes.push(await detailVente(r));
   return c.json({ ventes });
 });
 
+// Trottinettes : un numéro de série par unité est obligatoire à la vente (garantie, retrouvable sur le Z et la fiche client).
+const TYPE_TROTT = /^(trottinettes?( électriques?)?( enfant)?|draisienne électrique( enfant)?)$/i;
+async function variantesTrott(ids: string[]): Promise<Set<string>> {
+  const res = new Set<string>();
+  const liste = [...new Set(ids.filter(Boolean))];
+  if (!liste.length) return res;
+  try {
+    const d: any = await shopifyRead(`query($ids: [ID!]!) { nodes(ids: $ids) { ... on ProductVariant { id product { productType } } } }`, { ids: liste });
+    for (const n of d?.nodes ?? []) if (n?.id && TYPE_TROTT.test(String(n.product?.productType ?? "").trim())) res.add(n.id);
+  } catch (e: any) { console.log(JSON.stringify({ event: "type-trott", message: String(e?.message ?? e).slice(0, 200) })); }
+  return res;
+}
+app.post("/api/caisse/series-requises", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const lignes = Array.isArray(b.lignes) ? b.lignes : [];
+  const t = await variantesTrott(lignes.map((l: any) => clean(l.variantId, 80)));
+  return c.json({ indices: lignes.map((l: any, i: number) => (t.has(clean(l.variantId, 80)) ? i : -1)).filter((i: number) => i >= 0) });
+});
+
 // Détail complet d'une vente (pour le reçu).
 export async function detailVente(v: any) {
-  const lignes = (await sql`SELECT libelle, quantite, prix_unitaire_cents FROM vente_lignes WHERE vente_id = ${v.id} ORDER BY id`) as any[];
+  const lignes = (await sql`SELECT libelle, quantite, prix_unitaire_cents, series FROM vente_lignes WHERE vente_id = ${v.id} ORDER BY id`) as any[];
   const pays = (await sql`SELECT moyen, montant_cents FROM vente_paiements WHERE vente_id = ${v.id} ORDER BY id`) as any[];
   const avs = (await sql`SELECT libelle, effet, remise_cents FROM vente_avantages WHERE vente_id = ${v.id} ORDER BY id`) as any[];
   const brut = lignes.reduce((s, l) => s + l.quantite * l.prix_unitaire_cents, 0);
@@ -153,7 +172,7 @@ export async function detailVente(v: any) {
     numero: v.numero_facture ?? null, clientId: v.client_id ?? null,
     id: v.id, date: v.cree_le, magasin: v.magasin, vendeur: v.vendeur, client: v.client_nom || null,
     totalCents: v.total_cents, fideliteCents: v.remise_cents, brutCents: brut,
-    lignes: lignes.map((l) => ({ libelle: l.libelle, quantite: l.quantite, prixCents: l.prix_unitaire_cents })),
+    lignes: lignes.map((l) => ({ libelle: l.libelle, quantite: l.quantite, prixCents: l.prix_unitaire_cents, series: Array.isArray(l.series) ? l.series : [] })),
     paiements: pays.map((p) => ({ moyen: p.moyen, cents: p.montant_cents })),
     avantages: avs.map((x) => ({ libelle: x.libelle, effet: x.effet, remiseCents: x.remise_cents })),
     ticket: await infosTicket(v.magasin ?? null),
@@ -194,9 +213,27 @@ app.post("/api/caisse/encaisser", async (c) => {
     type: ["piece", "main_oeuvre"].includes(l.type) ? l.type : "article",
     variantId: clean(l.variantId, 80) || null,
     sku: clean(l.sku, 80) || null,
+    trott: l.trott === true,
+    series: (Array.isArray(l.series) ? l.series : []).map((x: any) => clean(x, 60).replace(/\s+/g, " ")),
   }));
   if (nettoyees.some((l: any) => !l.libelle)) throw new AppError(400, "Chaque ligne doit avoir un libellé.");
   const brut = nettoyees.reduce((s: number, l: any) => s + l.quantite * l.prixCents, 0);
+
+  // Trottinettes : un numéro de série par unité, et un client (la garantie est liée à son compte).
+  const auto = await variantesTrott(nettoyees.map((l: any) => l.variantId));
+  const toutesSeries: string[] = [];
+  for (const l of nettoyees as any[]) {
+    l.trott = l.trott || (l.variantId && auto.has(l.variantId));
+    if (!l.trott) { l.series = []; continue; }
+    if (l.series.length !== l.quantite || l.series.some((x: string) => x.length < 3)) throw new AppError(400, `Numéro de série obligatoire pour « ${l.libelle} » (${l.quantite} à saisir).`);
+    toutesSeries.push(...l.series);
+  }
+  if (new Set(toutesSeries.map((x) => x.toLowerCase())).size !== toutesSeries.length) throw new AppError(400, "Le même numéro de série est saisi deux fois.");
+  if (toutesSeries.length) {
+    if (!(Number(b.clientId) > 0)) throw new AppError(400, "Vente d'une trottinette : choisis le client (sa garantie est liée à son compte).");
+    const dej = (await sql`SELECT vl.series, v.numero_facture FROM vente_lignes vl JOIN ventes v ON v.id = vl.vente_id WHERE EXISTS (SELECT 1 FROM jsonb_array_elements_text(vl.series) s WHERE lower(s) IN (SELECT lower(jsonb_array_elements_text(${JSON.stringify(toutesSeries)}::text::jsonb))))`) as any[];
+    if (dej.length) throw new AppError(409, `Ce numéro de série a déjà été vendu (facture ${dej[0].numero_facture ?? "?"}). Vérifie la saisie.`);
+  }
 
   const clientId = Number(b.clientId) > 0 ? Number(b.clientId) : null;
   const reparationId = Number(b.repairId) > 0 ? Number(b.repairId) : null;
@@ -256,7 +293,11 @@ app.post("/api/caisse/encaisser", async (c) => {
   const [v] = (await sql`INSERT INTO ventes (client_id, reparation_id, magasin, vendeur, total_cents, remise_cents, points_gagnes, points_utilises, acompte_deduit_cents) VALUES (${clientId}, ${reparationId}, ${u.magasin ?? null}, ${u.prenom}, ${totalCents}, ${remiseCents}, ${pointsGagnes}, ${remiseCents > 0 ? 1 : 0}, ${acompteDeduit}) RETURNING id`) as any[];
   await sql`UPDATE ventes SET numero_facture = 'F-' || to_char(now(), 'YYYY') || '-' || lpad(nextval('facture_seq')::text, 5, '0') WHERE id = ${v.id}`;
   for (const l of nettoyees) {
-    await sql`INSERT INTO vente_lignes (vente_id, libelle, quantite, prix_unitaire_cents, type, shopify_variant_id, sku) VALUES (${v.id}, ${l.libelle}, ${l.quantite}, ${l.prixCents}, ${l.type}, ${l.variantId}, ${l.sku})`;
+    await sql`INSERT INTO vente_lignes (vente_id, libelle, quantite, prix_unitaire_cents, type, shopify_variant_id, sku, series) VALUES (${v.id}, ${l.libelle}, ${l.quantite}, ${l.prixCents}, ${l.type}, ${l.variantId}, ${l.sku}, ${JSON.stringify(l.series)}::text::jsonb)`;
+    if (clientId) for (const serie of l.series as string[]) {
+      const mots = String(l.libelle).split(" ");
+      await sql`INSERT INTO trottinettes (client_id, marque, modele, serie) VALUES (${clientId}, ${mots[0] || "Trottinette"}, ${String(l.libelle).slice(0, 80)}, ${serie}) ON CONFLICT (client_id, serie) DO NOTHING`;
+    }
   }
   for (const d of deduits) {
     await sql`INSERT INTO vente_acomptes (vente_id, acompte_id, montant_cents) VALUES (${v.id}, ${d.id}, ${d.cents})`;
@@ -330,7 +371,7 @@ app.get("/pub/facture/:token", async (c) => {
   const ent = String(d.ticket?.entete ?? "TURN SOCIETY").split("\n").map(escF).join("<br>");
   const tva = Math.round(d.totalCents / 6);
   const ht = d.totalCents - tva;
-  const lignesH = d.lignes.map((l: any) => `<tr><td>${escF(l.libelle)}</td><td class="q">${escF(l.quantite)}</td><td class="n">${eurF(l.prixCents)}</td><td class="n">${eurF(l.quantite * l.prixCents)}</td></tr>`).join("");
+  const lignesH = d.lignes.map((l: any) => `<tr><td>${escF(l.libelle)}${(l.series ?? []).length ? `<div class="m">N° de série : ${l.series.map(escF).join(", ")}</div>` : ""}</td><td class="q">${escF(l.quantite)}</td><td class="n">${eurF(l.prixCents)}</td><td class="n">${eurF(l.quantite * l.prixCents)}</td></tr>`).join("");
   const remH = (d.fideliteCents ? `<tr><td colspan="3">Cagnotte fidélité</td><td class="n">-${eurF(d.fideliteCents)}</td></tr>` : "")
     + d.avantages.map((a: any) => `<tr><td colspan="3">${escF(a.libelle)}</td><td class="n">${a.remiseCents ? "-" + eurF(a.remiseCents) : "offert"}</td></tr>`).join("")
     + (d.acompteDeduitCents ? `<tr><td colspan="3">Acompte déjà versé</td><td class="n">-${eurF(d.acompteDeduitCents)}</td></tr>` : "");
