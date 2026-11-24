@@ -58,7 +58,7 @@ function avisBtns(r){
   var nl=String.fromCharCode(10),msg="Bonjour"+(c.prenom?" "+c.prenom:"")+", merci pour votre visite chez TURN Shop ! Votre avis nous aide beaucoup, et une récompense vous attend : "+u;
   return"<div class='card avbox'><b>Demander un avis au client</b><div class='actions'>"
     +(c.tel?"<a class='btn' href='sms:"+esc(c.tel.replace(/ /g,""))+"?&body="+encodeURIComponent(msg)+"'>Envoyer par SMS</a>":"")
-    +(c.email?"<a class='btn' href='mailto:"+esc(c.email)+"?subject="+encodeURIComponent("Votre avis sur TURN Shop")+"&body="+encodeURIComponent(msg+nl+nl+"L'équipe TURN Shop")+"'>Envoyer par email</a>":"")
+    +(c.email?"<button data-act='cAvisMail' data-id='"+r.id+"'>Envoyer l avis par email</button>":"")
     +"</div></div>"}
 function shopHtml(r){
   var s=r.shopify;if(!s||!s.eligible)return"";

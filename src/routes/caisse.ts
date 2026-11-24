@@ -336,3 +336,19 @@ app.get("/pub/facture/:token", async (c) => {
 <div class="c"><b>Règlement</b><table>${pays || "<tr><td>Réglé</td><td></td></tr>"}</table></div>
 <button onclick="window.print()">Imprimer / enregistrer en PDF</button></main></body></html>`);
 });
+
+// Demande d'avis envoyée directement par email (Brevo), sans ouvrir la messagerie.
+app.post("/api/caisse/avis", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const [v] = (await sql`SELECT v.id, v.client_id, v.magasin, v.reparation_id, cl.prenom, cl.email FROM ventes v LEFT JOIN clients cl ON cl.id = v.client_id WHERE v.id = ${Number(b.venteId)}`) as any[];
+  if (!v) throw new AppError(404, "Vente introuvable.");
+  const a = String(v.email ?? "").trim();
+  if (!a) throw new AppError(422, "Ce client n'a pas d'email.");
+  if (!brevoConfigure()) throw new AppError(503, "Les emails ne sont pas branchés (Brevo).");
+  const { avisUrl } = await infosTicket(v.magasin ?? null);
+  if (!avisUrl) throw new AppError(422, "Aucun lien d'avis Google n'est réglé (Paramètres > Ticket de caisse).");
+  const prenom = String(v.prenom ?? "").trim();
+  await envoiEmail(a, "Votre avis sur TURN Shop", `Bonjour${prenom ? " " + prenom : ""}, merci pour votre visite chez TURN Shop ! Votre avis nous aide beaucoup, et une récompense vous attend : ${avisUrl}\n\nL'équipe TURN Shop`);
+  await sql`INSERT INTO messages_envoyes (type, canal, client_id, reparation_id, vente_id, destinataire, statut) VALUES ('avis', 'email', ${v.client_id}, ${v.reparation_id ?? null}, ${v.id}, ${a}, 'envoye')`;
+  return c.json({ message: "Demande d'avis envoyée à " + a + "." });
+});

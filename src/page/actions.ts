@@ -74,6 +74,7 @@ export const ACTIONS = `var ACTS={
   cJour:function(){lirePay();chargeHisto()},
   cVjOuvre:function(){VJ=[];VJOPEN=0;vjSync();rdvInfos().then(function(){return api("/caisse/historique?jour=1")}).then(function(d){VJ=d.ventes;vjSync()}).catch(function(e){VJ=null;toastKo(e.message);vjSync()})},
   cVjClient:async function(b){var cid=+b.dataset.cid;VJ=null;VJOPEN=0;vjSync();try{var d=await api("/caisse/client?id="+cid);CUR=null;FICHE=null;TAB="accueil";CCLI=d.client;CFID=d.fidelite;CUSE=false;CMSG="";CAVOFF=[];CHOPEN=0;await chargeHisto()}catch(e){toastKo(e.message)}},
+  cAvisMail:async function(b){btnFlash(b);try{var d=await api("/caisse/avis",{venteId:+b.dataset.id});toastOk(d.message)}catch(e){toastKo(e.message)}},
   cVjFerme:function(){VJ=null;VJOPEN=0;vjSync()},
   cVjRecu:function(b){var id=+b.dataset.id;VJOPEN=VJOPEN===id?0:id;vjSync()},
   cRecu:function(b){var id=+b.dataset.id;CHOPEN=CHOPEN===id?0:id;lirePay();render()},
