@@ -9,7 +9,8 @@ import { writeFileSync, readFileSync } from "node:fs";
 import { PNG } from "pngjs";
 
 const PORT = Number(process.env.FS_PRINT_PORT || 9101);
-const VERSION = "2.2";
+const VERSION = "2.3";
+const MAC = process.platform === "darwin";
 const LOGS: string[] = [];
 function log(m: string) { LOGS.push(new Date().toLocaleTimeString("fr-FR") + " " + m); if (LOGS.length > 60) LOGS.shift(); console.log(m); }
 const jobs = new Map<string, { page: string; proc?: ReturnType<typeof spawn>; timer?: any; data?: any }>();
@@ -21,6 +22,10 @@ const CHEMINS = [
   process.env["ProgramFiles(x86)"] + "\\Microsoft\\Edge\\Application\\msedge.exe",
   process.env["ProgramFiles"] + "\\Microsoft\\Edge\\Application\\msedge.exe",
   process.env["FS_PRINT_BROWSER"] || "",
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  (process.env.HOME || "") + "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+  "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
   "/usr/bin/google-chrome",
 ];
 function navigateur(): string | null {
@@ -141,6 +146,28 @@ function run(cmd: string, args: string[], ms: number): Promise<number> {
   });
 }
 
+// ---------- macOS : impression via CUPS (lp) ----------
+function sortie(cmd: string, args: string[], ms = 8000): Promise<string> {
+  return new Promise((res) => {
+    let o = "";
+    const p = spawn(cmd, args, { stdio: ["ignore", "pipe", "ignore"] });
+    const t = setTimeout(() => { try { p.kill(); } catch {} res(o); }, ms);
+    p.stdout?.on("data", (b) => (o += b));
+    p.on("error", () => { clearTimeout(t); res(o); });
+    p.on("exit", () => { clearTimeout(t); res(o); });
+  });
+}
+async function imprimanteMac(motif?: RegExp): Promise<string> {
+  if (!motif) {
+    const d = await sortie("lpstat", ["-d"]);
+    const m = d.match(/:\s*(\S+)\s*$/m);
+    return m ? m[1] : "";
+  }
+  const l = await sortie("lpstat", ["-p"]);
+  for (const ln of l.split("\n")) { const m = ln.match(/^printer\s+(\S+)/); if (m && motif.test(m[1])) return m[1]; }
+  return "";
+}
+
 // PNG (576 px de large) -> octets ESC/POS (image raster + coupe)
 export function escposDepuisPng(buf: Buffer): Buffer {
   const png = PNG.sync.read(buf);
@@ -185,7 +212,7 @@ async function imprimer(id: string) {
     const png = join(dir, "t.png");
     const scale = DOTS / 272;
     await run(nav, [
-      "--headless=new", "--disable-gpu", ...(process.platform === "win32" ? [] : ["--no-sandbox"]), "--hide-scrollbars", "--no-first-run", "--user-data-dir=" + join(dir, "p"),
+      "--headless=new", "--disable-gpu", ...(process.platform === "linux" ? ["--no-sandbox"] : []), "--hide-scrollbars", "--no-first-run", "--user-data-dir=" + join(dir, "p"),
       "--screenshot=" + png, "--window-size=272,5000", "--force-device-scale-factor=" + scale,
       "--virtual-time-budget=2000", "http://127.0.0.1:" + PORT + "/job/" + id + "?raster=1",
     ], 20000);
@@ -194,6 +221,15 @@ async function imprimer(id: string) {
     const bf = join(dir, "t.bin"); writeFileSync(bf, bin);
     log("capture ok, octets=" + bin.length);
     if (process.env.FS_PRINT_DRY) return;
+    if (MAC) {
+      const imp = process.env.FS_PRINT_PRINTER || (await imprimanteMac());
+      if (!imp) throw new Error("aucune imprimante par defaut (Reglages Systeme > Imprimantes)");
+      const c = await run("lp", ["-d", imp, "-o", "raw", bf], 30000);
+      log("lp code " + c + " imprimante " + imp);
+      if (c !== 0) throw new Error("envoi imprimante impossible (" + c + ")");
+      setTimeout(() => { jobs.delete(id); try { rmSync(dir, { recursive: true, force: true }); } catch {} }, 5000);
+      return;
+    }
     const ps = join(dir, "p.ps1"); writeFileSync(ps, "\ufeff" + PS);
     const code = await run("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ps, "-Printer", process.env.FS_PRINT_PRINTER || "", "-File", bf], 30000);
     log("powershell code " + code);
@@ -249,7 +285,7 @@ async function imprimerEtiquettes(d: { html: string; w: number; h: number; n: nu
     jobs.set(id, { page, data: {} });
     const png = join(dir, "e.png");
     await run(nav, [
-      "--headless=new", "--disable-gpu", "--hide-scrollbars", ...(process.platform === "win32" ? [] : ["--no-sandbox"]),
+      "--headless=new", "--disable-gpu", "--hide-scrollbars", ...(process.platform === "linux" ? ["--no-sandbox"] : []),
       "--no-first-run", "--user-data-dir=" + join(dir, "p"), "--screenshot=" + png,
       "--window-size=" + Math.max(pxCssW + 40, 500) + "," + (pxCssH + 40), "--force-device-scale-factor=" + scale,
       "--virtual-time-budget=2000", "http://127.0.0.1:" + PORT + "/job/" + id,
@@ -263,6 +299,22 @@ async function imprimerEtiquettes(d: { html: string; w: number; h: number; n: nu
     const crop = join(dir, "c.png"); writeFileSync(crop, PNG.sync.write(out));
     log("etiquettes : " + d.n + " x " + d.w + "x" + d.h + " mm, image " + cw + "x" + ch);
     if (process.env.FS_PRINT_DRY) return;
+    if (MAC) {
+      const imp = d.printer || process.env.FS_LABEL_PRINTER || (await imprimanteMac(/brother|ql/i)) || (await imprimanteMac());
+      if (!imp) throw new Error("imprimante d'etiquettes introuvable (Reglages Systeme > Imprimantes)");
+      const fichiers: string[] = [];
+      const hh = Math.round(ch / d.n);
+      for (let k = 0; k < d.n; k++) {
+        const one = new PNG({ width: cw, height: hh });
+        PNG.bitblt(out, one, 0, k * hh, cw, hh, 0, 0);
+        const f = join(dir, "e" + k + ".png"); writeFileSync(f, PNG.sync.write(one)); fichiers.push(f);
+      }
+      const media = "Custom." + d.w + "x" + d.h + "mm";
+      const c = await run("lp", ["-d", imp, "-o", "media=" + media, "-o", "fit-to-page", ...fichiers], 30000);
+      log("etiquettes lp code " + c + " imprimante " + imp + " media " + media);
+      if (c !== 0) throw new Error("envoi imprimante etiquettes impossible (" + c + ")");
+      return true;
+    }
     const ps = join(dir, "e.ps1"); writeFileSync(ps, "\ufeff" + PS_ETQ);
     const code = await run("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ps, "-Printer", d.printer || process.env.FS_LABEL_PRINTER || "", "-File", crop, "-W", String(d.w), "-H", String(d.h), "-N", String(d.n)], 60000);
     log("etiquettes powershell code " + code);
