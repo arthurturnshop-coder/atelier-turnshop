@@ -27,6 +27,7 @@ export function ligneListe(r: any, journal: any[]) {
     phone: r.telephone ?? "",
     email: r.email ?? "",
     pieceArrivee: r.piece_arrivee === true,
+    pieceAValider: r.piece_a_valider === true,
     trottinette: `${r.marque} ${r.modele} (N° ${r.serie})`,
     statut: r.statut,
     panne: r.panne,
@@ -83,8 +84,9 @@ app.get("/api/reparation", async (c) => {
   const [r] = (await sql`SELECT r.*, c.prenom, c.nom, c.telephone, c.email, t.marque, t.modele, t.serie FROM reparations r JOIN clients c ON c.id = r.client_id JOIN trottinettes t ON t.id = r.trottinette_id WHERE r.id = ${id} AND r.supprime_le IS NULL`) as any[];
   if (!r) throw new AppError(404, "Réparation introuvable.");
   const journal = (await sql`SELECT reparation_id, date, type, texte FROM journal WHERE reparation_id = ${id} ORDER BY id`) as any[];
+  const cmds = (await sql`SELECT l.id, l.libelle, l.statut, l.suivi, f.nom AS fournisseur, l.commandee_le, l.recue_le FROM commande_lignes l JOIN fournisseurs f ON f.id = l.fournisseur_id WHERE l.reparation_id = ${id} AND l.statut <> 'panier' ORDER BY l.id`) as any[];
   const [tc] = (await sql`SELECT code_acces FROM trottinettes WHERE id = ${r.trottinette_id}`) as any[];
-  return c.json({ ...ligneListe(r, journal), trottinetteId: r.trottinette_id, codeAcces: tc?.code_acces ?? "", devis: await devisDe(id), acompte: await acomptesDe(id), statuts: STATUTS, ticketEntete: (await lireTicket()).entete, gardeInfo: { franchiseJours: GARDE.franchiseJours, prixCents: GARDE.prixCents, abandonJour: GARDE.abandonJour } });
+  return c.json({ ...ligneListe(r, journal), commandes: cmds.map((l) => ({ id: l.id, libelle: l.libelle, statut: l.statut, suivi: l.suivi ?? "", fournisseur: l.fournisseur, jours: l.commandee_le ? Math.floor((Date.now() - new Date(l.commandee_le).getTime()) / 86400000) : 0 })), trottinetteId: r.trottinette_id, codeAcces: tc?.code_acces ?? "", devis: await devisDe(id), acompte: await acomptesDe(id), statuts: STATUTS, ticketEntete: (await lireTicket()).entete, gardeInfo: { franchiseJours: GARDE.franchiseJours, prixCents: GARDE.prixCents, abandonJour: GARDE.abandonJour } });
 });
 
 // Nouvelle prise en charge. enMagasin:false = rendez-vous, sousGarantie:true = garantie.

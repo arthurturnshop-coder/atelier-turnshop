@@ -12,8 +12,13 @@ function refsCmd(l){
   if(l.barcode)h+="<div class='muted'>Code-barres "+esc(l.barcode)+" <button class='link' data-act='copier' data-t='"+esc(l.barcode)+"' data-l='Copier'>Copier</button></div>";
   if(!l.sku&&!l.barcode)h+="<div class='muted'>Pas de SKU ni de code-barres <button class='link' data-act='copier' data-t='"+esc(l.libelle)+"' data-l='Copier le nom'>Copier le nom</button></div>";
   return h}
+function joursCmd(l){return l.commandeLe?Math.floor((Date.now()-new Date(l.commandeLe).getTime())/86400000):0}
+function suiviHtml(l){
+  var j=joursCmd(l),tard=j>=7;
+  return"<div class='muted' style='margin-top:4px'><span class='tag"+(tard?" warn":"")+"'>Commandé il y a "+j+" j"+(tard?" · toujours pas arrivé ?":"")+"</span></div>"
+    +"<div class='dl' style='margin-top:4px'><input id='sv-"+l.id+"' value='"+esc(l.suivi||"")+"' placeholder='N° de suivi'><button class='sec' data-act='cmdSuivi' data-id='"+l.id+"'>OK</button>"+(l.suivi?"<a class='link' target='_blank' rel='noopener' href='https://t.17track.net/fr#nums="+encodeURIComponent(l.suivi)+"'>Suivre le colis</a>":"")+"</div>"}
 function ligneCmd(l,mode){
-  var h="<tr><td>"+(l.commandeId&&mode!=="panier"?"<span class='tag'>"+cmdNum(l.commandeId)+"</span> ":"")+esc(l.libelle)+refsCmd(l)+(l.client?"<div class='muted'>Pour "+esc(l.client)+(l.reparationId?" (fiche "+l.reparationId+")":"")+"</div>":"")+"</td>";
+  var h="<tr><td>"+(l.commandeId&&mode!=="panier"?"<span class='tag'>"+cmdNum(l.commandeId)+"</span> ":"")+esc(l.libelle)+refsCmd(l)+(l.client?"<div class='muted'>Pour "+esc(l.client)+(l.reparationId?" (fiche "+l.reparationId+")":"")+"</div>":"")+(mode==="commandee"?suiviHtml(l):"")+"</td>";
   if(mode==="panier")h+="<td class='n'><input type='number' min='1' value='"+l.quantite+"' data-act='cmdQte' data-id='"+l.id+"'></td><td class='n'><button class='link' data-act='cmdDel' data-id='"+l.id+"'>Retirer</button></td>";
   else if(mode==="commandee")h+="<td class='n'>"+l.quantite+"</td><td class='n'><button data-act='cmdRecevoir' data-id='"+l.id+"'>Réceptionner</button></td>";
   else h+="<td class='n'>"+l.quantite+"</td><td class='n'><span class='tag ok'>Reçu</span></td>";
@@ -52,6 +57,7 @@ ACTS.fMail=function(b){cmdRun(api("/achats/fournisseur/modifier",{id:+b.dataset.
 ACTS.cmdLigne=function(b){var id=+b.dataset.id;cmdRun(api("/achats/ligne",{fournisseurId:id,libelle:v("cl-"+id),quantite:v("cq-"+id)}))};
 ACTS.cmdDel=function(b){cmdRun(api("/achats/ligne/supprimer",{id:+b.dataset.id}))};
 ACTS.cmdPasser=function(b){if(!confirm("Marquer ce panier comme commandé ? (pense à l'avoir envoyé au fournisseur)"))return;cmdRun(api("/achats/commander",{fournisseurId:+b.dataset.id}))};
+ACTS.cmdSuivi=function(b){var i=document.getElementById("sv-"+b.dataset.id);api("/achats/ligne/suivi",{id:+b.dataset.id,suivi:i?i.value:""}).then(function(){btnFlash(b,"✓");CMD=null;render()}).catch(function(e){alert(e.message)})};
 ACTS.cmdRecevoir=function(b){cmdRun(api("/achats/recevoir",{id:+b.dataset.id}))};
 ACTS.cmdRecevoirTout=function(b){var f=trouveF(+b.dataset.id);if(!f)return;cmdRun(api("/achats/recevoir",{ids:f.commandees.map(function(l){return l.id})}))};
 ACTS.cmdCopy=function(b){var f=trouveF(+b.dataset.id);if(!f)return;var t=texteCommande(f);

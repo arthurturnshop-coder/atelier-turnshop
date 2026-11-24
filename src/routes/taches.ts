@@ -8,6 +8,21 @@ import { AppError, clean, exigeAdmin } from "../util";
 
 const vers = (r: any) => ({ reparationId: r.reparation_id ?? null, tel: r.telephone ?? "", client: r.client ?? "", trott: r.trott ?? "", recurrente: r.recurrente_id != null, id: r.id, texte: r.texte, echeance: r.echeance ?? null, epingle: r.epingle === true, priorite: r.priorite === true, fait: r.fait === true, faitPar: r.fait_par ?? "", creePar: r.cree_par ?? "" });
 
+await sql`ALTER TABLE taches ADD COLUMN IF NOT EXISTS ligne_id INT`;
+// Commande pas arrivée depuis plus d'une semaine : une tâche « vérifier la commande » (une à la fois par ligne, renouvelée chaque semaine).
+async function genererCommandesEnRetard() {
+  const rows = (await sql`SELECT l.id, l.libelle, l.suivi, l.reparation_id, f.nom AS fournisseur, trim(c.prenom || ' ' || c.nom) AS client
+    FROM commande_lignes l JOIN fournisseurs f ON f.id = l.fournisseur_id LEFT JOIN reparations r ON r.id = l.reparation_id LEFT JOIN clients c ON c.id = r.client_id
+    WHERE l.statut = 'commandee' AND l.commandee_le < now() - interval '7 days' AND (l.relance_le IS NULL OR l.relance_le < now() - interval '7 days')
+      AND NOT EXISTS (SELECT 1 FROM taches k WHERE k.ligne_id = l.id AND k.fait = false)`) as any[];
+  const auj = await AUJ();
+  for (const l of rows) {
+    const texte = `Toujours pas arrivé : vérifier la commande « ${l.libelle} » (${l.fournisseur})${l.suivi ? ", suivi " + l.suivi : ""}${l.client ? " pour " + l.client : ""}`;
+    await sql`INSERT INTO taches (texte, echeance, priorite, cree_par, reparation_id, ligne_id) VALUES (${texte}, ${auj}::date, true, 'Commande en retard', ${l.reparation_id}, ${l.id})`;
+    await sql`UPDATE commande_lignes SET relance_le = now() WHERE id = ${l.id}`;
+  }
+}
+
 // ---------- Tâches récurrentes ----------
 const AUJ = async () => ((await sql`SELECT to_char((now() AT TIME ZONE 'Europe/Paris')::date, 'YYYY-MM-DD') AS d`) as any[])[0].d as string;
 const JOURS = ["", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
@@ -109,6 +124,7 @@ app.post("/api/recurrentes/supprimer", async (c) => {
 app.get("/api/taches", async (c) => {
   await genererRecurrentes();
   await genererRappels();
+  await genererCommandesEnRetard();
   await genererRelancesGarantie();
   const rows = (await sql`SELECT k.id, k.recurrente_id, k.reparation_id, k.texte, to_char(k.echeance, 'YYYY-MM-DD') AS echeance, k.epingle, k.priorite, k.fait, k.fait_par, k.cree_par,
       cl.telephone, trim(cl.prenom || ' ' || cl.nom) AS client, t.marque || ' ' || t.modele AS trott
