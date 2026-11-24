@@ -149,7 +149,7 @@ export async function detailVente(v: any) {
   return {
     contact: { prenom: co?.prenom ?? "", tel: co?.telephone ?? "", email: co?.email ?? "" },
     type: v.type ?? "vente", acompteDeduitCents: v.acompte_deduit_cents ?? 0,
-    numero: v.numero_facture ?? null,
+    numero: v.numero_facture ?? null, clientId: v.client_id ?? null,
     id: v.id, date: v.cree_le, magasin: v.magasin, vendeur: v.vendeur, client: v.client_nom || null,
     totalCents: v.total_cents, fideliteCents: v.remise_cents, brutCents: brut,
     lignes: lignes.map((l) => ({ libelle: l.libelle, quantite: l.quantite, prixCents: l.prix_unitaire_cents })),

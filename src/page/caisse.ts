@@ -78,7 +78,7 @@ function vjHtml(){
   if(!VJ.length)h+="<div class='muted'>Aucune vente aujourd hui.</div>";
   VJ.forEach(function(r){
     var res=r.lignes.slice(0,3).map(function(l){return esc(l.libelle)}).join(", ")+(r.lignes.length>3?"…":"");
-    h+="<button class='sec hrow' data-act='cVjRecu' data-id='"+r.id+"'><b>"+esc(dateLongue(r.date))+"</b> · "+eur(r.totalCents)+" · "+esc(r.client||"sans client")+(r.numero?" · "+esc(r.numero):"")+"<br><span class='muted'>"+res+"</span></button>";
+    h+="<button class='sec hrow' data-act='cVjRecu' data-id='"+r.id+"'><b>"+esc(dateLongue(r.date))+"</b> · "+eur(r.totalCents)+" · "+esc(r.client||"sans client")+(r.numero?" · "+esc(r.numero):"")+"<br><span class='muted'>"+res+"</span></button>"+(r.clientId?"<div class='actions'><button class='link' data-act='cVjClient' data-cid='"+r.clientId+"'>👤 Ouvrir le profil de "+esc(r.client||"ce client")+"</button></div>":"");
     if(VJOPEN===r.id)h+=recuHtml(r)+"<div class='actions'><button class='sec' data-act='cPrint' data-id='"+r.id+"'>Imprimer le reçu</button><button class='sec' data-act='cEmail' data-id='"+r.id+"'>✉ Envoyer par email</button></div>"});
   return h+"<div class='actions'><button data-act='cVjFerme'>Fermer</button></div></div>"}
 function histoHtml(){
@@ -117,7 +117,7 @@ function caisseHtml(){
   h+="</div>";
   h+="<div class='card'><div class='step'>Panier</div>";
   if(!PAN.length)h+="<div class='muted'>Panier vide. Ajoute un article ci-dessous.</div>";
-  else h+="<table class='panier' style='width:100%;border-collapse:collapse'><tr><th style='text-align:left'>Article</th><th>Qté</th><th>Prix €</th><th></th></tr>"+PAN.map(function(l,i){return"<tr><td>"+esc(l.libelle)+((l.barcode||l.sku)?"<div class='muted' style='font-size:12px'>"+(l.barcode?"EAN "+esc(l.barcode):"")+(l.barcode&&l.sku?" · ":"")+(l.sku?"sku "+esc(l.sku):"")+"</div>":"")+(l.variantId?"<div style='font-size:13px'><b>📍 "+(l.emplacement?esc(l.emplacement):"pas de case")+"</b> <button class='link' data-act='cCase' data-i='"+i+"'>"+(l.emplacement?"modifier":"📍 Case")+"</button></div>":"")+"</td><td><input type='number' min='1' value='"+l.quantite+"' data-act='cQte' data-i='"+i+"'></td><td><input value='"+esc(l.prix)+"' data-act='cPrix' data-i='"+i+"'></td><td><button class='link' data-act='cDel' data-i='"+i+"'>Retirer</button></td></tr>"}).join("")+"</table>";
+  else h+="<table class='panier' style='width:100%;border-collapse:collapse'><tr><th style='text-align:left'>Article</th><th>Qté</th><th>Prix €</th><th></th></tr>"+PAN.map(function(l,i){return"<tr><td>"+esc(l.libelle)+((l.barcode||l.sku)?"<div class='muted' style='font-size:12px'>"+(l.barcode?"EAN "+esc(l.barcode):"")+(l.barcode&&l.sku?" · ":"")+(l.sku?"sku "+esc(l.sku):"")+"</div>":"")+(l.variantId?"<div style='font-size:13px'><b>📍 "+(l.emplacement?esc(l.emplacement):"pas de case")+"</b></div>":"")+"</td><td><input type='number' min='1' value='"+l.quantite+"' data-act='cQte' data-i='"+i+"'></td><td><input value='"+esc(l.prix)+"' data-act='cPrix' data-i='"+i+"'></td><td><button class='link' data-act='cDel' data-i='"+i+"'>Retirer</button></td></tr>"}).join("")+"</table>";
   h+="<div style='margin-top:8px'>"+prodBox("caisse")+"</div>";
   h+="<div class='dl' style='margin-top:8px'><input id='cl' class='lb' placeholder='Article (libellé)'><input id='cq2' class='q' type='number' min='1' value='1'><input id='cp' class='p' placeholder='Prix €'><button data-act='cAdd'>Ajouter</button></div></div>";
   var dispo=(CAV||[]).filter(function(a){return avApplicable(a,brut)});
