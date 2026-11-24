@@ -42,11 +42,32 @@ async function appel(chemin: string, corps: any): Promise<string> {
   } finally { clearTimeout(t); }
 }
 
+const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const LIBELLE_BOUTON = (u: string) => (/\/pub\/devis\//.test(u) ? "Voir et accepter mon devis" : /\/pub\/facture\//.test(u) ? "Voir ma facture" : /g\.page|google\.|maps/i.test(u) ? "Laisser mon avis" : "Ouvrir");
+
+// Habillage commun de tous les emails : bandeau vert, texte lisible, liens importants en gros bouton.
+export function emailHtml(texte: string): string {
+  const liens: string[] = [];
+  const corps = texte.split(/\n{2,}/).map((para) => {
+    const seul = para.trim().match(/^https?:\/\/\S+$/);
+    if (seul) { liens.push(seul[0]); return `<div style="text-align:center;margin:22px 0"><a href="${esc(seul[0])}" style="background:#1c5a34;color:#ffffff;text-decoration:none;font-weight:700;font-size:16px;padding:14px 26px;border-radius:10px;display:inline-block">${LIBELLE_BOUTON(seul[0])}</a></div>`; }
+    // Phrase qui se termine par « : https://… » : on garde la phrase, et le lien devient un bouton.
+    const fin = para.match(/^([\s\S]*?)\s*(https?:\/\/\S+)\s*$/);
+    if (fin && /:\s*$/.test(fin[1])) {
+      liens.push(fin[2]);
+      return `<p style="margin:0 0 6px;line-height:1.55">${esc(fin[1].replace(/\s*:\s*$/, "")).replace(/\n/g, "<br>")}</p><div style="text-align:center;margin:18px 0 22px"><a href="${esc(fin[2])}" style="background:#1c5a34;color:#ffffff;text-decoration:none;font-weight:700;font-size:16px;padding:14px 26px;border-radius:10px;display:inline-block">${LIBELLE_BOUTON(fin[2])}</a></div>`;
+    }
+    const lie = esc(para).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" style="color:#1c5a34;font-weight:600">$1</a>').replace(/\n/g, "<br>");
+    return `<p style="margin:0 0 14px;line-height:1.55">${lie}</p>`;
+  }).join("");
+  const secours = liens.length ? `<p style="margin:22px 0 0;font-size:12px;color:#888;line-height:1.4">Le bouton ne s'ouvre pas ? Copie ce lien dans ton navigateur :<br><span style="word-break:break-all">${esc(liens[0])}</span></p>` : "";
+  return `<!doctype html><html><body style="margin:0;background:#f4f4f2;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#1a1a1a"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f2;padding:24px 10px"><tr><td align="center"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:14px;overflow:hidden"><tr><td style="background:#1c5a34;padding:22px 28px;color:#ffffff;font-size:22px;font-weight:800;letter-spacing:1px">TURN Shop</td></tr><tr><td style="padding:28px 28px 24px;font-size:15px">${corps}${secours}</td></tr><tr><td style="padding:16px 28px 22px;border-top:1px solid #eee;font-size:12px;color:#888;line-height:1.5">TURN SOCIETY · Boutiques Amiens et Rouen · turnshop.fr</td></tr></table></td></tr></table></body></html>`;
+}
+
 export async function envoiEmail(a: string, sujet: string, texte: string): Promise<string> {
   const exp = Bun.env.BREVO_EMAIL_EXPEDITEUR;
   if (!exp) throw new Error("BREVO_EMAIL_EXPEDITEUR manquant (adresse expéditeur validée dans Brevo).");
-  const html = texte.split("\n").map((l) => l.replace(/&/g, "&amp;").replace(/</g, "&lt;")).join("<br>");
-  return await appel("/smtp/email", { sender: { name: "TURN Shop", email: exp }, to: [{ email: a }], subject: sujet, htmlContent: `<div style="font-family:Arial,sans-serif;font-size:15px">${html}</div>`, textContent: texte });
+  return await appel("/smtp/email", { sender: { name: "TURN Shop", email: exp }, to: [{ email: a }], subject: sujet, htmlContent: emailHtml(texte), textContent: texte });
 }
 
 export async function envoiSms(num: string, texte: string) {
