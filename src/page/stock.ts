@@ -32,7 +32,7 @@ ACTS.stCode=function(){
 ACTS.stSearch=function(){STQ=v("stq");api("/stock?magasin="+encodeURIComponent(MAG||"")+"&q="+encodeURIComponent(STQ)).then(function(d){STK=d;var p=STQ;render();var e=document.getElementById("stq");if(e){e.focus();e.setSelectionRange(p.length,p.length)}}).catch(function(){})};
 ACTS.stDelta=function(b){stRun(api("/stock/maj",{id:+b.dataset.id,delta:+b.dataset.d}),"")};
 ACTS.stDel=function(b){var p=stProd(+b.dataset.id);if(p&&confirm("Retirer "+p.nom+" du stock ? (récupérable en le rescannant)"))stRun(api("/stock/archiver",{id:p.id}))};
-ACTS.stEtq=function(b){var p=stProd(+b.dataset.id);if(!p)return;ETQ.push({empl:p.emplacement||"",titre:p.nom,prix:(p.prixCents/100).toFixed(2),barcode:p.code,sku:"",qte:Math.max(1,p.qte)});TAB="etq";render()};
+ACTS.stEtq=function(b){var p=stProd(+b.dataset.id);if(!p)return;ETQ.push({empl:p.emplacement||"",titre:p.nom,prix:(p.prixCents/100).toFixed(2),barcode:p.code,sku:"",qte:Math.max(1,p.qte)});btnFlash(b,"✓ Ajoutée");toastOk("Étiquette ajoutée au panier d étiquettes ("+ETQ.length+")")};
 ACTS.stEdit=function(b){var p=stProd(+b.dataset.id);if(!p)return;
   var n=prompt("Nom",p.nom);if(n===null)return;
   var pv=prompt("Prix de vente TTC",(p.prixCents/100).toFixed(2));if(pv===null)return;

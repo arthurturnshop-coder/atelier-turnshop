@@ -58,4 +58,5 @@ function bip(f,d,n){try{var A=window.AudioContext||window.webkitAudioContext;if(
 function bipOk(){bip(1800,0.09,1)}
 function bipKo(){bip(300,0.22,2)}
 function toastKo(t){try{var d=document.createElement("div");d.textContent=t;d.style.cssText="position:fixed;top:14px;left:50%;transform:translateX(-50%);background:#c0392b;color:#fff;padding:10px 18px;border-radius:8px;font-weight:600;z-index:99999;box-shadow:0 4px 14px rgba(0,0,0,.3)";document.body.appendChild(d);setTimeout(function(){d.remove()},3500)}catch(e){}}
+function toastOk(t){try{var d=document.createElement("div");d.textContent="✓ "+t;d.style.cssText="position:fixed;top:14px;left:50%;transform:translate(-50%,-30px);opacity:0;transition:all .25s ease;background:#1e8449;color:#fff;padding:10px 18px;border-radius:8px;font-weight:600;z-index:99999;box-shadow:0 4px 14px rgba(0,0,0,.3)";document.body.appendChild(d);setTimeout(function(){d.style.opacity="1";d.style.transform="translate(-50%,0)"},20);setTimeout(function(){d.style.opacity="0";d.style.transform="translate(-50%,-30px)"},1800);setTimeout(function(){d.remove()},2200)}catch(e){}}
 `;
