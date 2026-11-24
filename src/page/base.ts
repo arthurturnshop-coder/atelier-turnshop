@@ -32,7 +32,7 @@ function renderWho(){
 var VIEWF=0,VIEWC=0;
 function viewSave(){
   if(!TOK&&!PW)return;
-  try{sessionStorage.setItem("atelierView",JSON.stringify({t:TAB,a:ATSUB,v:VUE,f:(FICHE&&FICHE.id)||0,c:(CUR&&CUR.id)||0}))}catch(e){}}
+  try{sessionStorage.setItem("atelierView",JSON.stringify({t:TAB,a:ATSUB,v:VUE,f:(FICHE&&FICHE.id)||0,c:(CUR&&CUR.id)||0,k:{p:PAN,c:CCLI,u:CUSE,r:CREP,y:CPAY,o:CAVOFF}}))}catch(e){}}
 function viewRestore(){
   if(!TOK&&!PW)return;
   var s=null;try{s=JSON.parse(sessionStorage.getItem("atelierView")||"null")}catch(e){}
@@ -41,7 +41,8 @@ function viewRestore(){
   if(ok)TAB=s.t;
   if(["liste","planning","creer","devis"].indexOf(s.a)>=0)ATSUB=s.a;
   if(s.v)VUE=s.v;
-  VIEWF=s.f||0;VIEWC=s.c||0}
+  VIEWF=s.f||0;VIEWC=s.c||0;
+  if(s.k){try{if(Array.isArray(s.k.p))PAN=s.k.p;if(s.k.c){CCLI=s.k.c;CUSE=!!s.k.u;api("/caisse/client?id="+s.k.c.id).then(function(d){CFID=d.fidelite;render()}).catch(function(){})}if(s.k.y)CPAY=s.k.y;if(Array.isArray(s.k.o))CAVOFF=s.k.o}catch(e){}}}
 function viewRestoreOpen(){
   if(VIEWF){var f=VIEWF;VIEWF=0;VIEWC=0;ouvrirFiche(f);return}
   if(VIEWC){var c=VIEWC;VIEWC=0;rechOpen(c)}}
