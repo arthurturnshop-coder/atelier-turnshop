@@ -293,7 +293,7 @@ function Nouvelle({onFait, payer, setMsg, profil}) {
             <s-stack gap="small-200">
               <s-text type="strong">Ta demande n'est envoyée à l'atelier qu'après paiement</s-text>
               <s-text>{fait.sansDevis
-                ? 'Un blocage de ' + eur(2000) + ' est demandé en ligne. Le diagnostic est gratuit : ce montant est déduit de ta facture si tu fais réparer, gardé si tu ne viens pas au rendez-vous.'
+                ? 'Un blocage de ' + eur(500) + ' est demandé en ligne. Le diagnostic est gratuit : ce montant est déduit de ta facture si tu fais réparer, gardé si tu ne viens pas au rendez-vous.'
                 : 'Un acompte est demandé en ligne. Il est déduit de ta facture finale et gardé si tu ne viens pas au rendez-vous.'}</s-text>
               <s-text>Si l'atelier refuse ou ne peut pas te recevoir, tu es remboursé.</s-text>
             </s-stack>
@@ -429,7 +429,7 @@ function Nouvelle({onFait, payer, setMsg, profil}) {
             <s-option value="matin">Matin</s-option>
             <s-option value="apres-midi">Après-midi</s-option>
           </s-select>
-          {!prestaChoisie && !pieceChoisie && <s-banner tone="info">Panne à diagnostiquer : un blocage de rendez-vous de 20 € est demandé à la fin. Le diagnostic est gratuit, le montant est déduit de ta facture si tu fais réparer, gardé si tu ne viens pas, et remboursé si le devis ne te convient pas.</s-banner>}
+          {!prestaChoisie && !pieceChoisie && <s-banner tone="info">Panne à diagnostiquer : un blocage de rendez-vous de 5 € est demandé à la fin. Le diagnostic est gratuit, le montant est déduit de ta facture si tu fais réparer, gardé si tu ne viens pas, et remboursé si le devis ne te convient pas.</s-banner>}
           {total > 0 && <s-text type="strong">{'Total estimé : ' + eur(total)}</s-text>}
           <s-text color="subdued">Un acompte est à régler en ligne juste après l'envoi pour engager le rendez-vous. Il est déduit de ta facture et remboursé si l'atelier ne peut pas te recevoir.</s-text>
           <s-button variant="primary" loading={envoi} onClick={envoyer}>Envoyer ma demande</s-button>

@@ -202,10 +202,10 @@ app.get("/pub/modeles/:id", async (c) => {
   });
 });
 
-// Montant du blocage de rendez-vous (réglage "blocage_rdv_cents", 20 € par défaut).
+// Montant du blocage de rendez-vous (réglage "blocage_rdv_cents", 5 € par défaut).
 async function blocageCents() {
   const [l] = (await sql`SELECT valeur FROM reglages WHERE cle = 'blocage_rdv_cents'`) as any[];
-  return Math.max(100, Number(l?.valeur ?? 2000) || 2000);
+  return Math.max(100, Number(l?.valeur ?? 500) || 500);
 }
 
 // ---- Mon espace : mes réparations ----
