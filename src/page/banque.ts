@@ -1,7 +1,8 @@
 export const BANQUE = `// ---------- Compta > Banque : relevé bancaire classé par mois, catégorie et magasin ----------
-var BQ={det:false,sens:"debit",syn:null,ops:null,mois:"",aClasser:false,msg:"",busy:false};
+var BQ={pil:null,det:false,sens:"debit",syn:null,ops:null,mois:"",aClasser:false,msg:"",busy:false};
 var COMPSUB="z";
 function bqCharge(){
+  if(!BQ.pil)api("/banque/pilotage").then(function(d){BQ.pil=d;if(TAB==="compta")render()}).catch(function(){BQ.pil={mois:[]}});
   api("/banque/synthese?sens="+BQ.sens).then(function(d){BQ.syn=d;if(TAB==="compta")render()}).catch(function(e){BQ.msg=e.message;BQ.syn={mois:[],aClasser:0};if(TAB==="compta")render()})}
 function bqOps(){
   var q=BQ.aClasser?"a_classer=1":"mois="+BQ.mois;
@@ -21,6 +22,23 @@ function bqResume(m,deb){
   m.lignes.slice(0,8).forEach(function(l){var t=l.amiens+l.rouen+l.commun,p=m.total?Math.round(t*100/m.total):0;
     h+="<div style='margin:5px 0'><div style='display:flex;justify-content:space-between;font-size:13px'><span>"+esc(l.categorie)+"</span><b>"+eur(t)+" <span class='muted'>"+p+"%</span></b></div><div style='height:6px;background:#eee;border-radius:3px'><div style='height:6px;width:"+p+"%;background:#2f6fd0;border-radius:3px'></div></div></div>"});
   return h+"</div>"}
+function bqPilote(){
+  var p=BQ.pil;if(!p)return"<div class='card muted'>Pilotage : chargement…</div>";
+  if(!p.mois.length)return"";
+  function c(l,v,col){return"<tr><td>"+l+"</td><td class='n'><b style='color:"+(col||"inherit")+"'>"+v+"</b></td></tr>"}
+  var h="<div class='card'><div class='step'>Pilotage (estimation)</div><div class='muted'>CA = ventes de la caisse + ventes en ligne encaissées. Marge = CA HT − achats marchandises HT. Résultat = marge − salaires − charges.</div>";
+  p.mois.slice(0,6).forEach(function(m){
+    h+="<div style='margin-top:12px;padding-top:8px;border-top:1px solid #eee'><b>"+esc(bqMoisLib(m.mois))+"</b><table class='devis' style='width:100%;margin-top:4px'>"
+      +c("CA TTC (Amiens "+eur(m.amiens)+" · Rouen "+eur(m.rouen)+" · web "+eur(m.web)+")",eur(m.caTtc))
+      +c("CA HT",eur(m.caHt))
+      +c("Achats marchandises HT","-"+eur(m.achatsHt))
+      +c("Marge brute estimée",eur(m.marge)+" ("+m.margePct+" %)","#1e8449")
+      +c("Salaires et rémunérations","-"+eur(m.salaires))
+      +c("Autres charges HT (abonnements, assurances, prêt, frais…)","-"+eur(m.charges))
+      +c("Résultat estimé",eur(m.resultat),m.resultat<0?"#c0392b":"#1e8449")
+      +c("TVA à payer estimée (collectée "+eur(m.tvaCollectee)+" − récupérable "+eur(m.tvaRecup)+")",eur(m.tvaAPayer))
+      +"</table><div class='muted'>"+m.nb+" ventes en caisse · panier moyen "+eur(m.panier)+(m.retraits?" · retraits espèces non comptés : "+eur(m.retraits):"")+"</div></div>"});
+  return h+"</div>"}
 function bqOpsHtml(){
   if(!BQ.ops)return"";
   var o=BQ.ops,h="<div class='card'><div class='step'>"+(BQ.aClasser?"Opérations à classer":"Opérations de "+esc(bqMoisLib(BQ.mois)))+"</div>"
@@ -39,6 +57,7 @@ function vBanque(){
     +(BQ.msg?"<div class='muted' style='margin-top:6px'>"+esc(BQ.msg)+"</div>":"")
     +(s.aClasser>0?"<div style='margin-top:8px'><button class='sec' data-act='bqClasser'>⚠ "+s.aClasser+" opération(s) à classer</button></div>":"")+"</div>";
   if(!s.mois.length)h+="<div class='card muted'>Aucun relevé importé. Importe un CSV (date; libellé; débit; crédit).</div>";
+  h+=bqPilote();
   s.mois.forEach(function(m){h+=bqResume(m,BQ.sens==="debit")});
   if(s.mois.length){h+="<div class='card'><div class='muted'>TVA estimée à 20 % sur "+(BQ.sens==="debit"?"achats, logiciels, télécom et fournitures":"les encaissements de ventes")+" (montants TTC ÷ 6). À confirmer avec le comptable.</div><button class='sec' data-act='bqDet' style='margin-top:6px'>"+(BQ.det?"Masquer":"Voir")+" le détail par magasin</button></div>";if(BQ.det)s.mois.forEach(function(m){h+=bqTable(m)})}
   return h+bqOpsHtml()}
@@ -55,6 +74,6 @@ ACTS.bqExport=function(){
 document.addEventListener("change",function(e){
   var t=e.target;if(!t||t.id!=="bq-file"||!t.files||!t.files[0])return;
   var fr=new FileReader();BQ.msg="Import en cours…";render();
-  fr.onload=function(){api("/banque/import",{texte:String(fr.result)}).then(function(d){BQ.msg=d.message;BQ.syn=null;BQ.ops=null;render()}).catch(function(er){BQ.msg=er.message;render()})};
+  fr.onload=function(){api("/banque/import",{texte:String(fr.result)}).then(function(d){BQ.msg=d.message;BQ.syn=null;BQ.pil=null;BQ.ops=null;render()}).catch(function(er){BQ.msg=er.message;render()})};
   fr.readAsText(t.files[0],"utf-8")});
 `;
