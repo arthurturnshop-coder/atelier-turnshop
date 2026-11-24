@@ -274,6 +274,8 @@ app.post("/pub/moi", async (c) => {
     const [dvl] = (await sql`SELECT token FROM devis_envois WHERE reparation_id = ${r.id} AND statut = 'envoye' AND expire_le > now() ORDER BY id DESC LIMIT 1`.catch(() => [])) as any[];
     reparations.push({
       devisLien: dvl ? `${(Bun.env.PUBLIC_URL || "https://atelier-turnshop-production.up.railway.app").replace(/\/$/, "")}/pub/devis/${dvl.token}` : "",
+      autorisations: (Array.isArray(r.autorisations) ? r.autorisations : []).map((x: any) => `${({ freins: "Freins", pneus: "Pneus et chambres à air", eclairage: "Éclairage", cables: "Câbles et connectique", serrage: "Contrôle sécurité et serrage général" } as Record<string, string>)[x.cle] ?? x.cle} : ${x.mode === "changer" ? "changer si nécessaire (sur devis)" : "vérifier et te prévenir"}`),
+      etatDepot: r.etat || "",
       id: r.id, numero: pcn(r.id), trottinette: `${r.marque} ${r.modele}`, panne: r.panne, groupe: e.groupe, etat: e.libelle, etape: e.etape, etapes: e.etapes, rdvStatut: r.rdv_statut ?? "",
       depot: r.date_depot, rdv: r.debut, rdvSouhaite: r.rdv_souhaite, magasin: r.magasin,
       devis: dv.lignes.map((l) => ({ libelle: l.libelle, quantite: l.quantite, prixCents: l.prixCents })), remiseCents: dv.remiseMultiCents, totalCents: dv.netCents,
@@ -343,6 +345,13 @@ app.post("/pub/rdv", async (c) => {
     await variantesParSku(ps);
     const prix = await prixVariantes(ps.map((p) => p.variant_id).filter(Boolean));
     for (const p of ps) await sql`INSERT INTO devis_lignes (reparation_id, type, libelle, quantite, prix_unitaire_cents, shopify_variant_id, sku) VALUES (${r.id}, 'piece', ${p.libelle}, 1, ${prix[p.variant_id]?.prix ?? 0}, ${p.variant_id || null}, ${p.sku || null})`;
+  }
+  // Autorisations du client (freins, pneus...) : vérifier ou changer si nécessaire, sur devis complémentaire.
+  const AUTOS: Record<string, string> = { freins: "Freins", pneus: "Pneus et chambres à air", eclairage: "Éclairage", cables: "Câbles et connectique", serrage: "Contrôle sécurité et serrage général" };
+  const autos = (Array.isArray(b.autorisations) ? b.autorisations : []).filter((x: any) => AUTOS[x?.cle] && ["verifier", "changer"].includes(x?.mode)).map((x: any) => ({ cle: x.cle, mode: x.mode })).slice(0, 10);
+  if (autos.length) {
+    const txt = autos.map((x: any) => `${AUTOS[x.cle]} : ${x.mode === "changer" ? "changer si nécessaire (extension de devis à envoyer)" : "vérifier et prévenir"}`).join(" · ");
+    await sql`UPDATE reparations SET autorisations = ${JSON.stringify(autos)}::jsonb, remarques = ${"Autorisations client : " + txt} WHERE id = ${r.id}`;
   }
   // Brouillon : invisible pour l'atelier (soft-delete) tant que le paiement n'est pas reçu (voir enregistrePaiementWeb).
   await sql`UPDATE reparations SET supprime_le = now() WHERE id = ${r.id}`;

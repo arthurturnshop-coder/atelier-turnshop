@@ -87,6 +87,14 @@ function Page() {
 }
 
 // ---------- Mes réparations ----------
+const AUTOS = [
+  {cle: 'freins', l: 'Freins'},
+  {cle: 'pneus', l: 'Pneus et chambres à air'},
+  {cle: 'eclairage', l: 'Éclairage'},
+  {cle: 'cables', l: 'Câbles et connectique'},
+  {cle: 'serrage', l: 'Contrôle sécurité et serrage général'},
+];
+
 function Frise({etapes}) {
   // Un seul badge : l'étape en cours (ou la dernière faite si tout est terminé).
   const liste = etapes || [];
@@ -113,7 +121,23 @@ function Carte({r, payer, repondre}) {
         <s-text color="subdued">{r.numero + (r.depot ? ' · déposée le ' + jour(r.depot) : '')}</s-text>
         <Frise etapes={r.etapes} />
         <s-text type="strong">{r.etat}</s-text>
-        <s-text>{'Panne : ' + r.panne}</s-text>
+        {r.totalCents > 0 && <s-text>{'Total du devis : ' + eur(r.totalCents)}</s-text>}
+        <s-button variant="secondary" onClick={() => setDetailOuvert(!detailOuvert)}>{detailOuvert ? 'Masquer la fiche' : 'Voir la fiche complète'}</s-button>
+        {detailOuvert && (
+          <s-stack gap="small-300">
+            <s-text>{'Panne : ' + r.panne}</s-text>
+            {r.etatDepot && <s-text>{'État à la réception : ' + r.etatDepot}</s-text>}
+            {(r.autorisations || []).length > 0 && (
+              <s-stack gap="small-300">
+                <s-text type="strong">Ce que tu as autorisé à l'atelier</s-text>
+                {r.autorisations.map((x, i) => <s-text key={i}>{'• ' + x}</s-text>)}
+                <s-text color="subdued">Si on change une pièce en plus, on t'envoie une extension de devis que tu valides avant tout.</s-text>
+              </s-stack>
+            )}
+            {r.devis.map((l, i) => <s-text key={i}>{l.quantite + ' × ' + l.libelle + ' : ' + (l.prixCents > 0 ? eur(l.quantite * l.prixCents) : 'prix à confirmer')}</s-text>)}
+            {r.devis.length === 0 && <s-text color="subdued">Le devis sera préparé par l'atelier.</s-text>}
+          </s-stack>
+        )}
         {r.rdvSouhaite && !r.rdv && <s-text>{'Créneau : ' + (/^\d{4}-\d{2}-\d{2}$/.test(sp[0]) ? jour(sp[0] + 'T12:00:00Z') : sp[0]) + (sp[1] ? ' (' + sp.slice(1).join(' ') + ')' : '') + (r.magasin ? ' à ' + r.magasin : '')}</s-text>}
         {r.rdv && <s-text>{'Rendez-vous : ' + jour(r.rdv) + (r.magasin ? ' (' + r.magasin + ')' : '')}</s-text>}
         {r.rdvStatut === 'propose' && (
@@ -122,19 +146,9 @@ function Carte({r, payer, repondre}) {
             <s-button onClick={() => repondre(r.id, 'annuler')}>Annuler ma demande</s-button>
           </s-stack>
         )}
-        {r.devis.length > 0
-          ? (
-            <s-stack gap="small-300">
-              <s-text>{r.devis.length + (r.devis.length > 1 ? ' lignes' : ' ligne') + ' dans ton devis'}</s-text>
-              <s-button variant="secondary" onClick={() => setDetailOuvert(!detailOuvert)}>{detailOuvert ? 'Masquer le détail du devis' : 'Voir le détail du devis'}</s-button>
-              {detailOuvert && <s-stack gap="small-300">{r.devis.map((l, i) => <s-text key={i}>{l.quantite + ' × ' + l.libelle + ' : ' + (l.prixCents > 0 ? eur(l.quantite * l.prixCents) : 'prix à confirmer')}</s-text>)}</s-stack>}
-            </s-stack>
-          )
-          : <s-text color="subdued">Le devis sera préparé par l'atelier.</s-text>}
         {r.remiseCents > 0 && <s-text>{'Remise plusieurs prestations : -' + eur(r.remiseCents)}</s-text>}
         {r.gardiennage && <s-text>{'Gardiennage : ' + eur(r.gardiennage.fraisCents)}</s-text>}
         {r.abandonnee && <s-banner tone="warning">Cette trottinette est considérée comme abandonnée.</s-banner>}
-        {r.totalCents > 0 && <s-text type="strong">{'Total du devis : ' + eur(r.totalCents)}</s-text>}
         {r.verseCents > 0 && <s-text>{'Déjà versé : ' + eur(r.verseCents)}</s-text>}
         {r.verseCents > 0 && r.resteAPayerCents > 0 && <s-text>{'Reste à régler : ' + eur(r.resteAPayerCents)}</s-text>}
         {r.devisLien && (
@@ -203,6 +217,7 @@ function Nouvelle({onFait, payer, setMsg, profil}) {
   const [options, setOptions] = useState({});
   const [pieces, setPieces] = useState({});
   const [panne, setPanne] = useState('');
+  const [autos, setAutos] = useState({});
   const [magasin, setMagasin] = useState('Amiens');
   const [date, setDate] = useState('');
   const [creneau, setCreneau] = useState('matin');
@@ -245,7 +260,7 @@ function Nouvelle({onFait, payer, setMsg, profil}) {
     setMsg(null);
     setEnvoi(true);
     try {
-      const j = await appel('/pub/rdv', {prenom, nom, tel, email, modeleId: modele ? modele.id : null, marque: marqueLibre, modele: modeleLibre, magasin, date, creneau, panne, prestationIds: ids(prestas), optionIds: ids(options), pieceIds: ids(pieces)});
+      const j = await appel('/pub/rdv', {prenom, nom, tel, email, modeleId: modele ? modele.id : null, marque: marqueLibre, modele: modeleLibre, magasin, date, creneau, panne, autorisations: Object.keys(autos).filter((k) => autos[k]).map((k) => ({cle: k, mode: autos[k]})), prestationIds: ids(prestas), optionIds: ids(options), pieceIds: ids(pieces)});
       setFait({j, sansDevis});
       setEnvoi(false);
     } catch (e) { setMsg({err: true, texte: e.message}); setEnvoi(false); }
@@ -371,6 +386,19 @@ function Nouvelle({onFait, payer, setMsg, profil}) {
 
       <s-section heading="3. Décris ton besoin">
         <s-text-area label="Panne ou demande (facultatif si tu as choisi une prestation)" rows="3" value={panne} error={erreurs.panne} onInput={(e) => setPanne(e.currentTarget.value)} />
+      </s-section>
+
+      <s-section heading="Pendant qu'on y est (facultatif)">
+        <s-stack gap="base">
+          <s-text color="subdued">Gagne du temps : dis-nous ce qu'on peut faire sans te rappeler. Tout changement de pièce passe par une extension de devis que tu valides avant.</s-text>
+          {AUTOS.map((a) => (
+            <s-select key={a.cle} label={a.l} value={autos[a.cle] || ''} onChange={(e) => setAutos({...autos, [a.cle]: e.currentTarget.value})}>
+              <s-option value="">Rien de plus</s-option>
+              <s-option value="verifier">Vérifier et me prévenir</s-option>
+              <s-option value="changer">Changer si nécessaire (sur devis)</s-option>
+            </s-select>
+          ))}
+        </s-stack>
       </s-section>
 
       <s-section heading="4. Tes coordonnées">
