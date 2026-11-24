@@ -106,6 +106,7 @@ function Frise({etapes}) {
 
 function Carte({r, payer, repondre}) {
   const sp = (r.rdvSouhaite || '').split(' ');
+  const [detailOuvert, setDetailOuvert] = useState(false);
   return (
     <s-section heading={r.trottinette}>
       <s-stack gap="base">
@@ -122,7 +123,13 @@ function Carte({r, payer, repondre}) {
           </s-stack>
         )}
         {r.devis.length > 0
-          ? <s-stack gap="small-300">{r.devis.map((l, i) => <s-text key={i}>{l.quantite + ' × ' + l.libelle + ' : ' + (l.prixCents > 0 ? eur(l.quantite * l.prixCents) : 'prix à confirmer')}</s-text>)}</s-stack>
+          ? (
+            <s-stack gap="small-300">
+              <s-text>{r.devis.length + (r.devis.length > 1 ? ' lignes' : ' ligne') + ' dans ton devis'}</s-text>
+              <s-button variant="secondary" onClick={() => setDetailOuvert(!detailOuvert)}>{detailOuvert ? 'Masquer le détail du devis' : 'Voir le détail du devis'}</s-button>
+              {detailOuvert && <s-stack gap="small-300">{r.devis.map((l, i) => <s-text key={i}>{l.quantite + ' × ' + l.libelle + ' : ' + (l.prixCents > 0 ? eur(l.quantite * l.prixCents) : 'prix à confirmer')}</s-text>)}</s-stack>}
+            </s-stack>
+          )
           : <s-text color="subdued">Le devis sera préparé par l'atelier.</s-text>}
         {r.remiseCents > 0 && <s-text>{'Remise plusieurs prestations : -' + eur(r.remiseCents)}</s-text>}
         {r.gardiennage && <s-text>{'Gardiennage : ' + eur(r.gardiennage.fraisCents)}</s-text>}
