@@ -147,7 +147,11 @@ function Carte({r, payer, repondre}) {
           </s-stack>
         )}
         {r.remiseCents > 0 && <s-text>{'Remise plusieurs prestations : -' + eur(r.remiseCents)}</s-text>}
-        {r.gardiennage && <s-text>{'Gardiennage : ' + eur(r.gardiennage.fraisCents)}</s-text>}
+        {r.gardiennage && (
+          <s-banner tone="critical" heading="Gardiennage en cours">
+            <s-text type="strong">{'Gardiennage : ' + eur(r.gardiennage.fraisCents) + (r.gardiennage.jours ? ' (' + r.gardiennage.jours + ' jours)' : '') + ' — Venez la chercher le plus rapidement possible, les frais augmentent chaque jour.'}</s-text>
+          </s-banner>
+        )}
         {r.abandonnee && <s-banner tone="warning">Cette trottinette est considérée comme abandonnée.</s-banner>}
         {r.verseCents > 0 && <s-text>{'Déjà versé : ' + eur(r.verseCents)}</s-text>}
         {r.verseCents > 0 && r.resteAPayerCents > 0 && <s-text>{'Reste à régler : ' + eur(r.resteAPayerCents)}</s-text>}
