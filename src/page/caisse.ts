@@ -78,7 +78,7 @@ function vjHtml(){
   if(!VJ.length)h+="<div class='muted'>Aucune vente aujourd hui.</div>";
   VJ.forEach(function(r){
     var res=r.lignes.slice(0,3).map(function(l){return esc(l.libelle)}).join(", ")+(r.lignes.length>3?"…":"");
-    h+="<button class='sec hrow' data-act='cVjRecu' data-id='"+r.id+"'><b>"+esc(dateLongue(r.date))+"</b> · "+eur(r.totalCents)+" · "+esc(r.client||"sans client")+(r.numero?" · "+esc(r.numero):"")+"<br><span class='muted'>"+res+"</span></button>"+(r.clientId?"<div class='actions'><button class='link' data-act='cVjClient' data-cid='"+r.clientId+"'>👤 Ouvrir le profil de "+esc(r.client||"ce client")+"</button></div>":"");
+    h+="<div style='display:flex;gap:8px;align-items:stretch;margin-top:6px'><button class='sec hrow' style='flex:1;margin:0' data-act='cVjRecu' data-id='"+r.id+"'><b>"+esc(dateLongue(r.date))+"</b> · "+eur(r.totalCents)+" · "+esc(r.client||"sans client")+(r.numero?" · "+esc(r.numero):"")+"<br><span class='muted'>"+res+"</span></button>"+(r.clientId?"<button class='sec' style='margin:0;font-size:22px;padding:0 16px' title='Ouvrir le profil de "+esc(r.client||"ce client")+"' data-act='cVjClient' data-cid='"+r.clientId+"'>👤</button>":"")+"</div>";
     if(VJOPEN===r.id)h+=recuHtml(r)+"<div class='actions'><button class='sec' data-act='cPrint' data-id='"+r.id+"'>Imprimer le reçu</button><button class='sec' data-act='cEmail' data-id='"+r.id+"'>✉ Envoyer par email</button></div>"});
   return h+"<div class='actions'><button data-act='cVjFerme'>Fermer</button></div></div>"}
 function histoHtml(){
