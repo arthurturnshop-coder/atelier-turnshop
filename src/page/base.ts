@@ -9,7 +9,7 @@ var RACC="",ATSUB="liste",VUE="tout",LST=null,FICHE=null,PJOUR="",PMAG="",PLAN=n
 var app=document.getElementById("app"),nav=document.getElementById("nav");
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(m){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]})}
 function v(id){var e=document.getElementById(id);return e?String(e.value).trim():""}
-function eur(c){return (c/100).toFixed(2).replace(".",",")+" €"}
+function eur(c){return (c/100).toFixed(2).replace(".",",")+String.fromCharCode(160)+"€"}
 function day(d){try{return new Date(d).toLocaleDateString("fr-FR")}catch(e){return d||""}}
 function dayHour(d){try{return new Date(d).toLocaleString("fr-FR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}catch(e){return d||""}}
 function today(){return new Date().toISOString().slice(0,10)}

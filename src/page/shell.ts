@@ -38,8 +38,8 @@ button.link{background:none;color:#111;border:0;text-decoration:underline;min-he
 .ct-autre{background:#fdeaea;border-color:#d33}
 .cons-b{margin-top:10px;display:flex;gap:8px}
 .chiffres{display:flex;flex-wrap:wrap;gap:8px}
-.chiffre{flex:1 1 140px;background:#f5f5f5;border-radius:10px;padding:10px;text-align:center}
-.chiffre b{display:block;font-size:clamp(20px,2.1vw,30px);white-space:nowrap}
+.chiffre{flex:1 1 150px;min-width:0;background:#f5f5f5;border-radius:10px;padding:10px;text-align:center}
+.chiffre b{display:block;font-size:clamp(16px,1.7vw,26px);white-space:nowrap;overflow:hidden}
 .chiffre span{font-size:13px;color:#555}
 .avis{background:#f0f7ff;border:1px solid #b6d4f5;border-radius:10px;padding:10px;margin-top:10px}
 .avis .row{display:flex;gap:8px;flex-wrap:wrap}
