@@ -219,7 +219,9 @@ var COMPH=false;
 function vCompta(){
   if(!estResp()){app.innerHTML="<div class='caisse'><h3>Compta</h3><div class='muted'>Réservé aux responsables.</div></div>";return}
   if(!CLO.h&&!COMPH){COMPH=true;cloHistCharge()}
-  app.innerHTML="<div class='caisse'><h3>Compta · tickets Z et encaissements</h3>"+(CLO.msg?"<div class='muted'>"+esc(CLO.msg)+"</div>":"")+cloHist()+"</div>"}
+  var sub="<div class='actions'><button class='"+(COMPSUB==="z"?"":"sec")+"' data-act='compSub' data-v='z'>Caisse (tickets Z)</button><button class='"+(COMPSUB==="banque"?"":"sec")+"' data-act='compSub' data-v='banque'>Banque</button></div>";
+  if(COMPSUB==="banque"){app.innerHTML="<div class='caisse'><h3>Compta · banque</h3>"+sub+vBanque()+"</div>";return}
+  app.innerHTML="<div class='caisse'><h3>Compta · tickets Z et encaissements</h3>"+sub+(CLO.msg?"<div class='muted'>"+esc(CLO.msg)+"</div>":"")+cloHist()+"</div>"}
 function cloCharge(){return api("/caisse/session").then(function(d){CLO.d=d;render()}).catch(function(e){CLO.msg=e.message;render()})}
 function cloHistCharge(){if(!estResp())return;api("/caisse/cloture-historique?periode="+CLO.per).then(function(h){var y=window.scrollY;CLO.h=h;render();window.scrollTo(0,y)}).catch(function(e){CLO.msg=e.message;render()})}
 ACTS.cloOuvre=function(){CLO={open:true,d:null,h:null,per:CLO.per||"30j",msg:"",aj:null};render();cloCharge();cloHistCharge()};
