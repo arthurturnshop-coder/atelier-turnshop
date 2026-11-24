@@ -58,7 +58,7 @@ export const ACTIONS = `var ACTS={
       CCLI=d.client;CFID=d.fidelite;CUSE=false;CAVOFF=[];CREC=null;CHOPEN=0;CREP=f.id;CPAY={carte:"",especes:"",virement:"",bon_achat:""};CMSG="";
       FICHE=null;CUR=null;TAB="accueil";await chargeHisto()}catch(e){alert(e.message)}},
   acompte:async function(b){var m=pxCents(v("ac-m"));if(m<=0){alert("Indique le montant.");return}
-    try{var mdpA=prompt("Mot de passe de celui qui encaisse :");if(!mdpA)return;var d=await api("/reparations/acompte",{mdpCaissier:mdpA,repairId:+b.dataset.id,paiements:[{moyen:v("ac-t"),montant:v("ac-m")}]});await recharger(+b.dataset.id);CREC=d.vente;alert(d.message)}catch(e){alert(e.message)}},
+    try{var mdpA=await demandeCode("Qui encaisse l'acompte ?");if(mdpA===null)return;var d=await api("/reparations/acompte",{mdpCaissier:mdpA,repairId:+b.dataset.id,paiements:[{moyen:v("ac-t"),montant:v("ac-m")}]});await recharger(+b.dataset.id);CREC=d.vente;alert(d.message)}catch(e){alert(e.message)}},
   rembourse:async function(b){var t=v("rb-t");if(!t){alert("Choisis comment rembourser.");return}
     if(!confirm("Rembourser "+eur(+b.dataset.c)+" au client ?"))return;
     try{var d=await api("/reparations/rembourser",{repairId:+b.dataset.id,moyen:t});alert(d.message);await recharger(+b.dataset.id)}catch(e){alert(e.message)}},
@@ -105,12 +105,13 @@ export const ACTIONS = `var ACTS={
   cFermeRecu:function(){CREC=null;lirePay();render()},
   cPrint:function(b){btnFlash(b);var r=document.querySelector("[data-recu='"+b.dataset.id+"']");if(!r)return;var c=r.cloneNode(true);c.className="printme";impImprimer(c.outerHTML,"","",true)},
   cCase:function(b){return cCaseFn(b)},
-  cEncaisser:async function(){await rdvInfos();lirePay();var mdpE=document.getElementById("c-mdp"),mdpC=mdpE?mdpE.value:CMDP;CMDP=mdpC;if(!mdpC){CMSG="Tape ton mot de passe (celui qui encaisse) avant d'encaisser.";render();return}var pay=["carte","especes","virement","bon_achat"].map(function(m){return{moyen:m,montant:CPAY[m]}}).filter(function(p){return p.montant});
+  cEncaisser:async function(){await rdvInfos();lirePay();var pay=["carte","especes","virement","bon_achat"].map(function(m){return{moyen:m,montant:CPAY[m]}}).filter(function(p){return p.montant});
     var brut=panierTotal(),ids=avChoisis(brut).map(function(a){return a.id});
     if(!CREP){try{var need=await api("/caisse/series-requises",{lignes:PAN});need.indices.forEach(function(i){PAN[i].trott=true;PAN[i].series=PAN[i].series||[]})}catch(e){}}
     if(!CREP&&PAN.some(function(l){return l.trott})){
       if(!PAN.every(serieOk)){CMSG="Trottinette : saisis le numéro de série (un par trottinette) avant d encaisser.";render();return}
       if(!CCLI){CMSG="Trottinette : choisis le client (sa garantie est liée à son compte).";render();return}}
+    var mdpC=await demandeCode("Qui encaisse ?");if(mdpC===null)return;
     try{var d=await api("/caisse/encaisser",{lignes:PAN,paiements:pay,clientId:CCLI?CCLI.id:null,utiliserFidelite:CUSE,avantageIds:ids,repairId:CREP,mdpCaissier:mdpC});CMDP="";CREP=null;CACO=0;PAN=[];CPAY={carte:"",especes:"",virement:"",bon_achat:""};CUSE=false;CAVOFF=[];CREC=d.vente;CMSG="";CHOPEN=0;CCLI=null;CFID=null;await chargeHisto()}catch(e){CMSG=e.message;render()}},
   shopTest:async function(){SHOPRES="<div class='muted'>Test en cours…</div>";render();try{var d=await api("/shopify/diagnostic");SHOPRES=d.etapes.map(function(e){return"<div>"+(e.ok?"✅ ":"❌ ")+"<b>"+esc(e.nom)+"</b><div class='muted'>"+esc(e.detail)+"</div></div>"}).join("")}catch(e){SHOPRES=esc(e.message)}render()},
   addPresta:async function(b){var x=(PRESTA?PRESTA.prestations:[]).filter(function(p){return p.id===+b.dataset.id})[0];if(!x||!FICHE)return;
