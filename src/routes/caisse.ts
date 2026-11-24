@@ -164,7 +164,10 @@ export async function detailVente(v: any) {
 // Historique : les achats d'un client, ou les ventes du jour si aucun client.
 app.get("/api/caisse/historique", async (c) => {
   const id = Number(c.req.query("clientId"));
-  const rows = (id > 0
+  const jour = c.req.query("jour") === "1";
+  const rows = (jour
+    ? await sql`SELECT v.*, trim(cl.prenom || ' ' || cl.nom) AS client_nom FROM ventes v LEFT JOIN clients cl ON cl.id = v.client_id WHERE (v.cree_le AT TIME ZONE 'Europe/Paris')::date = (now() AT TIME ZONE 'Europe/Paris')::date ORDER BY v.id DESC LIMIT 300`
+    : id > 0
     ? await sql`SELECT v.*, trim(cl.prenom || ' ' || cl.nom) AS client_nom FROM ventes v LEFT JOIN clients cl ON cl.id = v.client_id WHERE v.client_id = ${id} ORDER BY v.id DESC LIMIT 30`
     : await sql`SELECT v.*, trim(cl.prenom || ' ' || cl.nom) AS client_nom FROM ventes v LEFT JOIN clients cl ON cl.id = v.client_id WHERE (v.cree_le AT TIME ZONE 'Europe/Paris')::date = (now() AT TIME ZONE 'Europe/Paris')::date ORDER BY v.id DESC LIMIT 30`) as any[];
   const ventes = [];

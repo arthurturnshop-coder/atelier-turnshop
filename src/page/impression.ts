@@ -215,10 +215,10 @@ ACTS.cloAjout=function(b){var id=+b.dataset.id;api("/caisse/ventes-orphelines?se
 ACTS.cloAjoutNo=function(){CLO.aj=null;render()};
 ACTS.cloAjoute=function(b){if(!confirm("Ajouter cette vente au ticket Z ? Les totaux et l écart seront recalculés."))return;api("/caisse/ajouter-vente",{session:+b.dataset.s,vente:+b.dataset.v}).then(function(){CLO.aj=null;CLO.msg="Vente ajoutée au ticket Z.";cloHistCharge()}).catch(function(e){CLO.msg=e.message;render()})};
 function cloCharge(){return api("/caisse/session").then(function(d){CLO.d=d;render()}).catch(function(e){CLO.msg=e.message;render()})}
-function cloHistCharge(){if(!estResp())return;api("/caisse/cloture-historique?periode="+CLO.per).then(function(h){CLO.h=h;render()}).catch(function(e){CLO.msg=e.message;render()})}
+function cloHistCharge(){if(!estResp())return;api("/caisse/cloture-historique?periode="+CLO.per).then(function(h){var y=window.scrollY;CLO.h=h;render();window.scrollTo(0,y)}).catch(function(e){CLO.msg=e.message;render()})}
 ACTS.cloOuvre=function(){CLO={open:true,d:null,h:null,per:CLO.per||"30j",msg:"",aj:null};render();cloCharge();cloHistCharge()};
 ACTS.cloFerme=function(){CLO={open:false,d:CLO.d,h:null,per:CLO.per,msg:"",aj:null};render()};
-ACTS.cloPer=function(b){CLO.per=b.dataset.v;CLO.h=null;render();cloHistCharge()};
+ACTS.cloPer=function(b){CLO.per=b.dataset.v;var y=window.scrollY;render();window.scrollTo(0,y);cloHistCharge()};
 ACTS.cloOuvrir=function(){
   var f=document.getElementById("clo-fond");if(!f||!f.value.trim()){CLO.msg="Saisis le montant présent dans le tiroir.";render();return}
   api("/caisse/ouvrir",{fond:f.value}).then(function(){CLO.msg="Caisse ouverte.";return cloCharge()}).catch(function(e){CLO.msg=e.message;render()})};
