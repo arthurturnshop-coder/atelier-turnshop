@@ -20,7 +20,7 @@ app.post("/api/reglages/commandes", async (c) => {
 });
 
 const montant = (cents: number) => ({ shopMoney: { amount: (cents / 100).toFixed(2), currencyCode: "EUR" } });
-const PASSERELLE: Record<string, string> = { carte: "Carte (atelier)", especes: "Espèces (atelier)", virement: "Virement (atelier)" };
+const PASSERELLE: Record<string, string> = { carte: "Carte (atelier)", especes: "Espèces (atelier)", virement: "Virement (atelier)", bon_achat: "Bon d'achat (atelier)" };
 
 // Construit la commande Shopify à partir d'une vente de l'atelier (prix TTC, TVA 20 %).
 export function construireCommande(v: any, client: any, rep: any, lignes: any[], paiements: any[]) {

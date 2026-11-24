@@ -245,7 +245,7 @@ app.post("/api/caisse/encaisser", async (c) => {
     moyen: String(p.moyen ?? ""),
     cents: Math.max(0, Math.round((Number(String(p.montant ?? "0").replace(",", ".")) || 0) * 100)),
   })).filter((p: any) => p.cents > 0);
-  if (paiements.some((p: any) => !["carte", "especes", "virement"].includes(p.moyen))) throw new AppError(400, "Moyen de paiement inconnu.");
+  if (paiements.some((p: any) => !["carte", "especes", "virement", "bon_achat"].includes(p.moyen))) throw new AppError(400, "Moyen de paiement inconnu.");
   const payeTotal = paiements.reduce((s: number, p: any) => s + p.cents, 0);
   if (payeTotal !== totalCents) throw new AppError(400, `Les paiements (${(payeTotal / 100).toFixed(2)} €) ne correspondent pas au total (${(totalCents / 100).toFixed(2)} €).`);
 

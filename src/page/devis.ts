@@ -53,7 +53,7 @@ ACTS.dvFact=async function(){
   try{var s=await api("/devis-simples",dvPayload());DV.ed.id=s.id;var d=null;
     if(DV.ed.clientId)d=await api("/caisse/client?id="+DV.ed.clientId);
     PAN=DV.ed.lignes.map(function(l){return{libelle:l.libelle,quantite:l.quantite,prix:String(l.prixCents/100).replace(".",","),type:"article",variantId:"",sku:""}});
-    CCLI=d?d.client:null;CFID=d?d.fidelite:null;CUSE=false;CAVOFF=[];CREC=null;CHOPEN=0;CREP=null;CACO=0;CPAY={carte:"",especes:"",virement:""};CMSG="";
+    CCLI=d?d.client:null;CFID=d?d.fidelite:null;CUSE=false;CAVOFF=[];CREC=null;CHOPEN=0;CREP=null;CACO=0;CPAY={carte:"",especes:"",virement:"",bon_achat:""};CMSG="";
     DV.ed=null;DV.list=null;FICHE=null;CUR=null;TAB="accueil";if(d)await chargeHisto();else render()}catch(e){alert(e.message)}};
 async function cartVersDevis(){
   if(!PAN.length){alert("Le panier est vide.");return null}
@@ -62,7 +62,7 @@ async function cartVersDevis(){
   if(!CCLI&&nom){tel=(prompt("Téléphone du client (sa fiche client sera créée) ?")||"").trim();if(!tel)return null}
   var r=await api("/devis-simples",{clientId:CCLI?CCLI.id:0,nom:nom,telephone:tel,email:CCLI?(CCLI.email||""):"",lignes:PAN.map(function(l){return{libelle:l.libelle,quantite:l.quantite,prix:l.prix}})});
   return r}
-function cartVide(){PAN=[];CPAY={carte:"",especes:"",virement:""};CMSG="";CCLI=null;CFID=null;CUSE=false;CAVOFF=[];CREP=null;CACO=0}
+function cartVide(){PAN=[];CPAY={carte:"",especes:"",virement:"",bon_achat:""};CMSG="";CCLI=null;CFID=null;CUSE=false;CAVOFF=[];CREP=null;CACO=0}
 ACTS.cEnDevis=async function(){
   try{var r=await cartVersDevis();if(!r)return;cartVide();DV.list=null;DV.ed=null;DV.res=null;DV.hint="";DV.msg="Devis "+dvNum(r.id)+" enregistré. Ouvre-le pour le facturer ou créer une prise en charge.";FICHE=null;CUR=null;TAB="enc";ATSUB="devis";render()}catch(e){alert(e.message)}};
 ACTS.cEnPec=async function(){

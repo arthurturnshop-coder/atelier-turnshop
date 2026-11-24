@@ -52,7 +52,7 @@ export const ACTIONS = `var ACTS={
       PAN=f.devis.lignes.map(function(l){return{libelle:l.libelle,quantite:l.quantite,prix:String(l.prixCents/100).replace(".",","),type:l.type,variantId:l.variantId||"",sku:l.sku||""}});
       if(f.garde&&f.garde.fraisCents>0)PAN.push({libelle:"Gardiennage ("+f.garde.joursFrais+" jours x "+(f.garde.prixCents/100)+" EUR)",quantite:f.garde.joursFrais,prix:String(f.garde.prixCents/100).replace(".",","),type:"article",variantId:"",sku:""});
       CACO=f.acompte?f.acompte.resteCents:0;
-      CCLI=d.client;CFID=d.fidelite;CUSE=false;CAVOFF=[];CREC=null;CHOPEN=0;CREP=f.id;CPAY={carte:"",especes:"",virement:""};CMSG="";
+      CCLI=d.client;CFID=d.fidelite;CUSE=false;CAVOFF=[];CREC=null;CHOPEN=0;CREP=f.id;CPAY={carte:"",especes:"",virement:"",bon_achat:""};CMSG="";
       FICHE=null;CUR=null;TAB="accueil";await chargeHisto()}catch(e){alert(e.message)}},
   acompte:async function(b){var m=pxCents(v("ac-m"));if(m<=0){alert("Indique le montant.");return}
     try{var d=await api("/reparations/acompte",{repairId:+b.dataset.id,paiements:[{moyen:v("ac-t"),montant:v("ac-m")}]});await recharger(+b.dataset.id);CREC=d.vente;alert(d.message)}catch(e){alert(e.message)}},
@@ -70,7 +70,7 @@ export const ACTIONS = `var ACTS={
   cUse:function(b){CUSE=b.dataset.v==="1";lirePay();render()},
   cAdd:function(){var l=v("cl");if(!l){alert("Donne un libellé.");return}PAN.push({libelle:l,quantite:Math.max(1,Number(v("cq2"))||1),prix:v("cp")||"0"});lirePay();render()},
   cDel:function(b){PAN.splice(+b.dataset.i,1);lirePay();render()},
-  cTout:function(b){var brut=panierTotal(),net=brut-avRemTotal(brut)-remiseCents();net-=acoDeduit(net);CPAY={carte:"",especes:"",virement:""};CPAY[b.dataset.m]=(net/100).toFixed(2).replace(".",",");render()},
+  cTout:function(b){var brut=panierTotal(),net=brut-avRemTotal(brut)-remiseCents();net-=acoDeduit(net);CPAY={carte:"",especes:"",virement:"",bon_achat:""};CPAY[b.dataset.m]=(net/100).toFixed(2).replace(".",",");render()},
   cJour:function(){lirePay();chargeHisto()},
   cVjOuvre:function(){VJ=[];VJOPEN=0;vjSync();rdvInfos().then(function(){return api("/caisse/historique?jour=1")}).then(function(d){VJ=d.ventes;vjSync()}).catch(function(e){VJ=null;toastKo(e.message);vjSync()})},
   cVjFerme:function(){VJ=null;VJOPEN=0;vjSync()},
@@ -79,9 +79,9 @@ export const ACTIONS = `var ACTS={
   cFermeRecu:function(){CREC=null;lirePay();render()},
   cPrint:function(b){btnFlash(b);var r=document.querySelector("[data-recu='"+b.dataset.id+"']");if(!r)return;var c=r.cloneNode(true);c.className="printme";impImprimer(c.outerHTML,"","",true)},
   cCase:function(b){return cCaseFn(b)},
-  cEncaisser:async function(){await rdvInfos();lirePay();var pay=["carte","especes","virement"].map(function(m){return{moyen:m,montant:CPAY[m]}}).filter(function(p){return p.montant});
+  cEncaisser:async function(){await rdvInfos();lirePay();var pay=["carte","especes","virement","bon_achat"].map(function(m){return{moyen:m,montant:CPAY[m]}}).filter(function(p){return p.montant});
     var brut=panierTotal(),ids=avChoisis(brut).map(function(a){return a.id});
-    try{var d=await api("/caisse/encaisser",{lignes:PAN,paiements:pay,clientId:CCLI?CCLI.id:null,utiliserFidelite:CUSE,avantageIds:ids,repairId:CREP});CREP=null;CACO=0;PAN=[];CPAY={carte:"",especes:"",virement:""};CUSE=false;CAVOFF=[];CREC=d.vente;CMSG="";CHOPEN=0;if(CCLI){var x=await api("/caisse/client?id="+CCLI.id);CFID=x.fidelite}await chargeHisto()}catch(e){CMSG=e.message;render()}},
+    try{var d=await api("/caisse/encaisser",{lignes:PAN,paiements:pay,clientId:CCLI?CCLI.id:null,utiliserFidelite:CUSE,avantageIds:ids,repairId:CREP});CREP=null;CACO=0;PAN=[];CPAY={carte:"",especes:"",virement:"",bon_achat:""};CUSE=false;CAVOFF=[];CREC=d.vente;CMSG="";CHOPEN=0;if(CCLI){var x=await api("/caisse/client?id="+CCLI.id);CFID=x.fidelite}await chargeHisto()}catch(e){CMSG=e.message;render()}},
   shopTest:async function(){SHOPRES="<div class='muted'>Test en cours…</div>";render();try{var d=await api("/shopify/diagnostic");SHOPRES=d.etapes.map(function(e){return"<div>"+(e.ok?"✅ ":"❌ ")+"<b>"+esc(e.nom)+"</b><div class='muted'>"+esc(e.detail)+"</div></div>"}).join("")}catch(e){SHOPRES=esc(e.message)}render()},
   addPresta:async function(b){var x=(PRESTA?PRESTA.prestations:[]).filter(function(p){return p.id===+b.dataset.id})[0];if(!x||!FICHE)return;
     try{await api("/devis/ligne",{repairId:FICHE.id,type:"main_oeuvre",libelle:x.nom,quantite:1,prix:String(x.prixCents/100).replace(".",",")});

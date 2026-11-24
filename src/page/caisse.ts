@@ -1,5 +1,5 @@
 export const CAISSE = `// ---------- Caisse (colonne de droite du Dashboard) ----------
-var PAN=[],CCLI=null,CFID=null,CUSE=false,CPAY={carte:"",especes:"",virement:""},CREP=null,CMSG="";
+var PAN=[],CCLI=null,CFID=null,CUSE=false,CPAY={carte:"",especes:"",virement:"",bon_achat:""},CREP=null,CMSG="";
 var CAV=null,CAVBUSY=false,CAVOFF=[],CREC=null,CHIST=null,CHOPEN=0;
 var PRESTA=null,PRESBUSY=false,DEVHINT="",CACO=0,DEVOPT=0;
 function acoDeduit(reste){return CREP&&CACO>0?Math.max(0,Math.min(CACO,reste)):0}
@@ -13,7 +13,7 @@ function multiRem(brut){
     var q=mo.filter(function(l){return l.libelle.trim().toLowerCase()===p.nom.trim().toLowerCase()}).reduce(function(s,l){return s+l.quantite},0);
     if(q>=p.qteSeuil&&p.qteRemiseCents>best)best=p.qteRemiseCents});
   return Math.min(best,brut)}
-var MOY={carte:"Carte",especes:"Espèces",virement:"Virement",en_ligne:"En ligne"};
+var MOY={carte:"Carte",especes:"Espèces",virement:"Virement",bon_achat:"Bon d achat",en_ligne:"En ligne"};
 function pxCents(s){return Math.round(Number(String(s).replace(",","."))*100)||0}
 function panierTotal(){return PAN.reduce(function(s,l){return s+l.quantite*pxCents(l.prix)},0)}
 function avApplicable(a,brut){
@@ -29,7 +29,7 @@ function avCondition(a){
   if(a.declencheur==="achat")return"dès "+(a.seuilCents/100)+" € d'achat";
   return"du "+day(a.dateDebut)+" au "+day(a.dateFin)+(a.seuilCents>0?" dès "+(a.seuilCents/100)+" € d'achat":"")}
 function remiseCents(){var brut=panierTotal();return CUSE&&CFID?Math.min(Math.round(CFID.disponibleEuros*100),brut-avRemTotal(brut)):0}
-function lirePay(){CPAY={carte:v("pc"),especes:v("pe"),virement:v("pv")}}
+function lirePay(){CPAY={carte:v("pc"),especes:v("pe"),virement:v("pv"),bon_achat:v("pb")}}
 function dateLongue(d){try{return new Date(d).toLocaleString("fr-FR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit",timeZone:"Europe/Paris"})}catch(e){return d||""}}
 function recuHtml(r){
   var ttc=r.totalCents,ht=Math.round(ttc/1.2),tva=ttc-ht,t=r.ticket||{};
@@ -132,7 +132,7 @@ function caisseHtml(){
   if(rem)h+="<div>Remise fidélité : -"+eur(rem)+"</div>";
   if(aco)h+="<div>Acompte déjà versé : -"+eur(aco)+"</div>";
   h+="<div class='big'>À payer : "+eur(net)+"</div>"
-    +"<div class='pay'><span>Carte</span><input id='pc' placeholder='0,00' value='"+esc(CPAY.carte)+"'></div><div class='pay'><span>Espèces</span><input id='pe' placeholder='0,00' value='"+esc(CPAY.especes)+"'></div><div class='pay'><span>Virement</span><input id='pv' placeholder='0,00' value='"+esc(CPAY.virement)+"'></div>"
+    +"<div class='pay'><span>Carte</span><input id='pc' placeholder='0,00' value='"+esc(CPAY.carte)+"'></div><div class='pay'><span>Espèces</span><input id='pe' placeholder='0,00' value='"+esc(CPAY.especes)+"'></div><div class='pay'><span>Virement</span><input id='pv' placeholder='0,00' value='"+esc(CPAY.virement)+"'></div><div class='pay'><span>Bon d achat</span><input id='pb' placeholder='0,00' value='"+esc(CPAY.bon_achat)+"'></div>"
     +"<div class='actions'><button class='sec' data-act='cTout' data-m='carte'>Tout en carte</button><button class='sec' data-act='cTout' data-m='especes'>Tout en espèces</button><button class='sec' data-act='cTout' data-m='virement'>Tout en virement</button></div>"
     +"<button data-act='cEncaisser' style='width:100%;margin-top:10px;padding:14px;font-size:17px'>Encaisser</button><div class='muted'>"+esc(CMSG)+"</div>"
     +"<div class='muted' style='margin-top:10px'>Le client ne se décide pas maintenant ?</div><div class='actions'><button class='sec' data-act='cEnDevis'>Mettre en devis</button><button class='sec' data-act='cEnPec'>Faire réparer en boutique</button></div></div>";

@@ -157,7 +157,7 @@ function caisseBloquee(){var d=CLO.d;return !!d&&(!d.ouverte||!!d.ouverte.perime
 function cloLigne(l,v){return"<tr><td>"+l+"</td><td class='n'>"+eur(v)+"</td></tr>"}
 function cloHeure(x){var t=new Date(x);return t.toLocaleDateString("fr-FR")+" "+t.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}
 function cloTotaux(t){
-  var e=t.encaisse,r=t.rembourse||{},h="<table class='devis' style='width:100%'>"+cloLigne("Carte",e.carte)+cloLigne("Espèces encaissées",e.especes)+cloLigne("Virement",e.virement)+cloLigne("En ligne (Shopify)",e.en_ligne);
+  var e=t.encaisse,r=t.rembourse||{},h="<table class='devis' style='width:100%'>"+cloLigne("Carte",e.carte)+cloLigne("Espèces encaissées",e.especes)+cloLigne("Virement",e.virement)+(e.bon_achat?cloLigne("Bon d achat",e.bon_achat):"")+cloLigne("En ligne (Shopify)",e.en_ligne);
   Object.keys(r).forEach(function(k){h+=cloLigne("Remboursé ("+esc(k)+")",-r[k])});
   return h+"</table><div class='muted'>"+t.nbVentes+" vente(s) · "+t.nbAcomptes+" acompte(s) · CA ventes "+eur(t.caCents)+"</div>"}
 function cloEcartTxt(c){return(c>0?"+":"")+eur(c)}
@@ -235,7 +235,7 @@ ACTS.cloFermer=function(){
 function cloImprimeZ(z){
   var t=z.totaux||{encaisse:{carte:0,especes:0,virement:0,en_ligne:0},rembourse:{},nbVentes:0,caCents:0},e=t.encaisse;
   var h="<div class='rc'><b>TICKET Z - CLÔTURE DE CAISSE</b><br>TURN SOCIETY · "+esc(z.magasin)+"<br>Ouverte "+esc(cloHeure(z.ouverteLe))+"<br>Fermée "+esc(cloHeure(z.fermeeLe))+"</div><hr>"
-    +"<div class='rl'><span>Carte</span><span>"+eur(e.carte)+"</span></div><div class='rl'><span>Espèces</span><span>"+eur(e.especes)+"</span></div><div class='rl'><span>Virement</span><span>"+eur(e.virement)+"</span></div><div class='rl'><span>En ligne</span><span>"+eur(e.en_ligne)+"</span></div>";
+    +"<div class='rl'><span>Carte</span><span>"+eur(e.carte)+"</span></div><div class='rl'><span>Espèces</span><span>"+eur(e.especes)+"</span></div><div class='rl'><span>Virement</span><span>"+eur(e.virement)+"</span></div>"+(e.bon_achat?"<div class='rl'><span>Bon d achat</span><span>"+eur(e.bon_achat)+"</span></div>":"")+"<div class='rl'><span>En ligne</span><span>"+eur(e.en_ligne)+"</span></div>";
   Object.keys(t.rembourse||{}).forEach(function(k){h+="<div class='rl'><span>Remboursé "+esc(k)+"</span><span>-"+eur(t.rembourse[k])+"</span></div>"});
   h+="<hr><div class='rl'><span>Ventes</span><span>"+t.nbVentes+"</span></div><div class='rl'><span>CA ventes</span><span>"+eur(t.caCents)+"</span></div><hr>"
     +"<div class='rl'><span>Tiroir à l ouverture</span><span>"+eur(z.fondCents)+"</span></div><div class='rl'><span>Espèces attendues</span><span>"+eur(z.attenduCents)+"</span></div><div class='rl'><span>Espèces comptées</span><span>"+eur(z.compteCents)+"</span></div><div class='rl rt'><span>ÉCART</span><span>"+cloEcartTxt(z.ecartCents)+"</span></div>"

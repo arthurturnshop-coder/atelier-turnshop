@@ -28,7 +28,7 @@ async function calcul(m: string, de: Date | string, a: Date | string | null) {
   const [ac] = (await sql`SELECT count(*)::int AS n FROM ventes WHERE magasin = ${m} AND type = 'acompte' AND cree_le >= ${de} AND cree_le <= ${fin}`) as any[];
   const remb = (await sql`SELECT rb.moyen, sum(rb.montant_cents)::int AS n FROM remboursements rb JOIN reparations r ON r.id = rb.reparation_id
     WHERE r.magasin = ${m} AND rb.cree_le >= ${de} AND rb.cree_le <= ${fin} GROUP BY rb.moyen`) as any[];
-  const par: Record<string, number> = { carte: 0, especes: 0, virement: 0, en_ligne: 0 };
+  const par: Record<string, number> = { carte: 0, especes: 0, virement: 0, en_ligne: 0, bon_achat: 0 };
   for (const p of pay) par[p.moyen] = p.n;
   const rem: Record<string, number> = {};
   for (const r of remb) rem[r.moyen] = r.n;
