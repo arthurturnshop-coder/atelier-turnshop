@@ -224,5 +224,7 @@ a.btn{display:inline-block;background:#111;color:#fff;text-decoration:none;paddi
 .pside.late{border-left:6px solid #d00}.pcard.late{background:#fdecec;border-color:#d00;border-left-color:#d00}.stbtns button.dis{opacity:.45;cursor:not-allowed}
 .tache{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid #e3e3e3}.tache.top{border-left:4px solid #111;padding-left:8px;background:#fafafa}.tache.fait .tx{text-decoration:line-through;color:#888}.tache .tx{flex:1}.tache .tbtn{white-space:nowrap}.chk{min-height:26px;width:26px;min-width:26px;padding:0;background:#fff;color:#111;border:2px solid #111;font-size:15px}.rec-ok{border-left:4px solid #1a7f37;padding:8px 12px;background:#f0faf2}.rec-ko{border-left:4px solid #b42318;padding:8px 12px;background:#fdf1f0}
 .ttabs{display:flex;gap:0}.ttabs button{min-height:36px}
+nav{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}nav::-webkit-scrollbar{display:none}nav button{padding:14px 18px;white-space:nowrap}
+@media(max-width:1100px){nav button{padding:12px 11px;font-size:13px;letter-spacing:.03em}}
 </style></head><body><header><span>FS <small style='font-weight:400;font-size:14px;opacity:.9'>by TURN Shop</small></span><div id="rech" class="rech" style="display:none"><input id="rq" type="search" placeholder="Chercher : n° PC, client, modèle, produit..." autocomplete="off"><div id="rpanel" class="rpanel" style="display:none"></div></div><span id="who"></span></header><nav id="nav"></nav><main id="app">Chargement…</main>
 <script>`;
