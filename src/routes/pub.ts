@@ -6,6 +6,7 @@ import { sql } from "../db";
 import { AppError, clean } from "../util";
 import { shopifyMutate, shopifyRead } from "../shopify";
 import { devisDe } from "./reparations";
+import { lienFacture } from "./caisse";
 import { acomptesDe } from "./acomptes";
 import { infosGarde } from "../garde";
 
@@ -272,7 +273,9 @@ app.post("/pub/moi", async (c) => {
     const ac = await acomptesDe(r.id);
     const g = infosGarde(r.pret_le, r.statut, r.abandonnee_le);
     const [dvl] = (await sql`SELECT token FROM devis_envois WHERE reparation_id = ${r.id} AND statut = 'envoye' AND expire_le > now() ORDER BY id DESC LIMIT 1`.catch(() => [])) as any[];
+    const [vf] = (await sql`SELECT id FROM ventes WHERE reparation_id = ${r.id} AND COALESCE(type, 'vente') = 'vente' ORDER BY id DESC LIMIT 1`.catch(() => [])) as any[];
     reparations.push({
+      factureLien: vf ? lienFacture(vf.id) : "",
       devisLien: dvl ? `${(Bun.env.PUBLIC_URL || "https://atelier-turnshop-production.up.railway.app").replace(/\/$/, "")}/pub/devis/${dvl.token}` : "",
       autorisations: (Array.isArray(r.autorisations) ? r.autorisations : []).map((x: any) => `${({ freins: "Freins", pneus: "Pneus et chambres à air", eclairage: "Éclairage", cables: "Câbles et connectique", serrage: "Contrôle sécurité et serrage général" } as Record<string, string>)[x.cle] ?? x.cle} : ${x.mode === "changer" ? "changer si nécessaire (sur devis)" : "vérifier et te prévenir"}`),
       etatDepot: r.etat || "",

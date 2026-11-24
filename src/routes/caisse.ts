@@ -8,6 +8,7 @@ import { envoyerAvis } from "../automatisations";
 import { remiseMulti } from "./prestations";
 import { avantagesActifs, contexteClient, estApplicable, remiseDe } from "./avantages";
 import { AppError, clean, signature } from "../util";
+import { createHmac } from "node:crypto";
 import { brevoConfigure, envoiEmail } from "../brevo";
 
 // Les points Shopify (lecture seule) restent affichés à part dans le profil.
@@ -303,4 +304,35 @@ app.post("/api/caisse/email", async (c) => {
   await envoiEmail(a, "Ton reçu TURN Shop", "Bonjour,\n\nVoici ton reçu / ta facture TURN Shop :\n\n" + texte + "\n\nMerci de ta visite !\nL'équipe TURN Shop");
   if (v.reparation_id) await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${v.reparation_id}, 'note', ${`Reçu / facture envoyé par email à ${a}${signature(c)}`})`;
   return c.json({ message: "Reçu envoyé à " + a + "." });
+});
+
+// ---- Facture consultable en ligne (lien signé, sans mot de passe) ----
+const cleFacture = (id: number) => createHmac("sha256", Bun.env.ESPACE_SECRET || Bun.env.ATELIER_PASSWORD || "facture").update(`facture|${id}`).digest("hex").slice(0, 24);
+export const lienFacture = (id: number) => `${(Bun.env.PUBLIC_URL || "https://atelier-turnshop-production.up.railway.app").replace(/\/$/, "")}/pub/facture/${id}-${cleFacture(id)}`;
+const escF = (t: any) => String(t ?? "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[m]!);
+const eurF = (c: number) => (c / 100).toFixed(2).replace(".", ",") + " €";
+const MOYF: Record<string, string> = { carte: "Carte", especes: "Espèces", virement: "Virement", en_ligne: "En ligne", bon_achat: "Bon d'achat" };
+
+app.get("/pub/facture/:token", async (c) => {
+  const [idS, cle] = String(c.req.param("token") ?? "").split("-");
+  const id = Number(idS);
+  if (!(id > 0) || !cle || cle !== cleFacture(id)) return c.html("<p style='font-family:sans-serif;padding:24px'>Lien invalide.</p>", 404);
+  const [v] = (await sql`SELECT v.*, trim(cl.prenom || ' ' || cl.nom) AS client_nom FROM ventes v LEFT JOIN clients cl ON cl.id = v.client_id WHERE v.id = ${id}`) as any[];
+  if (!v) return c.html("<p style='font-family:sans-serif;padding:24px'>Facture introuvable.</p>", 404);
+  const d: any = await detailVente(v);
+  const numero = d.numero ?? `Ticket n° ${d.id}`;
+  const date = new Date(d.date).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" });
+  const lignes = d.lignes.map((l: any) => `<tr><td>${escF(l.quantite)} × ${escF(l.libelle)}</td><td class="n">${eurF(l.quantite * l.prixCents)}</td></tr>`).join("");
+  const rem = (d.fideliteCents ? `<tr><td>Cagnotte fidélité</td><td class="n">-${eurF(d.fideliteCents)}</td></tr>` : "")
+    + d.avantages.map((a: any) => `<tr><td>${escF(a.libelle)}</td><td class="n">${a.remiseCents ? "-" + eurF(a.remiseCents) : "offert"}</td></tr>`).join("")
+    + (d.acompteDeduitCents ? `<tr><td>Acompte déjà versé</td><td class="n">-${eurF(d.acompteDeduitCents)}</td></tr>` : "");
+  const pays = d.paiements.map((p: any) => `<tr><td>${escF(MOYF[p.moyen] ?? p.moyen)}</td><td class="n">${eurF(p.cents)}</td></tr>`).join("");
+  const ent = String(d.ticket?.entete ?? "TURN SOCIETY").split("\n").map(escF).join("<br>");
+  const tva = Math.round(d.totalCents / 6);
+  return c.html(`<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Facture ${escF(numero)}</title>
+<style>body{font-family:-apple-system,Segoe UI,Arial,sans-serif;background:#f4f4f2;margin:0;color:#111}main{max-width:560px;margin:0 auto;padding:16px}.c{background:#fff;border-radius:10px;padding:18px;margin-top:12px}h1{font-size:20px;margin:0 0 4px}table{width:100%;border-collapse:collapse}td{padding:6px 0;border-bottom:1px solid #eee}.n{text-align:right;white-space:nowrap}.t td{font-weight:700;font-size:17px;border-bottom:0}.m{color:#666;font-size:13px}button{background:#1c5a34;color:#fff;border:0;border-radius:8px;padding:12px 18px;font-size:15px;margin-top:12px}@media print{button{display:none}body{background:#fff}}</style></head><body><main>
+<div class="c"><div class="m">${ent}</div><h1 style="margin-top:12px">Facture ${escF(numero)}</h1><div class="m">${date}${d.client ? " · " + escF(d.client) : ""}</div></div>
+<div class="c"><table>${lignes}${rem}<tr class="t"><td>Total TTC</td><td class="n">${eurF(d.totalCents)}</td></tr></table><div class="m">dont TVA 20 % : ${eurF(tva)}</div></div>
+<div class="c"><b>Règlement</b><table>${pays || "<tr><td>Réglé</td><td></td></tr>"}</table></div>
+<button onclick="window.print()">Imprimer / enregistrer en PDF</button></main></body></html>`);
 });

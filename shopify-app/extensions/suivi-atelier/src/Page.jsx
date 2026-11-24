@@ -151,6 +151,7 @@ function Carte({r, payer, repondre}) {
         {r.abandonnee && <s-banner tone="warning">Cette trottinette est considérée comme abandonnée.</s-banner>}
         {r.verseCents > 0 && <s-text>{'Déjà versé : ' + eur(r.verseCents)}</s-text>}
         {r.verseCents > 0 && r.resteAPayerCents > 0 && <s-text>{'Reste à régler : ' + eur(r.resteAPayerCents)}</s-text>}
+        {r.factureLien && <s-button variant="secondary" href={r.factureLien} target="_blank">Voir ma facture</s-button>}
         {r.devisLien && (
           <s-stack gap="small-200">
             <s-banner tone="info">Ton devis est prêt : consulte-le, accepte-le ou refuse-le.</s-banner>
