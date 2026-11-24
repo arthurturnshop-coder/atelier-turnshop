@@ -76,6 +76,13 @@ function histoHtml(){
 function caisseHtml(){
   if(CAV===null&&!CAVBUSY){CAVBUSY=true;api("/caisse/avantages").then(function(d){CAV=d;CAVBUSY=false;render()}).catch(function(){CAV=[];CAVBUSY=false})}
   prestaLoad();
+  if(!CLO.d&&!CLOBUSY){CLOBUSY=true;api("/caisse/session").then(function(d){CLO.d=d;CLOBUSY=false;render()}).catch(function(){CLOBUSY=false})}
+  if(!CLO.d)return"<div class='caisse'><h3>Caisse</h3><div class='muted'>Chargement...</div></div>";
+  if(caisseBloquee()){
+    var hb="<div class='caisse'><h3>Caisse</h3>";
+    if(CREC)hb+="<div class='card'><b>Vente enregistrée</b>"+recuHtml(CREC)+"<div class='actions'><button data-act='cPrint' data-id='"+CREC.id+"'>Imprimer le reçu</button><button class='sec' data-act='cFermeRecu'>Fermer</button></div></div>";
+    hb+="<div class='card' style='text-align:center'><div style='font-size:28px;font-weight:700;color:#b00'>🔒 CAISSE FERMÉE</div><div class='muted'>"+(CLO.d.ouverte?"Ferme la caisse de la veille pour continuer.":"Ouvre la caisse pour accéder aux ventes.")+"</div></div>";
+    return hb+histoHtml()+cloHtml()+"</div>"}
   var brut=panierTotal(),av=avRemTotal(brut),rem=remiseCents(),aco=acoDeduit(brut-av-rem),net=brut-av-rem-aco;
   var h="<div class='caisse'><h3>Caisse</h3>";
   if(CREC)h+="<div class='card'><b>Vente enregistrée</b>"+recuHtml(CREC)+shopHtml(CREC)+avisBtns(CREC)+"<div class='actions'><button data-act='cPrint' data-id='"+CREC.id+"'>Imprimer le reçu</button><button class='sec' data-act='cEmail' data-id='"+CREC.id+"'>✉ Envoyer par email</button><button class='sec' data-act='cFermeRecu'>Fermer</button></div></div>";

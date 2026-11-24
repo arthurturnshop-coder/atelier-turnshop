@@ -177,6 +177,12 @@ app.post("/api/caisse/encaisser", async (c) => {
   const b = await c.req.json().catch(() => ({}));
   const lignes = Array.isArray(b.lignes) ? b.lignes : [];
   if (!lignes.length) throw new AppError(400, "Le panier est vide.");
+  {
+    const mg = (c.get("user") as any)?.magasin === "Rouen" ? "Rouen" : "Amiens";
+    const [ouv] = (await sql`SELECT jour >= (now() AT TIME ZONE 'Europe/Paris')::date AS ok FROM caisse_sessions WHERE magasin = ${mg} AND fermee_le IS NULL ORDER BY id DESC LIMIT 1`) as any[];
+    if (!ouv) throw new AppError(409, "Caisse fermée : ouvre la caisse avant d'encaisser.");
+    if (!ouv.ok) throw new AppError(409, "La caisse de la veille n'est pas fermée : ferme-la d'abord.");
+  }
   const nettoyees = lignes.map((l: any) => ({
     libelle: clean(l.libelle, 200),
     quantite: Math.max(1, Math.min(999, Math.round(Number(l.quantite) || 1))),

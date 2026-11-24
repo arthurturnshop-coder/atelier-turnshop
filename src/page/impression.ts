@@ -152,7 +152,8 @@ ACTS.docPrint=function(b){btnFlash(b);imprimerDoc(+b.dataset.id,b.dataset.mode)}
 
 
 // ----- Caisse : ouverture / fermeture (ticket Z) -----
-var CLO={open:false,d:null,h:null,per:"30j",msg:""};
+var CLO={open:false,d:null,h:null,per:"30j",msg:"",aj:null},CLOBUSY=false;
+function caisseBloquee(){var d=CLO.d;return !!d&&(!d.ouverte||!!d.ouverte.perimee)}
 function cloLigne(l,v){return"<tr><td>"+l+"</td><td class='n'>"+eur(v)+"</td></tr>"}
 function cloHeure(x){var t=new Date(x);return t.toLocaleDateString("fr-FR")+" "+t.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}
 function cloTotaux(t){
@@ -181,15 +182,21 @@ function cloHist(){
   if(!fermees.length)o+="<div class='muted'>Aucune fermeture de caisse sur la période.</div>";
   else{o+="<table class='devis' style='width:100%'><tr><th>Fermée le</th><th class='n'>Fond</th><th class='n'>Attendu</th><th class='n'>Compté</th><th class='n'>Écart</th><th></th></tr>";
     var ec=0;fermees.forEach(function(x){ec+=x.ecartCents;
-      o+="<tr><td>"+esc(cloHeure(x.fermeeLe))+"<div class='muted'>"+esc(x.fermePar||"")+"</div></td><td class='n'>"+eur(x.fondCents)+"</td><td class='n'>"+eur(x.attenduCents)+"</td><td class='n'>"+eur(x.compteCents)+"</td><td class='n'><b"+(x.ecartCents?" style='color:#b00'":"")+">"+cloEcartTxt(x.ecartCents)+"</b></td><td><button class='sec' data-act='cloZ' data-id='"+x.id+"'>Ticket Z</button></td></tr>"});
+      o+="<tr><td>"+esc(cloHeure(x.fermeeLe))+"<div class='muted'>"+esc(x.fermePar||"")+"</div></td><td class='n'>"+eur(x.fondCents)+"</td><td class='n'>"+eur(x.attenduCents)+"</td><td class='n'>"+eur(x.compteCents)+"</td><td class='n'><b"+(x.ecartCents?" style='color:#b00'":"")+">"+cloEcartTxt(x.ecartCents)+"</b></td><td><button class='sec' data-act='cloZ' data-id='"+x.id+"'>Ticket Z</button> <button class='link' data-act='cloAjout' data-id='"+x.id+"'>+ Vente retrouvée</button>"+((x.ajouts||[]).length?"<div class='muted'>"+x.ajouts.length+" ajout(s)</div>":"")+"</td></tr>"});
     o+="<tr><td colspan='4'><b>Cumul des écarts</b></td><td class='n'><b>"+cloEcartTxt(ec)+"</b></td><td></td></tr></table>"}
+  if(CLO.aj){var A=CLO.aj;o+="<div class='card'><div class='step'>Ventes retrouvées du "+esc(A.jour)+" (hors ouverture de caisse)</div>";
+    if(!A.ventes.length)o+="<div class='muted'>Aucune vente non comptée trouvée ce jour-là.</div>";
+    A.ventes.forEach(function(v){o+="<div class='dl'>"+esc(v.numero)+" · "+eur(v.totalCents)+" <button data-act='cloAjoute' data-s='"+A.id+"' data-v='"+v.id+"'>Ajouter au ticket Z</button></div>"});
+    o+="<div class='actions'><button class='sec' data-act='cloAjoutNo'>Fermer</button></div></div>"}
   return o}
 function cloHtml(){
-  if(!CLO.open)return"<div class='actions' style='margin-top:12px'><button class='sec' data-act='cloOuvre'>Caisse : ouvrir / clôturer</button></div>";
+  var blq=caisseBloquee();
+  if(!CLO.open&&!blq)return"<div class='actions' style='margin-top:12px'><button class='sec' data-act='cloOuvre'>Caisse : ouvrir / clôturer</button></div>";
   var d=CLO.d;if(!d)return"<div class='card'>Chargement...</div>";
   var h="<div class='card'><div class='step'>Caisse · "+esc(d.magasin)+"</div>";
   if(d.ouverte){
     var o=d.ouverte,att=o.fondCents+d.live.especesNettes;
+    if(o.perimee)h+="<div class='card' style='border:2px solid #b00'><b style='color:#b00'>La caisse du "+esc(o.jour.split("-").reverse().join("/"))+" n est pas fermée.</b><div class='muted'>Compte le tiroir et ferme-la : impossible d ouvrir la caisse du jour ou d encaisser tant que ce n est pas fait.</div></div>";
     h+="<div><span class='tag ok'>Caisse ouverte</span> depuis "+esc(cloHeure(o.ouverteLe))+" par "+esc(o.ouvertPar)+" · tiroir à l ouverture "+eur(o.fondCents)+"</div>"+cloTotaux(d.live)
       +"<div class='muted'>Espèces attendues dans le tiroir : <b id='clo-att'>"+eur(att)+"</b></div>"
       +"<div class='dl'><label class='muted'>Espèces comptées (€)</label><input id='clo-compte' placeholder='Compte le tiroir'></div>"
@@ -202,12 +209,15 @@ function cloHtml(){
     h+=cloOuvreForm(d)}
   if(CLO.msg)h+="<div class='muted'>"+esc(CLO.msg)+"</div>";
   if(estResp())h+=cloHist();
-  h+="<div class='actions'><button class='sec' data-act='cloFerme'>Fermer ce panneau</button></div>";
+  if(!blq)h+="<div class='actions'><button class='sec' data-act='cloFerme'>Fermer ce panneau</button></div>";
   return h+"</div>"}
+ACTS.cloAjout=function(b){var id=+b.dataset.id;api("/caisse/ventes-orphelines?session="+id).then(function(r){var z=CLO.h&&CLO.h.sessions.filter(function(x){return x.id===id})[0];CLO.aj={id:id,jour:z?z.jour.split("-").reverse().join("/"):"",ventes:r.ventes};render()}).catch(function(e){CLO.msg=e.message;render()})};
+ACTS.cloAjoutNo=function(){CLO.aj=null;render()};
+ACTS.cloAjoute=function(b){if(!confirm("Ajouter cette vente au ticket Z ? Les totaux et l écart seront recalculés."))return;api("/caisse/ajouter-vente",{session:+b.dataset.s,vente:+b.dataset.v}).then(function(){CLO.aj=null;CLO.msg="Vente ajoutée au ticket Z.";cloHistCharge()}).catch(function(e){CLO.msg=e.message;render()})};
 function cloCharge(){return api("/caisse/session").then(function(d){CLO.d=d;render()}).catch(function(e){CLO.msg=e.message;render()})}
 function cloHistCharge(){if(!estResp())return;api("/caisse/cloture-historique?periode="+CLO.per).then(function(h){CLO.h=h;render()}).catch(function(e){CLO.msg=e.message;render()})}
-ACTS.cloOuvre=function(){CLO={open:true,d:null,h:null,per:CLO.per||"30j",msg:""};render();cloCharge();cloHistCharge()};
-ACTS.cloFerme=function(){CLO={open:false,d:null,h:null,per:CLO.per,msg:""};render()};
+ACTS.cloOuvre=function(){CLO={open:true,d:null,h:null,per:CLO.per||"30j",msg:"",aj:null};render();cloCharge();cloHistCharge()};
+ACTS.cloFerme=function(){CLO={open:false,d:CLO.d,h:null,per:CLO.per,msg:"",aj:null};render()};
 ACTS.cloPer=function(b){CLO.per=b.dataset.v;CLO.h=null;render();cloHistCharge()};
 ACTS.cloOuvrir=function(){
   var f=document.getElementById("clo-fond");if(!f||!f.value.trim()){CLO.msg="Saisis le montant présent dans le tiroir.";render();return}
@@ -226,6 +236,8 @@ function cloImprimeZ(z){
   h+="<hr><div class='rl'><span>Ventes</span><span>"+t.nbVentes+"</span></div><div class='rl'><span>CA ventes</span><span>"+eur(t.caCents)+"</span></div><hr>"
     +"<div class='rl'><span>Tiroir à l ouverture</span><span>"+eur(z.fondCents)+"</span></div><div class='rl'><span>Espèces attendues</span><span>"+eur(z.attenduCents)+"</span></div><div class='rl'><span>Espèces comptées</span><span>"+eur(z.compteCents)+"</span></div><div class='rl rt'><span>ÉCART</span><span>"+cloEcartTxt(z.ecartCents)+"</span></div>"
     +(z.note?"<div class='rm'>"+esc(z.note)+"</div>":"")+"<div class='rc rm'>Ouverte par "+esc(z.ouvertPar||"")+" · fermée par "+esc(z.fermePar||"")+"</div>";
+  var aj=z.ajouts||[];
+  if(aj.length){h+="<hr><div class='rm'><b>Ajouts après clôture</b></div>";aj.forEach(function(a){h+="<div class='rm'>Cette facture a été rajoutée le "+esc(new Date(a.ajouteLe).toLocaleDateString("fr-FR"))+" : "+esc(a.numero)+" ("+eur(a.totalCents)+")</div>"})}
   impImprimer(h,"recu",pecCss())}
 ACTS.cloZ=function(b){
   var id=+b.dataset.id,z=null;

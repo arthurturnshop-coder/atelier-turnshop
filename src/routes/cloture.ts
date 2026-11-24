@@ -7,6 +7,7 @@ import { AppError, clean, exigeResponsable } from "../util";
 await sql`CREATE TABLE IF NOT EXISTS caisse_sessions (
   id SERIAL PRIMARY KEY, magasin TEXT NOT NULL, jour DATE NOT NULL, ouverte_le TIMESTAMPTZ NOT NULL DEFAULT now(), fond_cents INT NOT NULL DEFAULT 0, ouvert_par TEXT NOT NULL DEFAULT '',
   fermee_le TIMESTAMPTZ, ferme_par TEXT, especes_attendues_cents INT, especes_comptees_cents INT, ecart_cents INT, totaux JSONB, nb_ventes INT, note TEXT NOT NULL DEFAULT '')`;
+await sql`ALTER TABLE caisse_sessions ADD COLUMN IF NOT EXISTS ajouts JSONB NOT NULL DEFAULT '[]'::jsonb`;
 // Reprise des anciennes clôtures (une par jour) comme sessions fermées, une seule fois.
 try {
   const [vide] = (await sql`SELECT count(*)::int AS n FROM caisse_sessions`) as any[];
@@ -35,9 +36,9 @@ async function calcul(m: string, de: Date | string, a: Date | string | null) {
 }
 
 const vue = (s: any) => s && ({
-  id: s.id, magasin: s.magasin, jour: String(s.jour).slice(0, 10), ouverteLe: s.ouverte_le, fondCents: s.fond_cents, ouvertPar: s.ouvert_par,
+  id: s.id, magasin: s.magasin, jour: s.jour instanceof Date ? s.jour.toLocaleDateString("sv-SE") : String(s.jour).slice(0, 10), ouverteLe: s.ouverte_le, fondCents: s.fond_cents, ouvertPar: s.ouvert_par,
   fermeeLe: s.fermee_le, fermePar: s.ferme_par, attenduCents: s.especes_attendues_cents, compteCents: s.especes_comptees_cents, ecartCents: s.ecart_cents,
-  note: s.note, nbVentes: s.nb_ventes, totaux: s.totaux ? parse(s.totaux) : null,
+  note: s.note, nbVentes: s.nb_ventes, totaux: s.totaux ? parse(s.totaux) : null, ajouts: s.ajouts ? parse(s.ajouts) : [],
 });
 
 // État de la caisse : session ouverte (avec totaux en direct) ou fermée (dernier ticket Z + fond conseillé).
@@ -46,7 +47,10 @@ app.get("/api/caisse/session", async (c) => {
   const [ouv] = (await sql`SELECT * FROM caisse_sessions WHERE magasin = ${m} AND fermee_le IS NULL ORDER BY id DESC LIMIT 1`) as any[];
   const [der] = (await sql`SELECT * FROM caisse_sessions WHERE magasin = ${m} AND fermee_le IS NOT NULL ORDER BY id DESC LIMIT 1`) as any[];
   const live = ouv ? await calcul(m, ouv.ouverte_le, null) : null;
-  return c.json({ magasin: m, ouverte: ouv ? vue(ouv) : null, live, dernier: der ? vue(der) : null, fondConseilleCents: der?.especes_comptees_cents ?? 0 });
+  const [{ auj }] = (await sql`SELECT (now() AT TIME ZONE 'Europe/Paris')::date::text AS auj`) as any[];
+  const ouvV: any = ouv ? vue(ouv) : null;
+  if (ouvV) ouvV.perimee = ouvV.jour < auj;
+  return c.json({ magasin: m, ouverte: ouvV, live, dernier: der ? vue(der) : null, fondConseilleCents: der?.especes_comptees_cents ?? 0 });
 });
 
 app.post("/api/caisse/ouvrir", async (c) => {
@@ -115,4 +119,41 @@ app.get("/api/caisse/tickets-z", async (c) => {
   const m = u?.role === "admin" ? (demande === "Amiens" || demande === "Rouen" ? demande : "") : magDe(c);
   const sess = (await sql`SELECT * FROM caisse_sessions WHERE fermee_le IS NOT NULL AND (${m} = '' OR magasin = ${m}) AND jour >= (now() - interval '12 months')::date ORDER BY id DESC LIMIT 400`) as any[];
   return c.json({ sessions: sess.map(vue) });
+});
+
+// Ventes retrouvées après coup : celles du jour d'un ticket Z fermé, hors de sa fenêtre d'ouverture, pas encore ajoutées.
+app.get("/api/caisse/ventes-orphelines", async (c) => {
+  exigeResponsable(c);
+  const id = Number(c.req.query("session"));
+  const [s] = (await sql`SELECT * FROM caisse_sessions WHERE id = ${id} AND fermee_le IS NOT NULL`) as any[];
+  if (!s) throw new AppError(404, "Ticket Z introuvable.");
+  const deja = new Set<number>((await sql`SELECT (a->>'venteId')::int AS id FROM caisse_sessions, jsonb_array_elements(ajouts) a`).map((r: any) => r.id));
+  const ventes = (await sql`SELECT id, numero_facture, total_cents, type, cree_le FROM ventes WHERE magasin = ${s.magasin}
+    AND (cree_le AT TIME ZONE 'Europe/Paris')::date = ${s.jour}::date AND (cree_le < ${s.ouverte_le} OR cree_le > ${s.fermee_le}) ORDER BY cree_le`) as any[];
+  return c.json({ ventes: ventes.filter((v) => !deja.has(v.id)).map((v) => ({ id: v.id, numero: v.numero_facture ?? `Ticket n° ${v.id}`, totalCents: v.total_cents, type: v.type, le: v.cree_le })) });
+});
+
+// Ajoute une vente retrouvée au ticket Z : recalcule totaux, espèces attendues et écart, et note la date d'ajout.
+app.post("/api/caisse/ajouter-vente", async (c) => {
+  exigeResponsable(c);
+  const b = await c.req.json().catch(() => ({}));
+  const [s] = (await sql`SELECT * FROM caisse_sessions WHERE id = ${Number(b.session)} AND fermee_le IS NOT NULL`) as any[];
+  if (!s) throw new AppError(404, "Ticket Z introuvable.");
+  const [v] = (await sql`SELECT id, numero_facture, total_cents, type FROM ventes WHERE id = ${Number(b.vente)} AND magasin = ${s.magasin}`) as any[];
+  if (!v) throw new AppError(404, "Vente introuvable pour ce magasin.");
+  const ajouts: any[] = s.ajouts ? parse(s.ajouts) : [];
+  const [dejaAilleurs] = (await sql`SELECT 1 AS x FROM caisse_sessions, jsonb_array_elements(ajouts) a WHERE (a->>'venteId')::int = ${v.id} LIMIT 1`) as any[];
+  if (dejaAilleurs) throw new AppError(409, "Cette vente est déjà ajoutée à un ticket Z.");
+  const pay = (await sql`SELECT moyen, sum(montant_cents)::int AS n FROM vente_paiements WHERE vente_id = ${v.id} GROUP BY moyen`) as any[];
+  const t = parse(s.totaux) ?? { encaisse: { carte: 0, especes: 0, virement: 0, en_ligne: 0 }, rembourse: {}, nbVentes: 0, nbAcomptes: 0, caCents: 0, especesNettes: 0 };
+  let esp = 0;
+  for (const p of pay) { t.encaisse[p.moyen] = (t.encaisse[p.moyen] ?? 0) + p.n; if (p.moyen === "especes") esp += p.n; }
+  if (v.type === "acompte") t.nbAcomptes = (t.nbAcomptes ?? 0) + 1; else { t.nbVentes += 1; t.caCents += v.total_cents; }
+  t.especesNettes = (t.especesNettes ?? 0) + esp;
+  const attendu = (s.especes_attendues_cents ?? 0) + esp;
+  const [{ le }] = (await sql`SELECT now() AS le`) as any[];
+  ajouts.push({ venteId: v.id, numero: v.numero_facture ?? `Ticket n° ${v.id}`, totalCents: v.total_cents, especesCents: esp, ajouteLe: le });
+  await sql`UPDATE caisse_sessions SET totaux = ${JSON.stringify(t)}::jsonb, nb_ventes = ${t.nbVentes}, especes_attendues_cents = ${attendu},
+    ecart_cents = ${(s.especes_comptees_cents ?? 0) - attendu}, ajouts = ${JSON.stringify(ajouts)}::jsonb WHERE id = ${s.id}`;
+  return c.json({ message: "Vente ajoutée au ticket Z." });
 });
