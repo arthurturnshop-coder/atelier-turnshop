@@ -16,6 +16,9 @@ export async function devisDe(repId: number) {
   return { remiseMultiCents, netCents: total - remiseMultiCents, lignes: lignes.map((l) => ({ id: l.id, type: l.type, libelle: l.libelle, quantite: l.quantite, prixCents: l.prix_unitaire_cents, variantId: l.shopify_variant_id ?? "", sku: l.sku ?? "", barcode: l.barcode ?? "", commande: l.cmd ?? "" })), totalCents: total };
 }
 
+await sql`ALTER TABLE reparations ADD COLUMN IF NOT EXISTS boite TEXT`;
+const BOITES = ["C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8"];
+
 export function ligneListe(r: any, journal: any[]) {
   return {
     id: r.id,
@@ -41,6 +44,7 @@ export function ligneListe(r: any, journal: any[]) {
     rdvSouhaite: r.rdv_souhaite ?? "",
     rdvStatut: r.rdv_statut ?? "",
     magasin: r.magasin ?? "",
+    boite: r.boite ?? "",
     garde: infosGarde(r.pret_le, r.statut, r.abandonnee_le),
     abandonnee: !!r.abandonnee_le,
     journal: journal.filter((j) => j.reparation_id === r.id).map((j) => ({ date: j.date, type: j.type, texte: j.texte })),
@@ -94,6 +98,11 @@ app.post("/api/reparations", async (c) => {
   const enMagasin = b.enMagasin !== false;
   const garantie = b.sousGarantie === true;
   const [r] = await sql`INSERT INTO reparations (client_id, trottinette_id, panne, etat, remarques, date_depot, en_magasin, sous_garantie) VALUES (${clientId}, ${trottId}, ${panne}, ${clean(b.etat, 500)}, ${clean(b.remarques, 1000)}, ${date}, ${enMagasin}, ${garantie}) RETURNING id`;
+  const boiteNouv = clean(b.boite, 10).toUpperCase();
+  if (boiteNouv) {
+    const [pris] = (await sql`SELECT id FROM reparations WHERE boite = ${boiteNouv} AND supprime_le IS NULL AND statut <> 'récupéré' AND id <> ${r.id}`) as any[];
+    if (!pris) { await sql`UPDATE reparations SET boite = ${boiteNouv} WHERE id = ${r.id}`; await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${r.id}, 'note', ${"Matériel rangé dans la boîte " + boiteNouv + signature(c)})`; }
+  }
   const texte = enMagasin ? "Reçu à l'atelier" : "Prise en charge créée, trottinette pas encore en magasin";
   await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${r.id}, 'statut', ${texte + (garantie ? " (sous garantie)" : "") + signature(c)})`;
   return c.json({ id: r.id, message: "Fiche de réparation créée." });
@@ -139,6 +148,16 @@ app.post("/api/reparations/maj", async (c) => {
   if (typeof b.sousGarantie === "boolean" && b.sousGarantie !== (r.sous_garantie === true)) {
     await sql`UPDATE reparations SET sous_garantie = ${b.sousGarantie}, maj_le = now() WHERE id = ${id}`;
     await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${id}, 'statut', ${(b.sousGarantie ? "Marquée sous garantie" : "Garantie retirée") + signature(c)})`;
+    touche = true;
+  }
+  if (typeof b.boite === "string" && clean(b.boite, 10).toUpperCase() !== (r.boite ?? "")) {
+    const nv = clean(b.boite, 10).toUpperCase();
+    if (nv) {
+      const [pris] = (await sql`SELECT id FROM reparations WHERE boite = ${nv} AND supprime_le IS NULL AND statut <> 'récupéré' AND id <> ${id}`) as any[];
+      if (pris) throw new AppError(400, `La boîte ${nv} est déjà utilisée par PC-${String(pris.id).padStart(4, "0")}.`);
+    }
+    await sql`UPDATE reparations SET boite = ${nv || null}, maj_le = now() WHERE id = ${id}`;
+    await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${id}, 'note', ${(nv ? "Matériel rangé dans la boîte " + nv : "Boîte de rangement retirée") + signature(c)})`;
     touche = true;
   }
   if (note) {
@@ -210,4 +229,11 @@ app.post("/api/reparations/avis", async (c) => {
   await sql`UPDATE reparations SET avis_statut = 'refuse', avis_envoi_le = NULL, maj_le = now() WHERE id = ${id}`;
   await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${id}, 'avis', 'Pas de demande d''avis Google')`;
   return c.json({ message: "Pas de demande d'avis pour cette réparation." });
+});
+
+// Boîtes de rangement du matériel (C1 à C8) : libre ou occupée par quelle prise en charge.
+app.get("/api/boites", async (c) => {
+  const rows = (await sql`SELECT r.id, r.boite, c.prenom, c.nom FROM reparations r JOIN clients c ON c.id = r.client_id WHERE r.boite IS NOT NULL AND r.boite <> '' AND r.supprime_le IS NULL AND r.statut <> 'récupéré'`) as any[];
+  const noms = [...BOITES, ...rows.map((r) => r.boite).filter((b) => !BOITES.includes(b))];
+  return c.json({ boites: noms.map((nom) => { const r = rows.find((x) => x.boite === nom); return { nom, repairId: r?.id ?? null, client: r ? `${r.prenom} ${r.nom}`.trim() : "" }; }) });
 });

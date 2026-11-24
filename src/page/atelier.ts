@@ -27,7 +27,7 @@ async function loadEnc(){
     var cls="tk"+(r.enMagasin===false?" abs":(r.statut==="prêt"?" pret":(r.statut==="en attente de pièce"?" cmd":"")));
     return"<button class='"+cls+"' data-act='ouvrirFiche' data-id='"+r.id+"'><div class='l1'><span><b>"+pcn(r.id)+"</b> · "+esc(r.client)+"</span><span class='tag'>"+esc(r.statut)+"</span></div>"
       +"<div>"+esc(r.trottinette)+"</div><div class='muted'>"+esc(r.panne)+"</div>"
-      +"<div class='muted'>"+(r.pieceArrivee?"<span class='tag warn'>Pièce arrivée : prévenir</span> ":"")+(r.source==="web"?"<span class='tag ok'>Demande en ligne</span> ":"")+(r.rdvStatut==="attente"?"<span class='tag warn'>RDV à valider</span> ":"")+(r.enMagasin===false?"<span class='tag warn'>Pas en magasin</span> ":"")+(r.sousGarantie?"<span class='tag ok'>Sous garantie</span> ":"")+(r.abandonnee?"<span class='tag warn'>Abandonnée</span> ":(r.garde&&r.garde.fraisCents>0?"<span class='tag warn'>Gardiennage "+eur(r.garde.fraisCents)+"</span> ":(r.garde&&r.garde.jours>=4?"<span class='tag warn'>Prête depuis "+r.garde.jours+" j</span> ":"")))+"Dépôt "+esc(day(r.dateDepot))+"</div></button>"};
+      +"<div class='muted'>"+(r.boite?"<span class='tag'>📦 "+esc(r.boite)+"</span> ":"")+(r.pieceArrivee?"<span class='tag warn'>Pièce arrivée : prévenir</span> ":"")+(r.source==="web"?"<span class='tag ok'>Demande en ligne</span> ":"")+(r.rdvStatut==="attente"?"<span class='tag warn'>RDV à valider</span> ":"")+(r.enMagasin===false?"<span class='tag warn'>Pas en magasin</span> ":"")+(r.sousGarantie?"<span class='tag ok'>Sous garantie</span> ":"")+(r.abandonnee?"<span class='tag warn'>Abandonnée</span> ":(r.garde&&r.garde.fraisCents>0?"<span class='tag warn'>Gardiennage "+eur(r.garde.fraisCents)+"</span> ":(r.garde&&r.garde.jours>=4?"<span class='tag warn'>Prête depuis "+r.garde.jours+" j</span> ":"")))+"Dépôt "+esc(day(r.dateDepot))+"</div></button>"};
   if(VUE==="tout"){
     var AFE=["reçu","diagnostic","devis envoyé","en réparation"];
     var cols=[["Rendez-vous",function(r){return r.enMagasin===false}],["Commande",function(r){return r.statut==="en attente de pièce"}],["À faire",function(r){return r.enMagasin!==false&&AFE.indexOf(r.statut)>=0}],["Sous garantie",function(r){return r.sousGarantie===true}],["Prête",function(r){return r.statut==="prêt"}]];
@@ -89,7 +89,7 @@ function vFiche(){
     +(f.enMagasin===false?"<div class='tag warn' style='margin:6px 0'>Trottinette pas en magasin</div><button data-act='arrivee' data-id='"+f.id+"' data-fiche='1'>Trottinette arrivée</button>":"")
     +"<div class='step' style='margin-top:10px'>Statut</div><div class='stbtns'>"+ST.map(function(s){if(s==="devis envoyé"&&s!==f.statut)return"<button class='dis' disabled title='Se met tout seul quand tu envoies le devis au client'>"+esc(s)+" (auto)</button>";return"<button class='"+(s===f.statut?"on":"")+"' data-act='setStatut' data-id='"+f.id+"' data-s='"+esc(s)+"'>"+esc(s)+"</button>"}).join("")+"</div>"
     +"<label class='muted' style='display:flex;gap:8px;align-items:center'><input type='checkbox' style='width:auto;margin:0' "+(f.sousGarantie?"checked ":"")+"data-act='setGarantie' data-id='"+f.id+"'> Sous garantie</label></div>"
-    +garantieHtml(f)+gardeHtml(f)+acompteHtml(f)
+    +boiteCard(f)+garantieHtml(f)+gardeHtml(f)+acompteHtml(f)
     +"<div class='card'><div class='step'>Description de la panne</div><textarea id='fp' rows='3'>"+esc(f.panne)+"</textarea>"
     +"<div class='step'>Commentaire interne (visible seulement par TURN)</div><textarea id='fc' rows='3' placeholder='Ce que le client a demandé, ce qu il faudrait lui proposer...'>"+esc(f.commentaireInterne||"")+"</textarea>"
     +"<button data-act='saveFiche' data-id='"+f.id+"'>Enregistrer la description et le commentaire</button></div>"
@@ -97,6 +97,17 @@ function vFiche(){
     +"<div class='card'><div class='step'>Historique</div>"+(f.journal||[]).slice().reverse().map(function(j){return"<div class='hist'>"+esc(dayHour(j.date))+" · "+esc(j.texte)+"</div>"}).join("")
     +"<input id='fn' placeholder='Ajouter une note à l historique'><button class='sec' data-act='addNote' data-id='"+f.id+"'>Ajouter la note</button></div>";
   app.innerHTML=h}
+var BXOC=null;
+function boitesCharge(){if(BXOC===null){BXOC=undefined;api("/boites").then(function(d){BXOC=d.boites;if(TAB==="enc")render()}).catch(function(){BXOC=[]})}}
+function boiteSelect(id){
+  boitesCharge();var L=BXOC&&BXOC.length?BXOC:["C1","C2","C3","C4","C5","C6","C7","C8"].map(function(n){return{nom:n,repairId:null}});
+  return"<select id='"+id+"'><option value=''>📦 Boîte de rangement (aucune)</option>"+L.map(function(b){return"<option value='"+esc(b.nom)+"'"+(b.repairId?" disabled":"")+">"+esc(b.nom)+(b.repairId?" (prise : "+pcn(b.repairId)+")":"")+"</option>"}).join("")+"</select>"}
+function boiteCard(f){
+  boitesCharge();var L=BXOC&&BXOC.length?BXOC:["C1","C2","C3","C4","C5","C6","C7","C8"].map(function(n){return{nom:n,repairId:null}});
+  return"<div class='card'><div class='step'>📦 Matériel rangé dans la boîte</div><div class='actions' style='flex-wrap:wrap'>"+L.map(function(b){
+    var moi=f.boite===b.nom,pris=b.repairId&&b.repairId!==f.id;
+    return"<button class='"+(moi?"":"sec")+(pris?" dis":"")+"' "+(pris?"disabled title='"+esc(b.client||"")+"' ":"")+"data-act='boiteSet' data-id='"+f.id+"' data-b='"+esc(b.nom)+"'>"+esc(b.nom)+(pris?"<br><span style='font-size:11px'>"+pcn(b.repairId)+"</span>":"")+"</button>"}).join("")
+    +(f.boite?"<button class='sec' data-act='boiteSet' data-id='"+f.id+"' data-b=''>Retirer</button>":"")+"</div>"+(f.boite?"":"<div class='muted'>Pas encore rangé.</div>")+"</div>"}
 function gardeHtml(f){
   var g=f.garde;if(!g)return"";
   if(g.abandonnee)return"<div class='card avbox'><b>Trottinette considérée comme abandonnée</b><div class='muted'>Prête depuis "+g.jours+" jours sans être récupérée.</div></div>";

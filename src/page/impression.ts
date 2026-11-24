@@ -79,6 +79,7 @@ function pecHtml(f){
   if(f.etat)h+="<div class='rm' style='margin-top:4px'>État à l'arrivée</div><div>"+esc(f.etat)+"</div>";
   if(f.remarques)h+="<div class='rm' style='margin-top:4px'>Remarques</div><div>"+esc(f.remarques)+"</div>";
   if(f.sousGarantie)h+="<div style='margin-top:4px'><b>Sous garantie</b></div>";
+  if(f.boite)h+="<div style='margin-top:4px'>Matériel rangé : <b>boîte "+esc(f.boite)+"</b></div>";
   var d=f.devis||{lignes:[],netCents:0};
   if(d.lignes&&d.lignes.length){
     h+="<hr><div class='rm'>Devis</div>";

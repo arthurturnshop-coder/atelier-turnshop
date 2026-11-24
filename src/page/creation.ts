@@ -16,7 +16,7 @@ function vCreer(){
   if(ts.length)h+="<select id='ct-sel'>"+ts.map(function(t){return"<option value='"+t.id+"'>"+esc(t.marque+" "+t.modele)+(t.serie?" · "+esc(t.serie):"")+"</option>"}).join("")+"<option value='new'>Autre trottinette…</option></select>";
   h+="<div class='dl' id='ct-new'"+(ts.length?" style='display:none'":"")+"><input id='ct-m' placeholder='Marque'><input id='ct-mo' placeholder='Modèle'><input id='ct-s' placeholder='N° de série (vide = inconnu)'></div>";
   h+="<div class='lab'>3. "+(m==="devis"?"Objet du devis":"Panne décrite par le client")+"</div><textarea id='cr-p' rows='3' placeholder='"+(m==="devis"?"Ex : devis changement de batterie":"Panne décrite par le client")+"'></textarea>"
-    +"<input id='cr-e' placeholder='État à l arrivée'><textarea id='cr-r' rows='2' placeholder='Remarques'></textarea><input id='cr-d' type='date' value='"+today()+"'>"
+    +"<input id='cr-e' placeholder='État à l arrivée'><textarea id='cr-r' rows='2' placeholder='Remarques'></textarea>"+boiteSelect("cr-b")+"<input id='cr-d' type='date' value='"+today()+"'>"
     +"<label class='muted' style='display:flex;gap:8px;align-items:center'><input id='cr-abs' type='checkbox' style='width:auto;margin:0'"+(m!=="prise"?" checked":"")+"> La trottinette n'est pas encore en magasin</label>"
     +"<label class='muted' style='display:flex;gap:8px;align-items:center'><input id='cr-gar' type='checkbox' style='width:auto;margin:0'> Sous garantie</label>"
     +(m==="prise"?"<label class='muted' style='display:flex;gap:8px;align-items:center'><input id='cr-pec' type='checkbox' checked style='width:auto;margin:0'> Imprimer le ticket de prise en charge</label>":"")
@@ -44,7 +44,7 @@ ACTS.creOk=async function(){
     if(sel&&sel.value!=="new")tid=Number(sel.value);
     else{if(!v("ct-m")||!v("ct-mo"))throw new Error("Indique la marque et le modèle de la trottinette.");
       var dt=await api("/trottinettes",{customerId:cid,marque:v("ct-m"),modele:v("ct-mo"),serie:v("ct-s")||("NC-"+Date.now())});tid=dt.id}
-    var d=await api("/reparations",{customerId:cid,trottinetteId:tid,panne:(m==="devis"?"Devis : ":"")+pn,etat:v("cr-e"),remarques:v("cr-r"),dateDepot:v("cr-d"),enMagasin:!(abs&&abs.checked),sousGarantie:!!(gar&&gar.checked)});
+    var d=await api("/reparations",{customerId:cid,trottinetteId:tid,panne:(m==="devis"?"Devis : ":"")+pn,etat:v("cr-e"),remarques:v("cr-r"),boite:v("cr-b"),dateDepot:v("cr-d"),enMagasin:!(abs&&abs.checked),sousGarantie:!!(gar&&gar.checked)});
     CRE.busy=false;ATSUB="liste";
     await ouvrirFiche(d.id);
     if(m==="prise"&&pec&&pec.checked&&!(abs&&abs.checked))await imprimerPEC(d.id)

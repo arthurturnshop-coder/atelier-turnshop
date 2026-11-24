@@ -13,7 +13,7 @@ function repHtml(r){
     +"<button class='sec' data-act='ouvrirFiche' data-id='"+r.id+"'>Ouvrir la fiche</button>"+blocAvisRep(r)+"</div>"}
 function recepForm(t){
   return"<div class='rep'><div class='step'>Nouvelle prise en charge pour "+esc(t.marque+" "+t.modele)+"</div>"
-    +"<textarea id='p' rows='3' placeholder='Panne décrite par le client'></textarea><input id='e' placeholder='État à l arrivée'><textarea id='r' rows='2' placeholder='Remarques'></textarea><input id='d' type='date' value='"+today()+"'>"
+    +"<textarea id='p' rows='3' placeholder='Panne décrite par le client'></textarea><input id='e' placeholder='État à l arrivée'><textarea id='r' rows='2' placeholder='Remarques'></textarea>"+boiteSelect("b")+"<input id='d' type='date' value='"+today()+"'>"
     +"<label class='muted' style='display:flex;gap:8px;align-items:center'><input id='abs' type='checkbox' style='width:auto;margin:0'"+(RACC==="rdv"||RACC==="devis"?" checked":"")+"> La trottinette n'est pas encore en magasin (rendez-vous)</label>"
     +"<label class='muted' style='display:flex;gap:8px;align-items:center'><input id='gar' type='checkbox' style='width:auto;margin:0'> Sous garantie</label>"
     +"<label class='muted' style='display:flex;gap:8px;align-items:center'><input id='pec' type='checkbox' checked style='width:auto;margin:0'> Imprimer le ticket de prise en charge</label>"
