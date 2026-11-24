@@ -208,12 +208,16 @@ function cloHtml(){
       +"<div class='actions'><button class='sec' data-act='cloZ' data-id='"+z.id+"'>Imprimer le ticket Z</button></div>"}
     h+=cloOuvreForm(d)}
   if(CLO.msg)h+="<div class='muted'>"+esc(CLO.msg)+"</div>";
-  if(estResp())h+=cloHist();
   if(!blq)h+="<div class='actions'><button class='sec' data-act='cloFerme'>Fermer ce panneau</button></div>";
   return h+"</div>"}
 ACTS.cloAjout=function(b){var id=+b.dataset.id;api("/caisse/ventes-orphelines?session="+id).then(function(r){var z=CLO.h&&CLO.h.sessions.filter(function(x){return x.id===id})[0];CLO.aj={id:id,jour:z?z.jour.split("-").reverse().join("/"):"",ventes:r.ventes};render()}).catch(function(e){CLO.msg=e.message;render()})};
 ACTS.cloAjoutNo=function(){CLO.aj=null;render()};
 ACTS.cloAjoute=function(b){if(!confirm("Ajouter cette vente au ticket Z ? Les totaux et l écart seront recalculés."))return;api("/caisse/ajouter-vente",{session:+b.dataset.s,vente:+b.dataset.v}).then(function(){CLO.aj=null;CLO.msg="Vente ajoutée au ticket Z.";cloHistCharge()}).catch(function(e){CLO.msg=e.message;render()})};
+var COMPH=false;
+function vCompta(){
+  if(!estResp()){app.innerHTML="<div class='caisse'><h3>Compta</h3><div class='muted'>Réservé aux responsables.</div></div>";return}
+  if(!CLO.h&&!COMPH){COMPH=true;cloHistCharge()}
+  app.innerHTML="<div class='caisse'><h3>Compta · tickets Z et encaissements</h3>"+(CLO.msg?"<div class='muted'>"+esc(CLO.msg)+"</div>":"")+cloHist()+"</div>"}
 function cloCharge(){return api("/caisse/session").then(function(d){CLO.d=d;render()}).catch(function(e){CLO.msg=e.message;render()})}
 function cloHistCharge(){if(!estResp())return;api("/caisse/cloture-historique?periode="+CLO.per).then(function(h){var y=window.scrollY;CLO.h=h;render();window.scrollTo(0,y)}).catch(function(e){CLO.msg=e.message;render()})}
 ACTS.cloOuvre=function(){CLO={open:true,d:null,h:null,per:CLO.per||"30j",msg:"",aj:null};render();cloCharge();cloHistCharge()};
