@@ -26,10 +26,11 @@ function bqPilote(){
   var p=BQ.pil;if(!p)return"<div class='card muted'>Pilotage : chargement…</div>";
   if(!p.mois.length)return"";
   function c(l,v,col){return"<tr><td>"+l+"</td><td class='n'><b style='color:"+(col||"inherit")+"'>"+v+"</b></td></tr>"}
-  var h="<div class='card'><div class='step'>Pilotage (estimation)</div><div class='muted'>CA = ventes de la caisse + ventes en ligne encaissées. Marge = CA HT − achats marchandises HT. Résultat = marge − salaires − charges.</div>";
+  var h="<div class='card'><div class='step'>Pilotage (estimation)</div><div class='muted'>CA = ventes de la caisse (+ web) depuis qu'elle est utilisée, avant : encaissements de la banque. Marge = CA HT − achats marchandises HT. Résultat = marge − salaires − charges. Les achats sont comptés quand tu les paies, pas quand tu vends le stock : un mois de gros réassort donne une marge négative.</div>";
   p.mois.slice(0,6).forEach(function(m){
+    if(!m.releve){h+="<div style='margin-top:12px;padding-top:8px;border-top:1px solid #eee'><b>"+esc(bqMoisLib(m.mois))+"</b><div class='muted'>CA caisse : "+eur(m.caTtc)+" TTC ("+m.nb+" ventes, panier moyen "+eur(m.panier)+"). Marge et résultat pas calculables : relevé bancaire de ce mois pas encore importé.</div></div>";return}
     h+="<div style='margin-top:12px;padding-top:8px;border-top:1px solid #eee'><b>"+esc(bqMoisLib(m.mois))+"</b><table class='devis' style='width:100%;margin-top:4px'>"
-      +c("CA TTC (Amiens "+eur(m.amiens)+" · Rouen "+eur(m.rouen)+" · web "+eur(m.web)+")",eur(m.caTtc))
+      +c(m.source==="caisse"?"CA TTC (caisse Amiens "+eur(m.amiens)+" · Rouen "+eur(m.rouen)+" · web "+eur(m.web)+")":"CA TTC (encaissements vus sur la banque : CB, web, espèces, chèques, virements)",eur(m.caTtc))
       +c("CA HT",eur(m.caHt))
       +c("Achats marchandises HT","-"+eur(m.achatsHt))
       +c("Marge brute estimée",eur(m.marge)+" ("+m.margePct+" %)","#1e8449")

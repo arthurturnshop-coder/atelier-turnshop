@@ -147,15 +147,18 @@ app.get("/api/banque/pilotage", async (c) => {
   exigeAdmin(c);
   const caisse = (await sql`SELECT to_char(cree_le AT TIME ZONE 'Europe/Paris', 'YYYY-MM') AS mois, COALESCE(magasin, 'Commun') AS magasin, sum(total_cents)::int AS ttc, count(*)::int AS nb FROM ventes WHERE type = 'vente' GROUP BY 1, 2`) as any[];
   const deb = (await sql`SELECT to_char(jour, 'YYYY-MM') AS mois, categorie, sum(debit_cents)::int AS n FROM banque_ops WHERE debit_cents > 0 GROUP BY 1, 2`) as any[];
-  const web = (await sql`SELECT to_char(jour, 'YYYY-MM') AS mois, sum(credit_cents)::int AS n FROM banque_ops WHERE credit_cents > 0 AND categorie ILIKE '%ventes en ligne%' GROUP BY 1`) as any[];
+  const web = (await sql`SELECT to_char(jour, 'YYYY-MM') AS mois, sum(credit_cents)::int AS n FROM banque_ops WHERE credit_cents > 0 AND categorie ~* 'ventes en ligne|encaissements|dépôts|chèques remis|virements reçus' GROUP BY 1`) as any[];
   const ms = new Set<string>([...caisse.map((r) => r.mois), ...deb.map((r) => r.mois), ...web.map((r) => r.mois)]);
   const ht = (n: number) => Math.round(n / 1.2);
   const mois = [...ms].sort().reverse().map((m) => {
     const cs = caisse.filter((r) => r.mois === m);
     const am = cs.find((r) => r.magasin === "Amiens")?.ttc ?? 0, ro = cs.find((r) => r.magasin === "Rouen")?.ttc ?? 0;
     const caisseTtc = cs.reduce((t, r) => t + r.ttc, 0), nb = cs.reduce((t, r) => t + r.nb, 0);
-    const webTtc = web.find((r) => r.mois === m)?.n ?? 0;
-    const caTtc = caisseTtc + webTtc, caHt = ht(caTtc);
+    const banqueVentes = web.find((r) => r.mois === m)?.n ?? 0;
+    const releve = deb.some((r) => r.mois === m) || banqueVentes > 0;
+    // Mois avec ventes en caisse : caisse (+ web). Sinon (avant la caisse) : encaissements vus sur la banque (CB, web, espèces, chèques, virements).
+    const webTtc = nb > 0 ? (web.find((r) => r.mois === m)?.n ?? 0) : banqueVentes;
+    const caTtc = nb > 0 ? caisseTtc + webTtc : banqueVentes, caHt = ht(caTtc);
     let achatsTtc = 0, salaires = 0, tvaRec = 0, charges = 0, retraits = 0;
     for (const r of deb.filter((x) => x.mois === m)) {
       const cat = String(r.categorie);
@@ -168,7 +171,7 @@ app.get("/api/banque/pilotage", async (c) => {
       else charges += avecTva ? ht(r.n) : r.n;
     }
     const achatsHt = ht(achatsTtc), marge = caHt - achatsHt;
-    return { mois: m, amiens: am, rouen: ro, web: webTtc, caTtc, caHt, nb, panier: nb ? Math.round(caisseTtc / nb) : 0, achatsHt, marge, margePct: caHt > 0 ? Math.round((marge * 1000) / caHt) / 10 : 0, salaires, charges, resultat: marge - salaires - charges, tvaCollectee: Math.round(caTtc / 6), tvaRecup: tvaRec, tvaAPayer: Math.round(caTtc / 6) - tvaRec, retraits };
+    return { mois: m, amiens: am, rouen: ro, web: webTtc, caTtc, caHt, nb, panier: nb ? Math.round(caisseTtc / nb) : 0, achatsHt, marge, margePct: caHt > 0 ? Math.round((marge * 1000) / caHt) / 10 : 0, salaires, charges, resultat: marge - salaires - charges, tvaCollectee: Math.round(caTtc / 6), tvaRecup: tvaRec, tvaAPayer: Math.round(caTtc / 6) - tvaRec, retraits, releve, source: nb > 0 ? "caisse" : "banque" };
   });
   return c.json({ mois });
 });
