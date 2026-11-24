@@ -1,5 +1,6 @@
 export const CAISSE = `// ---------- Caisse (colonne de droite du Dashboard) ----------
 var PAN=[],CCLI=null,CFID=null,CUSE=false,CPAY={carte:"",especes:"",virement:"",bon_achat:""},CREP=null,CMSG="";
+var CVEH=false;
 var CAV=null,CAVBUSY=false,CAVOFF=[],CREC=null,CHIST=null,CHOPEN=0;
 var PRESTA=null,PRESBUSY=false,DEVHINT="",CACO=0,DEVOPT=0;
 function acoDeduit(reste){return CREP&&CACO>0?Math.max(0,Math.min(CACO,reste)):0}
@@ -35,7 +36,7 @@ function serieHtml(l,i){
   if(l.trott){var q=Math.max(1,l.quantite|0),h="<div style='margin-top:6px'><b>🛴 N° de série (obligatoire)</b>";
     for(var k=0;k<q;k++)h+="<input data-act='cSerie' data-i='"+i+"' data-k='"+k+"' value='"+esc((l.series||[])[k]||"")+"' placeholder='N° de série"+(q>1?" "+(k+1):"")+"' style='display:block;margin-top:4px;width:100%;max-width:260px'>";
     return h+"</div>"}
-  return"<div><button class='link' data-act='cTrott' data-i='"+i+"'>🛴 Trottinette : saisir le n° de série</button></div>"}
+  return""}
 function serieOk(l){if(!l.trott)return true;var q=Math.max(1,l.quantite|0);for(var k=0;k<q;k++){if(String((l.series||[])[k]||"").trim().length<3)return false}return true}
 function recuHtml(r){
   var ttc=r.totalCents,ht=Math.round(ttc/1.2),tva=ttc-ht,t=r.ticket||{};
@@ -132,6 +133,10 @@ function caisseHtml(){
   h+="<div class='card'><div class='step'>Panier</div>";
   if(!PAN.length)h+="<div class='muted'>Panier vide. Ajoute un article ci-dessous.</div>";
   else h+="<table class='panier' style='width:100%;border-collapse:collapse'><tr><th style='text-align:left'>Article</th><th>Qté</th><th>Prix €</th><th></th></tr>"+PAN.map(function(l,i){return"<tr><td>"+esc(l.libelle)+((l.barcode||l.sku)?"<div class='muted' style='font-size:12px'>"+(l.barcode?"EAN "+esc(l.barcode):"")+(l.barcode&&l.sku?" · ":"")+(l.sku?"sku "+esc(l.sku):"")+"</div>":"")+(l.emplacement?"<div style='font-size:13px'><b>📍 "+esc(l.emplacement)+"</b></div>":"")+serieHtml(l,i)+"</td><td><input type='number' min='1' value='"+l.quantite+"' data-act='cQte' data-i='"+i+"'></td><td><input value='"+esc(l.prix)+"' data-act='cPrix' data-i='"+i+"'></td><td><button class='link' data-act='cDel' data-i='"+i+"'>Retirer</button></td></tr>"}).join("")+"</table>";
+  var nonT=PAN.map(function(l,i){return{l:l,i:i}}).filter(function(x){return !x.l.trott});
+  if(PAN.length&&nonT.length){
+    if(CVEH)h+="<div class='dl' style='margin-top:6px'><select id='cveh-l'>"+nonT.map(function(x){return"<option value='"+x.i+"'>"+esc(x.l.libelle)+"</option>"}).join("")+"</select><button data-act='cVehOk'>Enregistrer le véhicule</button><button class='link' data-act='cVehNon'>Annuler</button></div>";
+    else h+="<div style='margin-top:4px'><button class='link' data-act='cVehOpen' style='font-size:12px;opacity:.7'>🛴 Enregistrer un véhicule</button></div>"}
   h+="<div style='margin-top:8px'>"+prodBox("caisse")+"</div>";
   h+="<div class='dl' style='margin-top:8px'><input id='cl' class='lb' placeholder='Article (libellé)'><input id='cq2' class='q' type='number' min='1' value='1'><input id='cp' class='p' placeholder='Prix €'><button data-act='cAdd'>Ajouter</button></div></div>";
   var dispo=(CAV||[]).filter(function(a){return avApplicable(a,brut)});
