@@ -68,8 +68,9 @@ var VJ=null,VJOPEN=0;
 function vjSync(){
   var o=document.getElementById("vj");
   if(!VJ){if(o)o.remove();return}
-  if(!o){o=document.createElement("div");o.id="vj";o.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:99999;overflow:auto;padding:20px";document.body.appendChild(o)}
+  if(!o){o=document.createElement("div");o.id="vj";o.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:99999;overflow:auto;padding:20px";o.onclick=function(e){if(e.target===o){VJ=null;VJOPEN=0;vjSync()}};document.body.appendChild(o)}
   o.innerHTML=vjHtml()}
+document.addEventListener("keydown",function(e){if(e.key==="Escape"&&VJ){VJ=null;VJOPEN=0;vjSync()}});
 function vjHtml(){
   if(!VJ)return"";
   var tot=0;VJ.forEach(function(r){tot+=r.totalCents});
