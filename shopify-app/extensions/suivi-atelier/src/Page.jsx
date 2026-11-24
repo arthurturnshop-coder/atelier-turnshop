@@ -121,7 +121,7 @@ function Carte({r, payer, repondre}) {
         <s-text color="subdued">{r.numero + (r.depot ? ' · déposée le ' + jour(r.depot) : '')}</s-text>
         <Frise etapes={r.etapes} />
         <s-text type="strong">{r.etat}</s-text>
-        {r.totalCents > 0 && <s-text>{'Total du devis : ' + eur(r.totalCents)}</s-text>}
+        {r.totalCents > 0 && <s-text>{(r.facturee ? 'Total facturé : ' : 'Total du devis : ') + eur(r.totalCents)}</s-text>}
         <s-button variant="secondary" onClick={() => setDetailOuvert(!detailOuvert)}>{detailOuvert ? 'Masquer la fiche' : 'Voir la fiche complète'}</s-button>
         {detailOuvert && (
           <s-stack gap="small-300">

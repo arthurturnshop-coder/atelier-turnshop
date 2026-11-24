@@ -276,15 +276,15 @@ app.post("/pub/moi", async (c) => {
     const [vf] = (await sql`SELECT id FROM ventes WHERE reparation_id = ${r.id} AND COALESCE(type, 'vente') = 'vente' ORDER BY id DESC LIMIT 1`.catch(() => [])) as any[];
     reparations.push({
       factureLien: vf ? lienFacture(vf.id) : "",
-      devisLien: dvl ? `${(Bun.env.PUBLIC_URL || "https://atelier-turnshop-production.up.railway.app").replace(/\/$/, "")}/pub/devis/${dvl.token}` : "",
+      devisLien: dvl && !vf ? `${(Bun.env.PUBLIC_URL || "https://atelier-turnshop-production.up.railway.app").replace(/\/$/, "")}/pub/devis/${dvl.token}` : "",
       autorisations: (Array.isArray(r.autorisations) ? r.autorisations : []).map((x: any) => `${({ freins: "Freins", pneus: "Pneus et chambres à air", eclairage: "Éclairage", cables: "Câbles et connectique", serrage: "Contrôle sécurité et serrage général" } as Record<string, string>)[x.cle] ?? x.cle} : ${x.mode === "changer" ? "changer si nécessaire (sur devis)" : "vérifier et te prévenir"}`),
       etatDepot: r.etat || "",
       id: r.id, numero: pcn(r.id), trottinette: `${r.marque} ${r.modele}`, panne: r.panne, groupe: e.groupe, etat: e.libelle, etape: e.etape, etapes: e.etapes, rdvStatut: r.rdv_statut ?? "",
       depot: r.date_depot, rdv: r.debut, rdvSouhaite: r.rdv_souhaite, magasin: r.magasin,
       devis: dv.lignes.map((l) => ({ libelle: l.libelle, quantite: l.quantite, prixCents: l.prixCents })), remiseCents: dv.remiseMultiCents, totalCents: dv.netCents,
-      verseCents: ac.verseCents, resteAPayerCents: Math.max(0, dv.netCents - ac.verseCents),
+      verseCents: ac.verseCents, resteAPayerCents: vf ? 0 : Math.max(0, dv.netCents - ac.verseCents), facturee: !!vf,
       gardiennage: g && g.fraisCents > 0 ? { jours: g.joursFrais, fraisCents: g.fraisCents } : null, abandonnee: !!r.abandonnee_le,
-      peutPayer: r.statut !== "récupéré" && r.rdv_statut !== "refuse" && r.rdv_statut !== "annule" && dv.netCents - ac.verseCents > 0,
+      peutPayer: !vf && r.statut !== "récupéré" && r.rdv_statut !== "refuse" && r.rdv_statut !== "annule" && dv.netCents - ac.verseCents > 0,
       // Panne non chiffrable : un blocage de rendez-vous est demandé (déduit de la facture, gardé si le client ne vient pas).
       aFinaliser: r.rdv_statut === "a_payer",
       besoinBlocage: r.source === "web" && r.rdv_statut !== "refuse" && r.rdv_statut !== "annule" && r.statut !== "récupéré" && dv.netCents === 0 && ac.verseCents === 0 && r.en_magasin === false,
