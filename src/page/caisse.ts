@@ -64,7 +64,15 @@ function shopHtml(r){
   var s=r.shopify;if(!s||!s.eligible)return"";
   if(s.nom)return"<div class='muted'>Commande Shopify "+esc(s.nom)+" créée (visible sur le compte du client).</div>";
   return"<div class='muted'>"+(s.erreur?"Pas partie vers Shopify : "+esc(s.erreur):"Pas envoyée à Shopify.")+"</div><div class='actions'><button class='sec' data-act='cShopRetry' data-id='"+r.id+"'>Envoyer vers Shopify</button></div>"}
-var VJ=null,VJOPEN=0;
+var VJ=null,VJOPEN=0,SAVF=null;
+function savForm(r){
+  var f=SAVF;if(!f||f.vid!==r.id)return"";
+  var opts=r.lignes.map(function(l,i){return"<option value='"+i+"'>"+esc(l.quantite+" x "+l.libelle)+" : "+eur(l.prixCents*l.quantite)+"</option>"}).join("");
+  var h="<div class='card avbox'>";
+  if(f.mode==="remb")h+="<b>Rembourser cette vente</b><div class='dl'><label class='muted'>Montant (€)</label><input id='sv-m' value='"+(r.totalCents/100).toFixed(2).split(".").join(",")+"'></div><div class='dl'><label class='muted'>Remboursé en</label><select id='sv-moy'><option value='carte'>Carte</option><option value='especes'>Espèces</option><option value='virement'>Virement</option><option value='bon'>Bon d achat (cagnotte)</option></select></div><div class='dl'><input id='sv-mot' placeholder='Motif (facultatif)'></div>";
+  else if(f.mode==="ech")h+="<b>Échanger un article</b><div class='muted'>Un bon d achat du montant de l article est créé sur la cagnotte du client : il choisit son nouvel article et l utilise à l encaissement.</div><div class='dl'><label class='muted'>Article rendu</label><select id='sv-l'>"+opts+"</select></div><div class='dl'><input id='sv-mot' placeholder='Motif (facultatif)'></div>";
+  else h+="<b>Garantie d une pièce</b><div class='muted'>Le dossier apparaît dans Garanties en cours sur le dashboard, avec relance toutes les semaines jusqu à ce que la pièce soit reçue ou remboursée.</div><div class='dl'><label class='muted'>Article défectueux</label><select id='sv-l'>"+opts+"</select></div><div class='dl'><input id='sv-mot' placeholder='Problème constaté'></div><div class='dl'><input id='sv-f' placeholder='Fournisseur (facultatif)'></div>";
+  return h+"<div class='actions'><button data-act='svOk' data-id='"+r.id+"'>Valider</button><button class='sec' data-act='svNo'>Annuler</button></div></div>"}
 function vjSync(){
   var o=document.getElementById("vj");
   if(!VJ){if(o)o.remove();return}
@@ -79,7 +87,7 @@ function vjHtml(){
   VJ.forEach(function(r){
     var res=r.lignes.slice(0,3).map(function(l){return esc(l.libelle)}).join(", ")+(r.lignes.length>3?"…":"");
     h+="<div style='display:flex;gap:8px;align-items:stretch;margin-top:6px'><button class='sec hrow' style='flex:1;margin:0' data-act='cVjRecu' data-id='"+r.id+"'><b>"+esc(dateLongue(r.date))+"</b> · "+eur(r.totalCents)+" · "+esc(r.client||"sans client")+(r.numero?" · "+esc(r.numero):"")+"<br><span class='muted'>"+res+"</span></button>"+(r.clientId?"<button class='sec' style='margin:0;font-size:22px;padding:0 16px' title='Ouvrir le profil de "+esc(r.client||"ce client")+"' data-act='cVjClient' data-cid='"+r.clientId+"'>👤</button>":"")+"</div>";
-    if(VJOPEN===r.id)h+=recuHtml(r)+"<div class='actions'><button class='sec' data-act='cPrint' data-id='"+r.id+"'>Imprimer le reçu</button><button class='sec' data-act='cEmail' data-id='"+r.id+"'>✉ Envoyer par email</button></div>"});
+    if(VJOPEN===r.id)h+=recuHtml(r)+"<div class='actions'><button class='sec' data-act='cPrint' data-id='"+r.id+"'>Imprimer le reçu</button><button class='sec' data-act='cEmail' data-id='"+r.id+"'>✉ Envoyer par email</button></div><div class='actions'>"+(estResp()?"<button class='sec' data-act='svOpen' data-m='remb' data-id='"+r.id+"'>↩ Rembourser</button>":"")+"<button class='sec' data-act='svOpen' data-m='ech' data-id='"+r.id+"'>🔁 Échanger</button><button class='sec' data-act='svOpen' data-m='gar' data-id='"+r.id+"'>🛠 Garantie pièce</button></div>"+savForm(r)});
   return h+"<div class='actions'><button data-act='cVjFerme'>Fermer</button></div></div>"}
 function histoHtml(){
   if(!CHIST)return"";

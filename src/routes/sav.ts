@@ -1,0 +1,119 @@
+import { app } from "../app";
+import { sql } from "../db";
+import "./auth";
+import { delaiRelance } from "./garantie";
+import { AppError, clean, exigeResponsable, signature } from "../util";
+
+// SAV depuis une vente : remboursement, échange (bon d'achat), garantie d'une pièce (suivi + relances hebdomadaires jusqu'à contrôle).
+await sql`CREATE TABLE IF NOT EXISTS sav_dossiers (
+  id SERIAL PRIMARY KEY, vente_id INT NOT NULL, client_id INT, magasin TEXT,
+  type TEXT NOT NULL CHECK (type IN ('garantie','echange','remboursement')),
+  libelle TEXT NOT NULL, quantite INT NOT NULL DEFAULT 1, montant_cents INT NOT NULL DEFAULT 0, motif TEXT NOT NULL DEFAULT '',
+  fournisseur TEXT NOT NULL DEFAULT '', rma TEXT NOT NULL DEFAULT '',
+  statut TEXT NOT NULL DEFAULT 'a_traiter', demande_le TIMESTAMPTZ, relance_le DATE, issue TEXT NOT NULL DEFAULT '',
+  cree_par TEXT, cree_le TIMESTAMPTZ NOT NULL DEFAULT now(), close_le TIMESTAMPTZ, close_par TEXT)`;
+await sql`ALTER TABLE remboursements ADD COLUMN IF NOT EXISTS vente_id INT, ADD COLUMN IF NOT EXISTS magasin TEXT`;
+
+const euros = (x: any) => Math.round((Number(String(x ?? "").replace(",", ".")) || 0) * 100);
+const eur = (c: number) => (c / 100).toFixed(2).replace(".", ",") + " €";
+
+async function venteEtLigne(venteId: number, ligne?: number) {
+  const [v] = (await sql`SELECT v.*, trim(cl.prenom || ' ' || cl.nom) AS client_nom FROM ventes v LEFT JOIN clients cl ON cl.id = v.client_id WHERE v.id = ${venteId}`) as any[];
+  if (!v) throw new AppError(404, "Vente introuvable.");
+  let l: any = null;
+  if (ligne !== undefined) {
+    const ls = (await sql`SELECT libelle, quantite, prix_unitaire_cents FROM vente_lignes WHERE vente_id = ${v.id} ORDER BY id`) as any[];
+    l = ls[ligne];
+    if (!l) throw new AppError(400, "Choisis l'article concerné.");
+  }
+  return { v, l };
+}
+const nomFacture = (v: any) => v.numero_facture ?? `Ticket n° ${v.id}`;
+
+app.post("/api/sav/rembourser", async (c) => {
+  exigeResponsable(c);
+  const b = await c.req.json().catch(() => ({}));
+  const { v } = await venteEtLigne(Number(b.venteId));
+  const montant = euros(b.montant);
+  const moyen = String(b.moyen ?? "");
+  if (!["carte", "especes", "virement", "bon"].includes(moyen)) throw new AppError(400, "Choisis comment rembourser.");
+  if (montant <= 0) throw new AppError(400, "Indique le montant à rembourser.");
+  const [dj] = (await sql`SELECT COALESCE(sum(montant_cents), 0)::int AS n FROM remboursements WHERE vente_id = ${v.id}`) as any[];
+  if (montant + dj.n > v.total_cents) throw new AppError(400, `Maximum remboursable : ${eur(v.total_cents - dj.n)} (déjà remboursé : ${eur(dj.n)}).`);
+  if (moyen === "bon" && !v.client_id) throw new AppError(400, "Un bon d'achat demande un client sur la vente.");
+  const u = c.get("user") as any;
+  const motif = clean(b.motif, 200);
+  await sql`INSERT INTO remboursements (reparation_id, client_id, montant_cents, moyen, motif, par, vente_id, magasin) VALUES (${v.reparation_id ?? null}, ${v.client_id ?? null}, ${montant}, ${moyen}, ${`Vente ${nomFacture(v)}${motif ? " · " + motif : ""}`}, ${u?.prenom ?? ""}, ${v.id}, ${v.magasin ?? null})`;
+  if (moyen === "bon") await sql`INSERT INTO bons_achat (client_id, montant_cents, motif) VALUES (${v.client_id}, ${montant}, ${"Remboursement " + nomFacture(v)})`;
+  await sql`INSERT INTO sav_dossiers (vente_id, client_id, magasin, type, libelle, montant_cents, motif, statut, issue, cree_par, close_le, close_par) VALUES (${v.id}, ${v.client_id ?? null}, ${v.magasin ?? null}, 'remboursement', ${"Remboursement " + nomFacture(v)}, ${montant}, ${motif}, 'termine', ${moyen}, ${u?.prenom ?? ""}, now(), ${u?.prenom ?? ""})`;
+  return c.json({ message: `${eur(montant)} remboursés (${moyen === "bon" ? "bon d'achat sur la cagnotte" : moyen}).${v.shopify_order_id ? " Pense à rembourser aussi la commande dans Shopify." : ""}` });
+});
+
+app.post("/api/sav/echange", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const { v, l } = await venteEtLigne(Number(b.venteId), Number(b.ligne));
+  if (!v.client_id) throw new AppError(400, "Un échange demande un client sur la vente (le bon d'achat est mis sur son compte).");
+  const qte = Math.max(1, Math.min(l.quantite, Math.round(Number(b.quantite) || l.quantite)));
+  const montant = qte * l.prix_unitaire_cents;
+  const u = c.get("user") as any;
+  await sql`INSERT INTO bons_achat (client_id, montant_cents, motif) VALUES (${v.client_id}, ${montant}, ${`Échange ${l.libelle} (${nomFacture(v)})`})`;
+  await sql`INSERT INTO sav_dossiers (vente_id, client_id, magasin, type, libelle, quantite, montant_cents, motif, statut, cree_par, close_le, close_par) VALUES (${v.id}, ${v.client_id}, ${v.magasin ?? null}, 'echange', ${l.libelle}, ${qte}, ${montant}, ${clean(b.motif, 200)}, 'termine', ${u?.prenom ?? ""}, now(), ${u?.prenom ?? ""})`;
+  return c.json({ message: `Bon d'achat de ${eur(montant)} créé sur la cagnotte de ${v.client_nom}. Il choisit son nouvel article et utilise la cagnotte à l'encaissement.` });
+});
+
+app.post("/api/sav/garantie", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const { v, l } = await venteEtLigne(Number(b.venteId), Number(b.ligne));
+  const u = c.get("user") as any;
+  const jours = 3;
+  await sql`INSERT INTO sav_dossiers (vente_id, client_id, magasin, type, libelle, quantite, montant_cents, motif, fournisseur, statut, relance_le, cree_par) VALUES (${v.id}, ${v.client_id ?? null}, ${v.magasin ?? null}, 'garantie', ${l.libelle}, 1, ${l.prix_unitaire_cents}, ${clean(b.motif, 300)}, ${clean(b.fournisseur, 80)}, 'a_traiter', ${(await sql`SELECT ((now() AT TIME ZONE 'Europe/Paris')::date + ${jours}::int)::text AS d`)[0].d}, ${u?.prenom ?? ""})`;
+  return c.json({ message: "Dossier garantie créé : il apparaît dans « Garanties en cours » sur le dashboard." });
+});
+
+app.get("/api/sav/dossiers", async (c) => {
+  const rows = (await sql`SELECT d.*, to_char(d.relance_le, 'YYYY-MM-DD') AS relance, v.numero_facture, trim(cl.prenom || ' ' || cl.nom) AS client_nom
+    FROM sav_dossiers d JOIN ventes v ON v.id = d.vente_id LEFT JOIN clients cl ON cl.id = d.client_id
+    WHERE d.type = 'garantie' AND d.statut IN ('a_traiter', 'demande_faite') ORDER BY d.id DESC LIMIT 100`) as any[];
+  const [{ auj }] = (await sql`SELECT (now() AT TIME ZONE 'Europe/Paris')::date::text AS auj`) as any[];
+  return c.json({ dossiers: rows.map((d) => ({
+    id: d.id, libelle: d.libelle, client: d.client_nom || "", numero: d.numero_facture ?? `Ticket n° ${d.vente_id}`, statut: d.statut, motif: d.motif, fournisseur: d.fournisseur, rma: d.rma,
+    demandeLe: d.demande_le, relanceLe: d.relance, enRetard: !!d.relance && d.relance <= auj, creeLe: d.cree_le,
+  })) });
+});
+
+app.post("/api/sav/maj", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const id = Number(b.id);
+  const [d] = (await sql`SELECT * FROM sav_dossiers WHERE id = ${id}`) as any[];
+  if (!d) throw new AppError(404, "Dossier introuvable.");
+  const u = c.get("user") as any;
+  const jours = await delaiRelance();
+  const a = String(b.action ?? "");
+  const prochaine = sql`((now() AT TIME ZONE 'Europe/Paris')::date + ${jours}::int)`;
+  if (a === "demande") {
+    await sql`UPDATE sav_dossiers SET statut = 'demande_faite', demande_le = now(), fournisseur = ${clean(b.fournisseur, 80) || d.fournisseur}, rma = ${clean(b.rma, 60)}, relance_le = ${prochaine} WHERE id = ${id}`;
+  } else if (a === "relance") {
+    await sql`UPDATE sav_dossiers SET relance_le = ${prochaine} WHERE id = ${id}`;
+  } else if (["piece_recue", "rembourse_fournisseur", "refus", "annule"].includes(a)) {
+    await sql`UPDATE sav_dossiers SET statut = ${a === "annule" ? "annule" : "termine"}, issue = ${a}, close_le = now(), close_par = ${u?.prenom ?? ""}, relance_le = NULL WHERE id = ${id}`;
+    await sql`UPDATE taches SET fait = true, fait_le = now() WHERE fait = false AND cree_par = 'Garantie' AND texte LIKE ${"Garantie #" + id + " %"}`;
+  } else throw new AppError(400, "Action inconnue.");
+  return c.json({ message: "OK" });
+});
+
+// Relances : tâche dans la to-do quand la date de relance est atteinte (puis prochaine échéance dans le délai réglé, 7 jours par défaut).
+async function relancer() {
+  try {
+    const jours = await delaiRelance();
+    const dus = (await sql`SELECT d.id, d.libelle, d.statut, trim(cl.prenom || ' ' || cl.nom) AS client_nom FROM sav_dossiers d LEFT JOIN clients cl ON cl.id = d.client_id
+      WHERE d.type = 'garantie' AND d.statut IN ('a_traiter', 'demande_faite') AND d.relance_le IS NOT NULL AND d.relance_le <= (now() AT TIME ZONE 'Europe/Paris')::date`) as any[];
+    for (const d of dus) {
+      const texte = `Garantie #${d.id} : ${d.statut === "a_traiter" ? "faire la demande au fournisseur" : "relancer le fournisseur"} (${d.libelle}${d.client_nom ? ", " + d.client_nom : ""})`;
+      const [ex] = (await sql`SELECT id FROM taches WHERE fait = false AND texte = ${texte} LIMIT 1`) as any[];
+      if (!ex) await sql`INSERT INTO taches (texte, echeance, priorite, cree_par) VALUES (${texte}, (now() AT TIME ZONE 'Europe/Paris')::date, true, 'Garantie')`;
+      await sql`UPDATE sav_dossiers SET relance_le = ((now() AT TIME ZONE 'Europe/Paris')::date + ${jours}::int) WHERE id = ${d.id}`;
+    }
+  } catch (e: any) { console.log(JSON.stringify({ event: "sav-relance", message: String(e?.message ?? e).slice(0, 200) })); }
+}
+setInterval(relancer, 30 * 60 * 1000);
+setTimeout(relancer, 90 * 1000);

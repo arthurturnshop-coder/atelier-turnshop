@@ -26,8 +26,8 @@ async function calcul(m: string, de: Date | string, a: Date | string | null) {
   const [nb] = (await sql`SELECT count(*)::int AS n, COALESCE(sum(total_cents), 0)::int AS total FROM ventes
     WHERE magasin = ${m} AND COALESCE(type, '') <> 'acompte' AND cree_le >= ${de} AND cree_le <= ${fin}`) as any[];
   const [ac] = (await sql`SELECT count(*)::int AS n FROM ventes WHERE magasin = ${m} AND type = 'acompte' AND cree_le >= ${de} AND cree_le <= ${fin}`) as any[];
-  const remb = (await sql`SELECT rb.moyen, sum(rb.montant_cents)::int AS n FROM remboursements rb JOIN reparations r ON r.id = rb.reparation_id
-    WHERE r.magasin = ${m} AND rb.cree_le >= ${de} AND rb.cree_le <= ${fin} GROUP BY rb.moyen`) as any[];
+  const remb = (await sql`SELECT rb.moyen, sum(rb.montant_cents)::int AS n FROM remboursements rb LEFT JOIN reparations r ON r.id = rb.reparation_id
+    WHERE COALESCE(rb.magasin, r.magasin) = ${m} AND rb.cree_le >= ${de} AND rb.cree_le <= ${fin} GROUP BY rb.moyen`) as any[];
   const par: Record<string, number> = { carte: 0, especes: 0, virement: 0, en_ligne: 0, bon_achat: 0 };
   for (const p of pay) par[p.moyen] = p.n;
   const rem: Record<string, number> = {};
@@ -97,8 +97,8 @@ app.get("/api/caisse/cloture-historique", async (c) => {
   else { [{ du, au }] = (await sql`SELECT (${auj}::date - 30)::text AS du, ${auj}::date::text AS au`) as any[]; }
   const pay = (await sql`SELECT (v.cree_le AT TIME ZONE 'Europe/Paris')::date::text AS j, p.moyen, sum(p.montant_cents)::int AS n FROM vente_paiements p JOIN ventes v ON v.id = p.vente_id
     WHERE v.magasin = ${m} AND (v.cree_le AT TIME ZONE 'Europe/Paris')::date BETWEEN ${du}::date AND ${au}::date GROUP BY 1, 2`) as any[];
-  const remb = (await sql`SELECT (rb.cree_le AT TIME ZONE 'Europe/Paris')::date::text AS j, sum(rb.montant_cents)::int AS n FROM remboursements rb JOIN reparations r ON r.id = rb.reparation_id
-    WHERE r.magasin = ${m} AND (rb.cree_le AT TIME ZONE 'Europe/Paris')::date BETWEEN ${du}::date AND ${au}::date GROUP BY 1`) as any[];
+  const remb = (await sql`SELECT (rb.cree_le AT TIME ZONE 'Europe/Paris')::date::text AS j, sum(rb.montant_cents)::int AS n FROM remboursements rb LEFT JOIN reparations r ON r.id = rb.reparation_id
+    WHERE COALESCE(rb.magasin, r.magasin) = ${m} AND (rb.cree_le AT TIME ZONE 'Europe/Paris')::date BETWEEN ${du}::date AND ${au}::date GROUP BY 1`) as any[];
   const sess = (await sql`SELECT * FROM caisse_sessions WHERE magasin = ${m} AND jour BETWEEN ${du}::date AND ${au}::date ORDER BY id DESC`) as any[];
   const jours: Record<string, any> = {};
   const J = (j: string) => (jours[j] ??= { jour: j, carte: 0, especes: 0, virement: 0, en_ligne: 0, rembourse: 0 });

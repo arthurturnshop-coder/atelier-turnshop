@@ -75,6 +75,19 @@ export const ACTIONS = `var ACTS={
   cVjOuvre:function(){VJ=[];VJOPEN=0;vjSync();rdvInfos().then(function(){return api("/caisse/historique?jour=1")}).then(function(d){VJ=d.ventes;vjSync()}).catch(function(e){VJ=null;toastKo(e.message);vjSync()})},
   cVjClient:async function(b){var cid=+b.dataset.cid;VJ=null;VJOPEN=0;vjSync();try{var d=await api("/caisse/client?id="+cid);CUR=null;FICHE=null;TAB="accueil";CCLI=d.client;CFID=d.fidelite;CUSE=false;CMSG="";CAVOFF=[];CHOPEN=0;await chargeHisto()}catch(e){toastKo(e.message)}},
   cAvisMail:async function(b){btnFlash(b);try{var d=await api("/caisse/avis",{venteId:+b.dataset.id});toastOk(d.message)}catch(e){toastKo(e.message)}},
+  svOpen:function(b){SAVF={mode:b.dataset.m,vid:+b.dataset.id};vjSync()},
+  svNo:function(){SAVF=null;vjSync()},
+  svOk:async function(b){var id=+b.dataset.id,f=SAVF;if(!f)return;btnFlash(b);var l=document.getElementById("sv-l"),mot=v("sv-mot");
+    try{var d;
+      if(f.mode==="remb")d=await api("/sav/rembourser",{venteId:id,montant:v("sv-m"),moyen:document.getElementById("sv-moy").value,motif:mot});
+      else if(f.mode==="ech")d=await api("/sav/echange",{venteId:id,ligne:+l.value,motif:mot});
+      else d=await api("/sav/garantie",{venteId:id,ligne:+l.value,motif:mot,fournisseur:v("sv-f")});
+      SAVF=null;toastOk(d.message);vjSync();savReload()}catch(e){toastKo(e.message)}},
+  savDemOpen:function(b){SAVED=+b.dataset.id;render()},
+  savDemNo:function(){SAVED=0;render()},
+  savDem:async function(b){try{await api("/sav/maj",{id:+b.dataset.id,action:"demande",fournisseur:v("sv-f"),rma:v("sv-r")});SAVED=0;await savReload()}catch(e){toastKo(e.message)}},
+  savAct:async function(b){var a=b.dataset.a,q={piece_recue:"Confirmer : la pièce de remplacement est bien arrivée et contrôlée ?",rembourse_fournisseur:"Confirmer : le fournisseur a bien remboursé ?",refus:"Confirmer : garantie refusée, dossier clos ?",annule:"Annuler ce dossier ?"};
+    if(q[a]&&!confirm(q[a]))return;try{await api("/sav/maj",{id:+b.dataset.id,action:a});await savReload()}catch(e){toastKo(e.message)}},
   cVjFerme:function(){VJ=null;VJOPEN=0;vjSync()},
   cVjRecu:function(b){var id=+b.dataset.id;VJOPEN=VJOPEN===id?0:id;vjSync()},
   cRecu:function(b){var id=+b.dataset.id;CHOPEN=CHOPEN===id?0:id;lirePay();render()},

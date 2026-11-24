@@ -42,6 +42,21 @@ function blocTaches(){
     if(act.length){h+="<div class='step' style='margin-top:12px'>Planning des récurrences</div>";
       act.forEach(function(r){h+="<div class='muted'>"+esc(r.texte)+" · "+esc(r.libelle)+" · prochaine fois : "+jourCourt(r.prochaine)+"</div>"})}}
   return h+"</div>"}
+var SAV=null,SAVED=0;
+function savReload(){return api("/sav/dossiers").then(function(d){SAV=d.dossiers;render()}).catch(function(){})}
+function savDate(x){return x?x.slice(8,10)+"/"+x.slice(5,7):""}
+function blocGaranties(){
+  if(!SAV||!SAV.length)return"";
+  var h="<div class='card'><b>Garanties en cours ("+SAV.length+")</b>";
+  SAV.forEach(function(d){
+    var st=d.statut==="a_traiter"?"À traiter : faire la demande au fournisseur":"Demande faite"+(d.demandeLe?" le "+savDate(String(d.demandeLe).slice(0,10)):"")+(d.fournisseur?" chez "+esc(d.fournisseur):"")+(d.rma?" · RMA "+esc(d.rma):"");
+    h+="<div style='border-top:1px solid #e3e3e3;padding:8px 0'><b>"+esc(d.libelle)+"</b> · "+esc(d.client||"sans client")+" · "+esc(d.numero)+(d.motif?"<div class='muted'>"+esc(d.motif)+"</div>":"")
+      +"<div"+(d.enRetard?" style='color:#b00;font-weight:700'":" class='muted'")+">"+st+(d.relanceLe?" · prochaine relance le "+savDate(d.relanceLe):"")+"</div>";
+    if(SAVED===d.id)h+="<div class='dl'><input id='sv-f' placeholder='Fournisseur' value='"+esc(d.fournisseur||"")+"'><input id='sv-r' placeholder='N° RMA (facultatif)'></div><div class='actions'><button data-act='savDem' data-id='"+d.id+"'>Valider</button><button class='sec' data-act='savDemNo'>Annuler</button></div>";
+    else if(d.statut==="a_traiter")h+="<div class='actions'><button data-act='savDemOpen' data-id='"+d.id+"'>Demande faite au fournisseur</button><button class='sec' data-act='savAct' data-a='annule' data-id='"+d.id+"'>Annuler le dossier</button></div>";
+    else h+="<div class='actions'><button class='sec' data-act='savAct' data-a='relance' data-id='"+d.id+"'>Relancé</button><button data-act='savAct' data-a='piece_recue' data-id='"+d.id+"'>✓ Pièce reçue</button><button data-act='savAct' data-a='rembourse_fournisseur' data-id='"+d.id+"'>✓ Remboursé</button><button class='sec' data-act='savAct' data-a='refus' data-id='"+d.id+"'>Refusé</button></div>";
+    h+="</div>"});
+  return h+"</div>"}
 function blocChiffres(){
   if(!CHIF)return"<div class='card'><b>Chiffres du jour</b><div class='muted'>Chargement…</div></div>";
   var items=[["receptionsAujourdhui","Réceptions aujourd'hui"],["enCours","Réparations en cours"],["pretesARendre","Prêtes à rendre"],["recuperees","Récupérées aujourd'hui"],["nouveauxClients","Nouveaux clients"],["avisProgrammes","Avis Google programmés"]];
@@ -51,6 +66,7 @@ function blocChiffres(){
 async function loadAccueil(){
   try{CONS=await api("/consignes")}catch(e){CONS=CONS||{}}
   try{CHIF=await api("/chiffres")}catch(e){CHIF=CHIF||null}
+  try{SAV=(await api("/sav/dossiers")).dossiers}catch(e){}
   if(TAB==="accueil"&&!CUR&&!EDITCONS&&!NEWCLI)render()}
 var NEWPRE="";
 function newPre(){var q=NEWPRE.trim(),r={pn:"",nm:"",tel:"",em:""};if(!q)return r;if(q.indexOf("@")>0)r.em=q;else if(/^[0-9 .+]{6,}$/.test(q))r.tel=q;else{var m=q.split(" ").filter(function(x){return x});if(m.length>1){r.pn=m[0];r.nm=m.slice(1).join(" ")}else r.nm=q}return r}
@@ -70,7 +86,7 @@ function vAccueil(){
     h+="<div class='card'><b>"+esc(c.name||"Sans nom")+"</b>"+(enCours?" <span class='tag'>"+enCours+" en cours</span>":"")
       +"<div class='muted'>"+esc(c.phone||"")+(c.phone&&c.email?" · ":"")+esc(c.email||"")+"</div>"
       +"<div class='actions'><button class='sec' data-act='open' data-i='"+i+"'>Voir le profil</button><button data-act='priseEnCharge' data-i='"+i+"'>Créer une prise en charge</button></div></div>"});
-  h+="</div>"+blocConsignes()+"</div>"+blocTaches()+blocChiffres()+"</div><div class='dright'>"+caisseHtml()+"</div></div>";
+  h+="</div>"+blocConsignes()+"</div>"+blocTaches()+blocGaranties()+blocChiffres()+"</div><div class='dright'>"+caisseHtml()+"</div></div>";
   app.innerHTML=h;caisseBind();
   var q=document.getElementById("q");if(q)q.addEventListener("keydown",function(e){if(e.key==="Enter")ACTS.search()});
   if(!CONS||!CHIF)loadAccueil()}
