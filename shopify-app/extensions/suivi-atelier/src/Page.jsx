@@ -201,7 +201,8 @@ function Suivi({data, payer, repondre, nouveau}) {
     <s-stack gap="base">
       {!data.reparations.length && <s-section><s-stack gap="base"><s-text>Tu n'as pas encore de réparation chez nous.</s-text><s-button variant="primary" onClick={nouveau}>Faire une demande</s-button></s-stack></s-section>}
       {cours.map((r) => <Carte key={r.id} r={r} payer={payer} repondre={repondre} />)}
-      {finies.length > 0 && <s-heading>Réparations terminées</s-heading>}
+      {finies.length > 0 && <s-divider />}
+      {finies.length > 0 && <s-heading>Mes réparations passées</s-heading>}
       {finies.map((r) => <Carte key={r.id} r={r} payer={payer} repondre={repondre} />)}
     </s-stack>
   );
