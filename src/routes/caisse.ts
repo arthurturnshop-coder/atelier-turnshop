@@ -8,6 +8,7 @@ import { envoyerAvis } from "../automatisations";
 import { remiseMulti } from "./prestations";
 import { avantagesActifs, contexteClient, estApplicable, remiseDe } from "./avantages";
 import { AppError, clean, signature } from "../util";
+import { vendeurParMdp } from "./caissier";
 import { createHmac } from "node:crypto";
 import { brevoConfigure, envoiEmail } from "../brevo";
 
@@ -290,9 +291,10 @@ app.post("/api/caisse/encaisser", async (c) => {
   if (payeTotal !== totalCents) throw new AppError(400, `Les paiements (${(payeTotal / 100).toFixed(2)} €) ne correspondent pas au total (${(totalCents / 100).toFixed(2)} €).`);
 
   const u = c.get("user");
+  const vendeur = await vendeurParMdp(c, b.mdpCaissier);
   const p = await lireParametres();
   const pointsGagnes = Math.floor((totalCents + acompteDeduit) / 100 / p.eurosPourPalier);
-  const [v] = (await sql`INSERT INTO ventes (client_id, reparation_id, magasin, vendeur, total_cents, remise_cents, points_gagnes, points_utilises, acompte_deduit_cents) VALUES (${clientId}, ${reparationId}, ${u.magasin ?? null}, ${u.prenom}, ${totalCents}, ${remiseCents}, ${pointsGagnes}, ${remiseCents > 0 ? 1 : 0}, ${acompteDeduit}) RETURNING id`) as any[];
+  const [v] = (await sql`INSERT INTO ventes (client_id, reparation_id, magasin, vendeur, total_cents, remise_cents, points_gagnes, points_utilises, acompte_deduit_cents) VALUES (${clientId}, ${reparationId}, ${u.magasin ?? null}, ${vendeur}, ${totalCents}, ${remiseCents}, ${pointsGagnes}, ${remiseCents > 0 ? 1 : 0}, ${acompteDeduit}) RETURNING id`) as any[];
   await sql`UPDATE ventes SET numero_facture = 'F-' || to_char(now(), 'YYYY') || '-' || lpad(nextval('facture_seq')::text, 5, '0') WHERE id = ${v.id}`;
   for (const l of nettoyees) {
     await sql`INSERT INTO vente_lignes (vente_id, libelle, quantite, prix_unitaire_cents, type, shopify_variant_id, sku, series) VALUES (${v.id}, ${l.libelle}, ${l.quantite}, ${l.prixCents}, ${l.type}, ${l.variantId}, ${l.sku}, ${JSON.stringify(l.series)}::text::jsonb)`;

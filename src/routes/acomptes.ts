@@ -4,6 +4,7 @@ import { sql } from "../db";
 // Doit passer après la protection /api/* (voir auth.ts).
 import "./auth";
 import { detailVente } from "./caisse";
+import { vendeurParMdp } from "./caissier";
 import { AppError, clean, exigeResponsable, signature } from "../util";
 import { rembourserEnLigne } from "./pub";
 
@@ -32,7 +33,8 @@ app.post("/api/reparations/acompte", async (c) => {
   if (paiements.some((p: any) => !MOYENS.includes(p.moyen))) throw new AppError(400, "Moyen de paiement inconnu.");
   const total = paiements.reduce((s: number, p: any) => s + p.cents, 0);
   const u = c.get("user");
-  const [v] = (await sql`INSERT INTO ventes (client_id, reparation_id, magasin, vendeur, total_cents, points_gagnes, type) VALUES (${r.client_id}, ${repId}, ${u.magasin ?? null}, ${u.prenom}, ${total}, 0, 'acompte') RETURNING id`) as any[];
+  const vendeur = await vendeurParMdp(c, b.mdpCaissier);
+  const [v] = (await sql`INSERT INTO ventes (client_id, reparation_id, magasin, vendeur, total_cents, points_gagnes, type) VALUES (${r.client_id}, ${repId}, ${u.magasin ?? null}, ${vendeur}, ${total}, 0, 'acompte') RETURNING id`) as any[];
   await sql`INSERT INTO vente_lignes (vente_id, libelle, quantite, prix_unitaire_cents, type) VALUES (${v.id}, ${"Acompte réparation " + pcn(repId)}, 1, ${total}, 'article')`;
   for (const p of paiements) await sql`INSERT INTO vente_paiements (vente_id, moyen, montant_cents) VALUES (${v.id}, ${p.moyen}, ${p.cents})`;
   await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${repId}, 'caisse', ${`Acompte encaissé : ${(total / 100).toFixed(2)} €${signature(c)}`})`;
