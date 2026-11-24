@@ -142,36 +142,43 @@ app.get("/api/banque/synthese", async (c) => {
 });
 
 
-// Pilotage : CA (caisse + web), marge brute estimée, charges, résultat et TVA estimés, par mois.
+// Pilotage : par mois et par entité (TURN SHOP = site + frais communs, Amiens, Rouen) : CA, marge, charges, résultat, TVA (estimations).
 app.get("/api/banque/pilotage", async (c) => {
   exigeAdmin(c);
+  const E = ["Commun", "Amiens", "Rouen"] as const;
   const caisse = (await sql`SELECT to_char(cree_le AT TIME ZONE 'Europe/Paris', 'YYYY-MM') AS mois, COALESCE(magasin, 'Commun') AS magasin, sum(total_cents)::int AS ttc, count(*)::int AS nb FROM ventes WHERE type = 'vente' GROUP BY 1, 2`) as any[];
-  const deb = (await sql`SELECT to_char(jour, 'YYYY-MM') AS mois, categorie, sum(debit_cents)::int AS n FROM banque_ops WHERE debit_cents > 0 GROUP BY 1, 2`) as any[];
-  const web = (await sql`SELECT to_char(jour, 'YYYY-MM') AS mois, sum(credit_cents)::int AS n FROM banque_ops WHERE credit_cents > 0 AND categorie ~* 'ventes en ligne|encaissements|dépôts|chèques remis|virements reçus' GROUP BY 1`) as any[];
-  const ms = new Set<string>([...caisse.map((r) => r.mois), ...deb.map((r) => r.mois), ...web.map((r) => r.mois)]);
+  const deb = (await sql`SELECT to_char(jour, 'YYYY-MM') AS mois, categorie, magasin, sum(debit_cents)::int AS n FROM banque_ops WHERE debit_cents > 0 GROUP BY 1, 2, 3`) as any[];
+  const cre = (await sql`SELECT to_char(jour, 'YYYY-MM') AS mois, categorie, magasin, sum(credit_cents)::int AS n FROM banque_ops WHERE credit_cents > 0 AND categorie ~* 'ventes en ligne|encaissements|dépôts|chèques remis|virements reçus' GROUP BY 1, 2, 3`) as any[];
+  const ms = new Set<string>([...caisse.map((r) => r.mois), ...deb.map((r) => r.mois), ...cre.map((r) => r.mois)]);
   const ht = (n: number) => Math.round(n / 1.2);
   const mois = [...ms].sort().reverse().map((m) => {
-    const cs = caisse.filter((r) => r.mois === m);
-    const am = cs.find((r) => r.magasin === "Amiens")?.ttc ?? 0, ro = cs.find((r) => r.magasin === "Rouen")?.ttc ?? 0;
-    const caisseTtc = cs.reduce((t, r) => t + r.ttc, 0), nb = cs.reduce((t, r) => t + r.nb, 0);
-    const banqueVentes = web.find((r) => r.mois === m)?.n ?? 0;
-    const releve = deb.some((r) => r.mois === m) || banqueVentes > 0;
-    // Mois avec ventes en caisse : caisse (+ web). Sinon (avant la caisse) : encaissements vus sur la banque (CB, web, espèces, chèques, virements).
-    const webTtc = nb > 0 ? (web.find((r) => r.mois === m)?.n ?? 0) : banqueVentes;
-    const caTtc = nb > 0 ? caisseTtc + webTtc : banqueVentes, caHt = ht(caTtc);
-    let achatsTtc = 0, salaires = 0, tvaRec = 0, charges = 0, retraits = 0;
-    for (const r of deb.filter((x) => x.mois === m)) {
-      const cat = String(r.categorie);
-      if (/retraits/i.test(cat)) { retraits += r.n; continue; }
-      if (/^remboursements/i.test(cat)) continue;
-      const avecTva = /achats|logiciels|télécom|fournitures/i.test(cat);
-      if (avecTva) tvaRec += Math.round(r.n / 6);
-      if (/achats/i.test(cat)) achatsTtc += r.n;
-      else if (/salaires/i.test(cat)) salaires += r.n;
-      else charges += avecTva ? ht(r.n) : r.n;
-    }
-    const achatsHt = ht(achatsTtc), marge = caHt - achatsHt;
-    return { mois: m, amiens: am, rouen: ro, web: webTtc, caTtc, caHt, nb, panier: nb ? Math.round(caisseTtc / nb) : 0, achatsHt, marge, margePct: caHt > 0 ? Math.round((marge * 1000) / caHt) / 10 : 0, salaires, charges, resultat: marge - salaires - charges, tvaCollectee: Math.round(caTtc / 6), tvaRecup: tvaRec, tvaAPayer: Math.round(caTtc / 6) - tvaRec, retraits, releve, source: nb > 0 ? "caisse" : "banque" };
+    const nbCaisse = caisse.filter((r) => r.mois === m).reduce((t, r) => t + r.nb, 0);
+    const releve = deb.some((r) => r.mois === m) || cre.some((r) => r.mois === m);
+    const col = (e: string) => {
+      const ent = e === "Commun" ? "Commun" : e;
+      let ca = 0, achatsTtc = 0, salaires = 0, tvaRec = 0, charges = 0, retraits = 0, nb = 0;
+      if (nbCaisse > 0) {
+        for (const r of caisse.filter((x) => x.mois === m && x.magasin === ent)) { ca += r.ttc; nb += r.nb; }
+        for (const r of cre.filter((x) => x.mois === m && x.magasin === ent && /ventes en ligne/i.test(x.categorie))) ca += r.n;
+      } else for (const r of cre.filter((x) => x.mois === m && x.magasin === ent)) ca += r.n;
+      for (const r of deb.filter((x) => x.mois === m && x.magasin === ent)) {
+        const cat = String(r.categorie);
+        if (/retraits/i.test(cat)) { retraits += r.n; continue; }
+        if (/^remboursements/i.test(cat)) continue;
+        const avecTva = /achats|logiciels|télécom|fournitures/i.test(cat);
+        if (avecTva) tvaRec += Math.round(r.n / 6);
+        if (/achats/i.test(cat)) achatsTtc += r.n;
+        else if (/salaires/i.test(cat)) salaires += r.n;
+        else charges += avecTva ? ht(r.n) : r.n;
+      }
+      const caHt = ht(ca), achats = ht(achatsTtc), marge = caHt - achats;
+      return { caTtc: ca, caHt, achats, marge, margePct: caHt > 0 ? Math.round((marge * 1000) / caHt) / 10 : null, salaires, charges, resultat: marge - salaires - charges, tva: Math.round(ca / 6) - tvaRec, retraits, nb };
+    };
+    const cols = { turn: col("Commun"), amiens: col("Amiens"), rouen: col("Rouen") };
+    const sum = (k: string) => (cols.turn as any)[k] + (cols.amiens as any)[k] + (cols.rouen as any)[k];
+    const total = { caTtc: sum("caTtc"), caHt: sum("caHt"), achats: sum("achats"), marge: sum("marge"), salaires: sum("salaires"), charges: sum("charges"), resultat: sum("resultat"), tva: sum("tva"), retraits: sum("retraits"), nb: sum("nb") } as any;
+    total.margePct = total.caHt > 0 ? Math.round((total.marge * 1000) / total.caHt) / 10 : null;
+    return { mois: m, releve, source: nbCaisse > 0 ? "caisse" : "banque", ...cols, total };
   });
   return c.json({ mois });
 });

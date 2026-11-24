@@ -1,5 +1,5 @@
 export const BANQUE = `// ---------- Compta > Banque : relevé bancaire classé par mois, catégorie et magasin ----------
-var BQ={pil:null,det:false,sens:"debit",syn:null,ops:null,mois:"",aClasser:false,msg:"",busy:false};
+var BQ={pil:null,sel:"",det:false,sens:"debit",syn:null,ops:null,mois:"",aClasser:false,msg:"",busy:false};
 var COMPSUB="z";
 function bqCharge(){
   if(!BQ.pil)api("/banque/pilotage").then(function(d){BQ.pil=d;if(TAB==="compta")render()}).catch(function(){BQ.pil={mois:[]}});
@@ -23,23 +23,26 @@ function bqResume(m,deb){
     h+="<div style='margin:5px 0'><div style='display:flex;justify-content:space-between;font-size:13px'><span>"+esc(l.categorie)+"</span><b>"+eur(t)+" <span class='muted'>"+p+"%</span></b></div><div style='height:6px;background:#eee;border-radius:3px'><div style='height:6px;width:"+p+"%;background:#2f6fd0;border-radius:3px'></div></div></div>"});
   return h+"</div>"}
 function bqPilote(){
-  var p=BQ.pil;if(!p)return"<div class='card muted'>Pilotage : chargement…</div>";
+  var p=BQ.pil;if(!p)return"<div class='card muted'>Chargement…</div>";
   if(!p.mois.length)return"";
-  function c(l,v,col){return"<tr><td>"+l+"</td><td class='n'><b style='color:"+(col||"inherit")+"'>"+v+"</b></td></tr>"}
-  var h="<div class='card'><div class='step'>Pilotage (estimation)</div><div class='muted'>CA = ventes de la caisse (+ web) depuis qu'elle est utilisée, avant : encaissements de la banque. Marge = CA HT − achats marchandises HT. Résultat = marge − salaires − charges. Les achats sont comptés quand tu les paies, pas quand tu vends le stock : un mois de gros réassort donne une marge négative.</div>";
-  p.mois.slice(0,6).forEach(function(m){
-    if(!m.releve){h+="<div style='margin-top:12px;padding-top:8px;border-top:1px solid #eee'><b>"+esc(bqMoisLib(m.mois))+"</b><div class='muted'>CA caisse : "+eur(m.caTtc)+" TTC ("+m.nb+" ventes, panier moyen "+eur(m.panier)+"). Marge et résultat pas calculables : relevé bancaire de ce mois pas encore importé.</div></div>";return}
-    h+="<div style='margin-top:12px;padding-top:8px;border-top:1px solid #eee'><b>"+esc(bqMoisLib(m.mois))+"</b><table class='devis' style='width:100%;margin-top:4px'>"
-      +c(m.source==="caisse"?"CA TTC (caisse Amiens "+eur(m.amiens)+" · Rouen "+eur(m.rouen)+" · web "+eur(m.web)+")":"CA TTC (encaissements vus sur la banque : CB, web, espèces, chèques, virements)",eur(m.caTtc))
-      +c("CA HT",eur(m.caHt))
-      +c("Achats marchandises HT","-"+eur(m.achatsHt))
-      +c("Marge brute estimée",eur(m.marge)+" ("+m.margePct+" %)","#1e8449")
-      +c("Salaires et rémunérations","-"+eur(m.salaires))
-      +c("Autres charges HT (abonnements, assurances, prêt, frais…)","-"+eur(m.charges))
-      +c("Résultat estimé",eur(m.resultat),m.resultat<0?"#c0392b":"#1e8449")
-      +c("TVA à payer estimée (collectée "+eur(m.tvaCollectee)+" − récupérable "+eur(m.tvaRecup)+")",eur(m.tvaAPayer))
-      +"</table><div class='muted'>"+m.nb+" ventes en caisse · panier moyen "+eur(m.panier)+(m.retraits?" · retraits espèces non comptés : "+eur(m.retraits):"")+"</div></div>"});
-  return h+"</div>"}
+  var m=p.mois.filter(function(x){return x.mois===BQ.sel})[0]||p.mois.filter(function(x){return x.releve})[0]||p.mois[0];BQ.sel=m.mois;
+  var h="<div class='card'><div class='step'>Pilotage</div><div class='actions' style='flex-wrap:wrap'>"+p.mois.slice(0,12).map(function(x){return"<button class='"+(x.mois===m.mois?"":"sec")+"' data-act='bqMois' data-m='"+x.mois+"'>"+esc(bqMoisLib(x.mois))+"</button>"}).join("")+"</div>";
+  if(!m.releve)h+="<div class='muted' style='margin-top:8px'>⚠ Relevé bancaire de ce mois pas importé : seules les ventes de la caisse sont comptées, achats et charges sont à 0.</div>";
+  function cel(v,col,pct){return"<td class='n'>"+(v===null?"":"<b style='color:"+(col||"inherit")+"'>"+eur(v)+"</b>")+(pct!==undefined&&pct!==null?" <span class='muted'>"+pct+" %</span>":"")+"</td>"}
+  function lig(l,k,neg,gras,col){var cs=["turn","amiens","rouen","total"];return"<tr"+(gras?" style='background:#f4f6f8'":"")+"><td>"+(gras?"<b>"+l+"</b>":l)+"</td>"+cs.map(function(c){var v=m[c][k];return cel(neg&&v?-v:v,col&&v<0?"#c0392b":(gras?"#1e8449":""),k==="marge"?m[c].margePct:undefined)}).join("")+"</tr>"}
+  h+="<div style='overflow-x:auto'><table class='devis' style='width:100%;margin-top:8px'><tr><th></th><th class='n'>TURN SHOP<br><span class='muted'>site + frais communs</span></th><th class='n'>AMIENS</th><th class='n'>ROUEN</th><th class='n'>TOTAL</th></tr>"
+    +lig("Chiffre d'affaires TTC","caTtc")+lig("Chiffre d'affaires HT","caHt")+lig("Achats marchandises HT","achats",true)
+    +lig("Marge brute","marge",false,true,true)+lig("Salaires","salaires",true)+lig("Autres charges HT","charges",true)
+    +lig("Résultat estimé","resultat",false,true,true)+lig("TVA à payer (estim.)","tva")+"</table></div>"
+    +"<div class='muted' style='margin-top:6px'>"+(m.source==="caisse"?"CA = ventes de la caisse (+ ventes en ligne de la banque). ":"CA = encaissements de la banque (CB, web, espèces, chèques, virements). ")+(m.total.nb?m.total.nb+" ventes en caisse. ":"")+(m.total.retraits?"Retraits d'espèces non comptés : "+eur(m.total.retraits)+". ":"")+"</div>"
+    +"<div class='muted'>Les achats sont comptés quand tu les paies, pas quand tu vends : un gros réassort donne une marge basse ce mois-là. TVA à 20 % estimée, à confirmer avec le comptable. Une dépense sans magasin va dans TURN SHOP : classe-la dans « Voir et classer » pour la mettre sur Amiens ou Rouen.</div></div>";
+  return h+bqPoles(m.mois)}
+function bqPoles(mois){
+  if(!BQ.syn)return"";var m=BQ.syn.mois.filter(function(x){return x.mois===mois})[0];if(!m)return"";
+  var h="<div class='card'><div class='step'>Où part l'argent · "+esc(bqMoisLib(mois))+"</div>";
+  m.lignes.slice(0,10).forEach(function(l){var t=l.amiens+l.rouen+l.commun,pc=m.total?Math.round(t*100/m.total):0;
+    h+="<div style='margin:6px 0'><div style='display:flex;justify-content:space-between;font-size:13px'><span>"+esc(l.categorie)+"</span><b>"+eur(t)+" <span class='muted'>"+pc+" %</span></b></div><div style='height:6px;background:#eee;border-radius:3px'><div style='height:6px;width:"+pc+"%;background:#2f6fd0;border-radius:3px'></div></div></div>"});
+  return h+"<div class='actions'><button class='sec' data-act='bqVoir' data-m='"+esc(mois)+"'>Voir et classer les opérations</button></div></div>"}
 function bqOpsHtml(){
   if(!BQ.ops)return"";
   var o=BQ.ops,h="<div class='card'><div class='step'>"+(BQ.aClasser?"Opérations à classer":"Opérations de "+esc(bqMoisLib(BQ.mois)))+"</div>"
@@ -53,17 +56,14 @@ function bqOpsHtml(){
   return h+"</div>"}
 function vBanque(){
   if(!BQ.syn){bqCharge();return"<div class='muted'>Chargement…</div>"}
-  var s=BQ.syn,h="<div class='card'><div class='actions'><button class='"+(BQ.sens==="debit"?"":"sec")+"' data-act='bqSens' data-s='debit'>Dépenses (débits)</button><button class='"+(BQ.sens==="credit"?"":"sec")+"' data-act='bqSens' data-s='credit'>Recettes (crédits)</button></div>"
-    +"<div class='dl' style='margin-top:8px;align-items:center'><label class='sec' style='cursor:pointer;padding:8px 12px;border:1px solid #1c5a34;border-radius:8px'>⬆ Importer un relevé (CSV)<input id='bq-file' type='file' accept='.csv,.txt' style='display:none'></label><button class='sec' data-act='bqExport'>⬇ Exporter les tableaux (CSV)</button></div>"
+  var s=BQ.syn,h="<div class='card'><div class='dl' style='align-items:center'><label class='sec' style='cursor:pointer;padding:8px 12px;border:1px solid #1c5a34;border-radius:8px'>⬆ Importer un relevé (CSV)<input id='bq-file' type='file' accept='.csv,.txt' style='display:none'></label><button class='sec' data-act='bqExport'>⬇ Exporter (CSV)</button></div>"
     +(BQ.msg?"<div class='muted' style='margin-top:6px'>"+esc(BQ.msg)+"</div>":"")
     +(s.aClasser>0?"<div style='margin-top:8px'><button class='sec' data-act='bqClasser'>⚠ "+s.aClasser+" opération(s) à classer</button></div>":"")+"</div>";
   if(!s.mois.length)h+="<div class='card muted'>Aucun relevé importé. Importe un CSV (date; libellé; débit; crédit).</div>";
   h+=bqPilote();
-  s.mois.forEach(function(m){h+=bqResume(m,BQ.sens==="debit")});
-  if(s.mois.length){h+="<div class='card'><div class='muted'>TVA estimée à 20 % sur "+(BQ.sens==="debit"?"achats, logiciels, télécom et fournitures":"les encaissements de ventes")+" (montants TTC ÷ 6). À confirmer avec le comptable.</div><button class='sec' data-act='bqDet' style='margin-top:6px'>"+(BQ.det?"Masquer":"Voir")+" le détail par magasin</button></div>";if(BQ.det)s.mois.forEach(function(m){h+=bqTable(m)})}
   return h+bqOpsHtml()}
 ACTS.compSub=function(b){COMPSUB=b.dataset.v;render()};
-ACTS.bqDet=function(){BQ.det=!BQ.det;render()};
+ACTS.bqMois=function(b){BQ.sel=b.dataset.m;render()};
 ACTS.bqSens=function(b){BQ.sens=b.dataset.s;BQ.syn=null;render()};
 ACTS.bqVoir=function(b){BQ.mois=b.dataset.m;BQ.aClasser=false;BQ.ops=null;bqOps()};
 ACTS.bqClasser=function(){BQ.aClasser=true;BQ.ops=null;bqOps()};
