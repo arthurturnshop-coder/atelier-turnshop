@@ -32,7 +32,9 @@ app.get("/api/chiffres", async (c) => {
   const [clients] = await sql`SELECT count(*)::int AS n FROM clients WHERE cree_le::date = CURRENT_DATE`;
   const [avis] = await sql`SELECT count(*)::int AS n FROM reparations WHERE avis_statut = 'programme' AND supprime_le IS NULL`;
   const [ca] = await sql`SELECT COALESCE(sum(total_cents), 0)::int AS n FROM ventes WHERE cree_le::date = CURRENT_DATE`;
+  const [mois] = await sql`SELECT COALESCE(sum(total_cents + acompte_deduit_cents), 0)::int AS n FROM ventes WHERE type = 'vente' AND date_trunc('month', cree_le AT TIME ZONE 'Europe/Paris') = date_trunc('month', now() AT TIME ZONE 'Europe/Paris')`;
   return c.json({
+    caMoisCents: mois.n,
     receptionsAujourdhui: recues.n,
     enCours: encours.n,
     pretesARendre: pretes.n,

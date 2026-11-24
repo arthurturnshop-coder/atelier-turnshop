@@ -47,7 +47,7 @@ function blocChiffres(){
   var items=[["receptionsAujourdhui","Réceptions aujourd'hui"],["enCours","Réparations en cours"],["pretesARendre","Prêtes à rendre"],["recuperees","Récupérées aujourd'hui"],["nouveauxClients","Nouveaux clients"],["avisProgrammes","Avis Google programmés"]];
   return"<div class='card'><b>Chiffres du jour</b><div class='chiffres' style='margin-top:8px'>"+items.map(function(i){
     return"<div class='chiffre'><b>"+esc(CHIF[i[0]]==null?0:CHIF[i[0]])+"</b><span>"+esc(i[1])+"</span></div>"}).join("")
-    +"<div class='chiffre'><b>"+eur(CHIF.caCaisseCents||0)+"</b><span>Encaissé en caisse aujourd'hui</span></div></div></div>"}
+    +"<div class='chiffre'><b>"+eur(CHIF.caCaisseCents||0)+"</b><span>Encaissé en caisse aujourd'hui</span></div><div class='chiffre'><b>"+eur(CHIF.caMoisCents||0)+"</b><span>CA de "+new Date().toLocaleDateString("fr-FR",{month:"long"})+" (mois en cours)</span></div></div></div>"}
 async function loadAccueil(){
   try{CONS=await api("/consignes")}catch(e){CONS=CONS||{}}
   try{CHIF=await api("/chiffres")}catch(e){CHIF=CHIF||null}
