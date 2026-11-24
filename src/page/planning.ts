@@ -16,7 +16,7 @@ function decaleJour(j,n){return new Date(new Date(j+"T12:00:00Z").getTime()+n*86
 function jourCourt(j){return new Date(j+"T12:00:00Z").toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short",timeZone:"Europe/Paris"})}
 function jourNum(j,opt){return new Date(j+"T12:00:00Z").toLocaleDateString("fr-FR",Object.assign({timeZone:"Europe/Paris"},opt))}
 function magDefaut(){return(MAG==="Amiens"||MAG==="Rouen")?MAG:"Amiens"}
-function findRep(id){var P=PLAN||{planifiees:[],nonPlanifiees:[]};return P.planifiees.concat(P.nonPlanifiees).filter(function(r){return r.id===id})[0]}
+function findRep(id){var P=PLAN||{planifiees:[],nonPlanifiees:[]};return P.planifiees.concat(P.nonPlanifiees,P.enRetard||[]).filter(function(r){return r.id===id})[0]}
 function setMsg(t){PMSG=t;var el=document.getElementById("pmsg");if(el)el.textContent=t}
 function loadPlan(msg){
   var seq=++PSEQ;
@@ -30,6 +30,7 @@ function enregistrer(id,tech,debut,duree,okMsg){
     var warn=d.chevauchement&&d.chevauchement.length?"Attention : chevauchement avec une autre réparation de "+tech+".":"";
     return loadPlan(warn||okMsg||"Planning enregistré.")
   }).catch(function(e){setMsg(e.message)})}
+function techDefaut(P){var t=techsDe(P);return PTECH||(t.indexOf(PRENOM)>=0?PRENOM:"")}
 function techsDe(P){var techs=(P.techniciens||[]).slice();P.planifiees.forEach(function(r){if(r.technicien&&techs.indexOf(r.technicien)<0)techs.push(r.technicien)});return techs}
 function couleurTech(techs,t){var i=techs.indexOf(t);return i<0?0:i%PCOLS.length}
 function colonnes(P,techs){
@@ -46,7 +47,7 @@ function panelHtml(r,techs,P){
   var plan=!!r.debut;
   var jour=plan?jourParis(r.debut):(((P.jours||[]).indexOf(aujourdhui())>=0)?aujourdhui():((P.jours||[PJOUR])[0]));
   var min=plan?minParis(r.debut):540;
-  var tech=r.technicien||PTECH||techs[0]||"";
+  var tech=r.technicien||PTECH||(techs.indexOf(PRENOM)>=0?PRENOM:techs[0])||"";
   var d=+r.dureeMin||PDEF,opts=PDURS.map(function(x){return x[0]});
   if(opts.indexOf(d)<0)opts.push(d);
   opts.sort(function(a,b){return a-b});
@@ -193,7 +194,7 @@ function pointerFin(e){
   var col=cb.col,slot=cb.slot;
     var min=PH0+slot*15,jour=col.dataset.jour,rep=findRep(d.id);
   if(!rep)return;
-  var tech=col.dataset.tech||rep.technicien||"";
+  var tech=col.dataset.tech||rep.technicien||techDefaut(PLAN||{techniciens:[],planifiees:[]});
   var dur=+rep.dureeMin||PDEF;
   if(d.pl&&rep.technicien===tech&&jourParis(rep.debut)===jour&&minParis(rep.debut)===min)return;
   if(!tech){PPEND={id:rep.id,nom:rep.client,jour:jour,min:min,dur:dur};PSEL=null;setMsg("");renderPlan();var pe=document.getElementById("ppend");if(pe)pe.scrollIntoView({block:"nearest"});return}
