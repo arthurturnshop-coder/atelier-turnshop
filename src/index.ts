@@ -23,6 +23,7 @@ import "./routes/cloture";
 import "./routes/retours";
 import "./routes/garantie";
 import "./routes/sav";
+import "./routes/chat";
 import "./routes/stats";
 import "./routes/commandes";
 import "./routes/acomptes";
