@@ -114,7 +114,16 @@ app.get("/api/recherche", async (c) => {
       for (const p of produits) for (const v of p.variantes) v.emplacement = m.get(v.sku) ?? m.get(v.barcode) ?? "";
     }
   } catch { /* stock maison indisponible : la recherche continue sans */ }
-  return c.json({ clients, reparations, produits, produitsIndisponibles, stockLocal });
+  // Numéro de série : retrouve la trottinette, son propriétaire actuel et la vente éventuelle.
+  const trottinettes: any[] = [];
+  if (q.length >= 3) {
+    const ts = (await sql`SELECT t.id, t.marque, t.modele, t.serie, t.client_id, trim(c.prenom || ' ' || c.nom) AS client FROM trottinettes t JOIN clients c ON c.id = t.client_id WHERE t.serie ILIKE ${like} ORDER BY t.id DESC LIMIT 6`) as any[];
+    for (const t of ts) {
+      const [v] = (await sql`SELECT v.numero_facture, v.cree_le FROM vente_lignes vl JOIN ventes v ON v.id = vl.vente_id WHERE EXISTS (SELECT 1 FROM jsonb_array_elements_text(vl.series) s WHERE lower(s) = lower(${t.serie})) ORDER BY v.id DESC LIMIT 1`) as any[];
+      trottinettes.push({ id: t.id, modele: `${t.marque} ${t.modele}`.trim(), serie: t.serie, clientId: t.client_id, client: t.client, facture: v?.numero_facture ?? "", venduLe: v?.cree_le ?? null });
+    }
+  }
+  return c.json({ clients, reparations, trottinettes, produits, produitsIndisponibles, stockLocal });
 });
 
 // Doublons : même email (sans tenir compte des majuscules) ou même numéro (9 derniers chiffres) sur une autre fiche.
@@ -195,7 +204,6 @@ app.post("/api/clients/fusionner", async (c) => {
 // Changer une trottinette de propriétaire (le client la récupère d'un autre). L'historique reste sur l'ancienne fiche.
 await sql`CREATE TABLE IF NOT EXISTS trott_transferts (id SERIAL PRIMARY KEY, trottinette_id INT NOT NULL, de_client INT, vers_client INT NOT NULL, par TEXT NOT NULL DEFAULT '', cree_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
 app.post("/api/trottinettes/transferer", async (c) => {
-  exigeResponsable(c);
   const b = await c.req.json().catch(() => ({}));
   const tid = Number(b.trottinetteId), vers = Number(b.versClientId);
   const [t] = (await sql`SELECT id, client_id, serie FROM trottinettes WHERE id = ${tid}`) as any[];

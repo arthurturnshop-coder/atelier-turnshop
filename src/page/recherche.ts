@@ -28,6 +28,8 @@ function pcn(id){return"PC-"+("0000"+id).slice(-4)}
 function rechHtml(d){
   var h="",rp=d.reparations||[];
   if(rp.length){h+="<div class='rp-sec'>Prises en charge</div>";rp.forEach(function(r){h+="<button class='rp-item rp-line' data-rid='"+esc(r.id)+"'><span class='rp-t'><b>"+pcn(r.id)+"</b> · "+esc(r.client||"Sans nom")+" · <span class='rp-m'>"+esc(r.trottinette)+" · "+esc(r.panne)+"</span></span><span class='tag'>"+esc(r.statut)+"</span></button>"})}
+  var tr=d.trottinettes||[];
+  if(tr.length){h+="<div class='rp-sec'>Trottinettes (n° de série)</div>";tr.forEach(function(t){h+="<button class='rp-item rp-line' data-cid='"+esc(t.clientId)+"'><span class='rp-t'><b>"+esc(t.serie)+"</b> · "+esc(t.modele)+" · appartient à <b>"+esc(t.client||"Sans nom")+"</b>"+(t.facture?" <span class='rp-m'>· vendue "+esc(t.facture)+(t.venduLe?" le "+esc(new Date(t.venduLe).toLocaleDateString("fr-FR")):"")+"</span>":"")+"</span></button>"})}
   h+="<div class='rp-sec'>Clients</div>";var cl=d.clients||[];
   if(!cl.length)h+="<div class='rp-muted'>Aucun client.</div>";
   else cl.forEach(function(c){h+="<button class='rp-item rp-line' data-cid='"+esc(c.id)+"'><span class='rp-t'><b>"+esc(c.name||"Sans nom")+"</b> <span class='rp-m'>"+esc([c.phone,c.email].filter(Boolean).join(" · "))+"</span></span></button>"});
