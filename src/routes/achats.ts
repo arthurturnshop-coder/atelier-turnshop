@@ -7,6 +7,9 @@ import { entreeStock, alertesSoeurs, produitParCode } from "./stock";
 import { AppError, clean, signature } from "../util";
 
 await sql`ALTER TABLE commande_lignes ADD COLUMN IF NOT EXISTS suivi TEXT`;
+await sql`ALTER TABLE fournisseurs ADD COLUMN IF NOT EXISTS mode TEXT NOT NULL DEFAULT 'groupe'`;
+await sql`UPDATE fournisseurs SET mode = 'unitaire' WHERE mode = 'groupe' AND nom ~* 'aliexpress|amazon|ebay|temu|banggood' AND NOT EXISTS (SELECT 1 FROM commandes c WHERE c.fournisseur_id = fournisseurs.id)`;
+await sql`ALTER TABLE commandes ADD COLUMN IF NOT EXISTS suivi TEXT`;
 await sql`ALTER TABLE commande_lignes ADD COLUMN IF NOT EXISTS relance_le TIMESTAMPTZ`;
 await sql`ALTER TABLE reparations ADD COLUMN IF NOT EXISTS piece_a_valider BOOLEAN NOT NULL DEFAULT false`;
 const nettoyerQte = (n: any) => Math.max(1, Math.min(999, Math.round(Number(n) || 1)));
@@ -14,13 +17,13 @@ const magasinDe = (c: any) => (c.get("user")?.magasin === "Rouen" ? "Rouen" : "A
 
 // Tout l'espace Commandes : par fournisseur, le panier, ce qui est commandé et ce qui est reçu récemment.
 app.get("/api/achats", async (c) => {
-  const fournisseurs = (await sql`SELECT id, nom, email FROM fournisseurs WHERE actif = true ORDER BY nom`) as any[];
-  const lignes = (await sql`SELECT l.*, trim(cl.prenom || ' ' || cl.nom) AS client FROM commande_lignes l LEFT JOIN reparations r ON r.id = l.reparation_id LEFT JOIN clients cl ON cl.id = r.client_id
+  const fournisseurs = (await sql`SELECT id, nom, email, mode FROM fournisseurs WHERE actif = true ORDER BY nom`) as any[];
+  const lignes = (await sql`SELECT l.*, co.suivi AS suivi_bloc, trim(cl.prenom || ' ' || cl.nom) AS client FROM commande_lignes l LEFT JOIN commandes co ON co.id = l.commande_id LEFT JOIN reparations r ON r.id = l.reparation_id LEFT JOIN clients cl ON cl.id = r.client_id
     WHERE l.statut <> 'recue' OR l.recue_le > now() - interval '7 days' ORDER BY l.id`) as any[];
-  const vers = (l: any) => ({ commandeId: l.commande_id ?? null, id: l.id, libelle: l.libelle, sku: l.sku ?? "", barcode: l.barcode ?? "", variantId: l.variant_id ?? "", quantite: l.quantite, reparationId: l.reparation_id, client: l.client || "", statut: l.statut, commandeLe: l.commandee_le, recueLe: l.recue_le, suivi: l.suivi ?? "" });
+  const vers = (l: any) => ({ commandeId: l.commande_id ?? null, id: l.id, libelle: l.libelle, sku: l.sku ?? "", barcode: l.barcode ?? "", variantId: l.variant_id ?? "", quantite: l.quantite, reparationId: l.reparation_id, client: l.client || "", statut: l.statut, commandeLe: l.commandee_le, recueLe: l.recue_le, suivi: l.suivi ?? l.suivi_bloc ?? "" });
   return c.json({
     fournisseurs: fournisseurs.map((f) => ({
-      id: f.id, nom: f.nom, email: f.email,
+      id: f.id, nom: f.nom, email: f.email, mode: f.mode,
       panier: lignes.filter((l) => l.fournisseur_id === f.id && l.statut === "panier").map(vers),
       commandees: lignes.filter((l) => l.fournisseur_id === f.id && l.statut === "commandee").map(vers),
       recues: lignes.filter((l) => l.fournisseur_id === f.id && l.statut === "recue").map(vers),
@@ -53,8 +56,9 @@ app.post("/api/achats/fournisseur", async (c) => {
 
 app.post("/api/achats/fournisseur/modifier", async (c) => {
   const b = await c.req.json().catch(() => ({}));
-  await sql`UPDATE fournisseurs SET email = ${clean(b.email, 120)} WHERE id = ${Number(b.id)}`;
-  return c.json({ message: "Email du fournisseur enregistré." });
+  if (b.mode === "groupe" || b.mode === "unitaire") await sql`UPDATE fournisseurs SET mode = ${b.mode} WHERE id = ${Number(b.id)}`;
+  if (b.email !== undefined) await sql`UPDATE fournisseurs SET email = ${clean(b.email, 120)} WHERE id = ${Number(b.id)}`;
+  return c.json({ message: "Fournisseur enregistré." });
 });
 
 // Ajouter une ligne au panier d'un fournisseur (produit du catalogue Shopify ou saisie libre).
@@ -113,10 +117,40 @@ app.post("/api/achats/ligne/maj", async (c) => {
 app.post("/api/achats/ligne/suivi", async (c) => {
   const b = await c.req.json().catch(() => ({}));
   const suivi = clean(b.suivi, 80);
-  const [l] = (await sql`UPDATE commande_lignes SET suivi = ${suivi || null} WHERE id = ${Number(b.id)} RETURNING reparation_id, libelle`) as any[];
-  if (!l) throw new AppError(404, "Ligne introuvable.");
-  if (l.reparation_id && suivi) await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${l.reparation_id}, 'note', ${`Suivi de la commande « ${l.libelle} » : ${suivi}${signature(c)}`})`;
+  const [l0] = (await sql`SELECT l.id, l.commande_id, f.mode FROM commande_lignes l JOIN fournisseurs f ON f.id = l.fournisseur_id WHERE l.id = ${Number(b.id)}`) as any[];
+  if (!l0) throw new AppError(404, "Ligne introuvable.");
+  let touchees: any[];
+  if (l0.mode === "groupe" && l0.commande_id) {
+    // Bloc (ex : eWheel) : un seul numéro de suivi pour tous les produits de la commande.
+    await sql`UPDATE commandes SET suivi = ${suivi || null} WHERE id = ${l0.commande_id}`;
+    await sql`UPDATE commande_lignes SET suivi = NULL WHERE commande_id = ${l0.commande_id}`;
+    touchees = (await sql`SELECT reparation_id, libelle FROM commande_lignes WHERE commande_id = ${l0.commande_id}`) as any[];
+  } else touchees = (await sql`UPDATE commande_lignes SET suivi = ${suivi || null} WHERE id = ${l0.id} RETURNING reparation_id, libelle`) as any[];
+  if (suivi) for (const l of touchees) if (l.reparation_id) await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${l.reparation_id}, 'note', ${`Suivi de la commande « ${l.libelle} » : ${suivi}${signature(c)}`})`;
   return c.json({ message: "Suivi enregistré." });
+});
+// Prises en charge ouvertes (pour rattacher un produit commandé).
+app.get("/api/achats/reparations-ouvertes", async (c) => {
+  const rows = (await sql`SELECT r.id, trim(cl.prenom || ' ' || cl.nom) AS client, r.statut FROM reparations r LEFT JOIN clients cl ON cl.id = r.client_id WHERE r.supprime_le IS NULL AND r.statut <> 'récupéré' ORDER BY r.id DESC LIMIT 150`) as any[];
+  return c.json(rows.map((r) => ({ id: r.id, client: r.client || "", statut: r.statut })));
+});
+// Rattacher (ou détacher avec repairId vide) une ligne à une prise en charge.
+app.post("/api/achats/ligne/rattacher", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const rid = b.repairId ? Number(b.repairId) : null;
+  const [l0] = (await sql`SELECT id, libelle, statut, reparation_id FROM commande_lignes WHERE id = ${Number(b.id)}`) as any[];
+  if (!l0) throw new AppError(404, "Ligne introuvable.");
+  if (rid) {
+    const [r] = (await sql`SELECT id, statut FROM reparations WHERE id = ${rid}`) as any[];
+    if (!r) throw new AppError(404, "Prise en charge introuvable.");
+    await sql`UPDATE commande_lignes SET reparation_id = ${rid} WHERE id = ${l0.id}`;
+    await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${rid}, 'note', ${`Pièce rattachée : « ${l0.libelle} »${l0.statut === "commandee" ? " (commandée)" : ""}${signature(c)}`})`;
+    if (l0.statut === "commandee" && ["reçu", "diagnostic", "devis envoyé", "à faire"].includes(r.statut)) await sql`UPDATE reparations SET statut = 'en attente de pièce' WHERE id = ${rid}`;
+  } else {
+    await sql`UPDATE commande_lignes SET reparation_id = NULL WHERE id = ${l0.id}`;
+    if (l0.reparation_id) await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${l0.reparation_id}, 'note', ${`Pièce détachée : « ${l0.libelle} »${signature(c)}`})`;
+  }
+  return c.json({ message: rid ? "Rattaché à la prise en charge." : "Détaché." });
 });
 app.post("/api/achats/ligne/supprimer", async (c) => {
   const b = await c.req.json().catch(() => ({}));

@@ -1,5 +1,5 @@
 export const COMMANDES = `// ---------- Commandes fournisseurs ----------
-var CMD=null,CMDMSG="",RE=null;
+var CMD=null,CMDMSG="",RE=null,REPS=[];
 function nlc(){return String.fromCharCode(10)}
 function texteCommande(f){
   var nl=nlc();
@@ -17,14 +17,20 @@ function suiviHtml(l){
   var j=joursCmd(l),tard=j>=7;
   return"<div class='muted' style='margin-top:4px'><span class='tag"+(tard?" warn":"")+"'>Commandé il y a "+j+" j"+(tard?" · toujours pas arrivé ?":"")+"</span></div>"
     +"<div class='dl' style='margin-top:4px'><input id='sv-"+l.id+"' value='"+esc(l.suivi||"")+"' placeholder='N° de suivi'><button class='sec' data-act='cmdSuivi' data-id='"+l.id+"'>OK</button>"+(l.suivi?"<a class='link' target='_blank' rel='noopener' href='https://t.17track.net/fr#nums="+encodeURIComponent(l.suivi)+"'>Suivre le colis</a>":"")+"</div>"}
+function rattHtml(l){
+  if(l.statut==="recue")return"";
+  var h="<div class='dl' style='margin-top:4px'>";
+  if(l.reparationId)h+="<button class='link' data-act='cmdDetach' data-id='"+l.id+"'>Détacher de la fiche "+l.reparationId+"</button>";
+  else h+="<select id='rt-"+l.id+"'><option value=''>Rattacher à une prise en charge…</option>"+(REPS||[]).map(function(r){return"<option value='"+r.id+"'>#"+r.id+" "+esc(r.client)+"</option>"}).join("")+"</select><button class='sec' data-act='cmdRatt' data-id='"+l.id+"'>Rattacher</button>";
+  return h+"</div>"}
 function ligneCmd(l,mode){
-  var h="<tr><td>"+(l.commandeId&&mode!=="panier"?"<span class='tag'>"+cmdNum(l.commandeId)+"</span> ":"")+esc(l.libelle)+refsCmd(l)+(l.client?"<div class='muted'>Pour "+esc(l.client)+(l.reparationId?" (fiche "+l.reparationId+")":"")+"</div>":"")+(mode==="commandee"?suiviHtml(l):"")+"</td>";
+  var h="<tr><td>"+(l.commandeId&&mode!=="panier"?"<span class='tag'>"+cmdNum(l.commandeId)+"</span> ":"")+esc(l.libelle)+refsCmd(l)+(l.client?"<div class='muted'>Pour "+esc(l.client)+(l.reparationId?" (fiche "+l.reparationId+")":"")+"</div>":"")+(mode==="commandee"?suiviHtml(l):mode==="commandee-g"?"<div class='muted'>Commandé il y a "+joursCmd(l)+" j</div>":"")+(mode!=="recue"?rattHtml(l):"")+"</td>";
   if(mode==="panier")h+="<td class='n'><input type='number' min='1' value='"+l.quantite+"' data-act='cmdQte' data-id='"+l.id+"'></td><td class='n'><button class='link' data-act='cmdDel' data-id='"+l.id+"'>Retirer</button></td>";
-  else if(mode==="commandee")h+="<td class='n'>"+l.quantite+"</td><td class='n'><button data-act='cmdRecevoir' data-id='"+l.id+"'>Réceptionner</button></td>";
+  else if(mode==="commandee"||mode==="commandee-g")h+="<td class='n'>"+l.quantite+"</td><td class='n'><button data-act='cmdRecevoir' data-id='"+l.id+"'>Réceptionner</button></td>";
   else h+="<td class='n'>"+l.quantite+"</td><td class='n'><span class='tag ok'>Reçu</span></td>";
   return h+"</tr>"}
 function vCmd(){
-  if(!CMD){app.innerHTML="<div class='card'>Chargement…</div>";api("/achats").then(function(d){return api("/stock/reappro?magasin="+encodeURIComponent(MAG||"")).then(function(r){RE=r;return d}).catch(function(){RE=null;return d})}).then(function(d){CMD=d;render()}).catch(function(e){app.innerHTML="<div class='card'>"+esc(e.message)+"</div>"});return}
+  if(!CMD){app.innerHTML="<div class='card'>Chargement…</div>";api("/achats").then(function(d){return api("/stock/reappro?magasin="+encodeURIComponent(MAG||"")).then(function(r){RE=r;return d}).catch(function(){RE=null;return d})}).then(function(d){return api("/achats/reparations-ouvertes").then(function(r){REPS=r;return d}).catch(function(){REPS=[];return d})}).then(function(d){CMD=d;render()}).catch(function(e){app.innerHTML="<div class='card'>"+esc(e.message)+"</div>"});return}
   var h="<div class='pmsg'>"+esc(CMDMSG)+"</div><div class='card'><div class='step'>Nouveau fournisseur</div><div class='dl'><input id='fn' class='lb' placeholder='Nom (ex : eWheel)'><input id='fe' class='lb' placeholder='Email pour les commandes'><button data-act='fAdd'>Ajouter</button></div></div>";
   if(RE&&RE.produits.length){
     h+="<div class='card'><div class='step'>À recommander : stock minimum atteint ("+RE.produits.length+")</div><div class='muted'>Suggestion pour "+esc(RE.magasin)+". Choisis le fournisseur et ajoute au panier.</div>";
@@ -36,7 +42,7 @@ function vCmd(){
     h+="</div>"}
   if(!CMD.fournisseurs.length)h+="<div class='card'>Ajoute ton premier fournisseur ci-dessus (eWheel, ...). Chaque fournisseur a son panier.</div>";
   CMD.fournisseurs.forEach(function(f){
-    h+="<div class='card'><div class='head'><div class='big'>"+esc(f.nom)+"</div><div class='dl'><input id='fe-"+f.id+"' value='"+esc(f.email)+"' placeholder='Email de commande' class='lb'><button class='sec' data-act='fMail' data-id='"+f.id+"'>Enregistrer l'email</button></div></div>";
+    h+="<div class='card'><div class='head'><div class='big'>"+esc(f.nom)+"</div><div class='dl'><input id='fe-"+f.id+"' value='"+esc(f.email)+"' placeholder='Email de commande' class='lb'><button class='sec' data-act='fMail' data-id='"+f.id+"'>Enregistrer l'email</button><button class='sec' data-act='fMode' data-id='"+f.id+"' title='Bloc = un seul suivi pour toute la commande ; Unitaire = un suivi par produit'>Mode : "+(f.mode==="unitaire"?"par produit":"bloc")+"</button></div></div>";
     if(REC&&REC.fid===f.id)h+=recepHtml(f);
     h+="<div class='actions' style='margin-top:6px'><button class='sec' data-act='histoOpen' data-id='"+f.id+"'>"+(HISTC&&HISTC.fid===f.id?"Masquer l'historique":"Historique des commandes")+"</button></div>"+(HISTC&&HISTC.fid===f.id?histoCmdHtml():"");
     h+="<div class='step' style='margin-top:10px'>Panier ("+f.panier.length+")</div>";
@@ -45,7 +51,11 @@ function vCmd(){
     h+="<div style='margin-top:8px'>"+prodBox("cmd"+f.id)+"</div><div class='dl' style='margin-top:6px'><input id='cl-"+f.id+"' class='lb' placeholder='Ou saisie libre : produit / référence'><input id='cq-"+f.id+"' class='q' type='number' min='1' value='1'><button class='sec' data-act='cmdLigne' data-id='"+f.id+"'>Ajouter</button></div>";
     if(f.panier.length)h+="<div class='actions'><button data-act='cmdPasser' data-id='"+f.id+"'>Marquer comme commandé</button><button class='sec' data-act='cmdCopy' data-id='"+f.id+"'>Copier la commande</button><button class='sec' data-act='cmdCsv' data-id='"+f.id+"'>Télécharger (CSV)</button>"
       +(f.email?"<a class='btn' href='mailto:"+esc(f.email)+"?subject="+encodeURIComponent("Commande TURN SOCIETY")+"&body="+encodeURIComponent(texteCommande(f))+"'>Envoyer par email</a>":"")+"</div><div class='muted'>L'envoi direct par l'API du fournisseur s'ajoute fournisseur par fournisseur.</div>";
-    if(f.commandees.length){h+="<div class='step' style='margin-top:12px'>Commandé, en attente de réception ("+f.commandees.length+")</div><table class='devis' style='width:100%'><tr><th>Produit</th><th class='n'>Qté</th><th></th></tr>"+f.commandees.map(function(l){return ligneCmd(l,"commandee")}).join("")+"</table><div class='actions'><button data-act='recOpen' data-id='"+f.id+"'>Réceptionner (scan)</button><button class='sec' data-act='cmdRecevoirTout' data-id='"+f.id+"'>Tout réceptionner</button></div>"}
+    if(f.commandees.length){h+="<div class='step' style='margin-top:12px'>Commandé, en attente de réception ("+f.commandees.length+")</div>";
+      if(f.mode==="unitaire")h+="<table class='devis' style='width:100%'><tr><th>Produit</th><th class='n'>Qté</th><th></th></tr>"+f.commandees.map(function(l){return ligneCmd(l,"commandee")}).join("")+"</table>";
+      else{var gr={},ord=[];f.commandees.forEach(function(l){var k=l.commandeId||0;if(!gr[k]){gr[k]=[];ord.push(k)}gr[k].push(l)});
+        ord.forEach(function(k){var ls=gr[k];h+="<div class='card' style='margin:6px 0'><div><span class='tag'>"+(k?cmdNum(k):"Commande")+"</span> <span class='muted'>"+ls.length+" produit"+(ls.length>1?"s":"")+"</span></div>"+suiviHtml(ls[0])+"<table class='devis' style='width:100%'><tr><th>Produit</th><th class='n'>Qté</th><th></th></tr>"+ls.map(function(l){return ligneCmd(l,"commandee-g")}).join("")+"</table></div>"})}
+      h+="<div class='actions'><button data-act='recOpen' data-id='"+f.id+"'>Réceptionner (scan)</button><button class='sec' data-act='cmdRecevoirTout' data-id='"+f.id+"'>Tout réceptionner</button></div>"}
     if(f.recues.length)h+="<div class='step' style='margin-top:12px'>Reçu cette semaine</div><table class='devis' style='width:100%'>"+f.recues.map(function(l){return ligneCmd(l,"recue")}).join("")+"</table>"
     if(f.recues.length)h+=ecHtml(f);
     h+="</div>"});
@@ -57,6 +67,9 @@ ACTS.fMail=function(b){cmdRun(api("/achats/fournisseur/modifier",{id:+b.dataset.
 ACTS.cmdLigne=function(b){var id=+b.dataset.id;cmdRun(api("/achats/ligne",{fournisseurId:id,libelle:v("cl-"+id),quantite:v("cq-"+id)}))};
 ACTS.cmdDel=function(b){cmdRun(api("/achats/ligne/supprimer",{id:+b.dataset.id}))};
 ACTS.cmdPasser=function(b){if(!confirm("Marquer ce panier comme commandé ? (pense à l'avoir envoyé au fournisseur)"))return;cmdRun(api("/achats/commander",{fournisseurId:+b.dataset.id}))};
+ACTS.fMode=function(b){var f=trouveF(+b.dataset.id);cmdRun(api("/achats/fournisseur/modifier",{id:+b.dataset.id,mode:f&&f.mode==="unitaire"?"groupe":"unitaire"}))};
+ACTS.cmdRatt=function(b){var s=document.getElementById("rt-"+b.dataset.id);if(!s||!s.value){alert("Choisis une prise en charge.");return}cmdRun(api("/achats/ligne/rattacher",{id:+b.dataset.id,repairId:+s.value}))};
+ACTS.cmdDetach=function(b){cmdRun(api("/achats/ligne/rattacher",{id:+b.dataset.id,repairId:null}))};
 ACTS.cmdSuivi=function(b){var i=document.getElementById("sv-"+b.dataset.id);api("/achats/ligne/suivi",{id:+b.dataset.id,suivi:i?i.value:""}).then(function(){btnFlash(b,"✓");CMD=null;render()}).catch(function(e){alert(e.message)})};
 ACTS.cmdRecevoir=function(b){cmdRun(api("/achats/recevoir",{id:+b.dataset.id}))};
 ACTS.cmdRecevoirTout=function(b){var f=trouveF(+b.dataset.id);if(!f)return;cmdRun(api("/achats/recevoir",{ids:f.commandees.map(function(l){return l.id})}))};

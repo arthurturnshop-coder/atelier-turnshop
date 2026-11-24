@@ -11,8 +11,8 @@ const vers = (r: any) => ({ reparationId: r.reparation_id ?? null, tel: r.teleph
 await sql`ALTER TABLE taches ADD COLUMN IF NOT EXISTS ligne_id INT`;
 // Commande pas arrivée depuis plus d'une semaine : une tâche « vérifier la commande » (une à la fois par ligne, renouvelée chaque semaine).
 async function genererCommandesEnRetard() {
-  const rows = (await sql`SELECT l.id, l.libelle, l.suivi, l.reparation_id, f.nom AS fournisseur, trim(c.prenom || ' ' || c.nom) AS client
-    FROM commande_lignes l JOIN fournisseurs f ON f.id = l.fournisseur_id LEFT JOIN reparations r ON r.id = l.reparation_id LEFT JOIN clients c ON c.id = r.client_id
+  const rows = (await sql`SELECT l.id, l.libelle, COALESCE(l.suivi, co.suivi) AS suivi, l.reparation_id, f.nom AS fournisseur, trim(c.prenom || ' ' || c.nom) AS client
+    FROM commande_lignes l JOIN fournisseurs f ON f.id = l.fournisseur_id LEFT JOIN commandes co ON co.id = l.commande_id LEFT JOIN reparations r ON r.id = l.reparation_id LEFT JOIN clients c ON c.id = r.client_id
     WHERE l.statut = 'commandee' AND l.commandee_le < now() - interval '7 days' AND (l.relance_le IS NULL OR l.relance_le < now() - interval '7 days')
       AND NOT EXISTS (SELECT 1 FROM taches k WHERE k.ligne_id = l.id AND k.fait = false)`) as any[];
   const auj = await AUJ();
