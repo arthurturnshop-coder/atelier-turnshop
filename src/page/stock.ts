@@ -15,11 +15,12 @@ function vStock(){
   h+="<div class='card'><div class='head'><div class='step'>Stock "+esc(STK.magasin||"")+" : "+STK.nb+" produit"+(STK.nb>1?"s":"")+" en stock"+(STK.valeurAchatHtCents?" · valeur d'achat HT "+eur(STK.valeurAchatHtCents):"")+"</div><input id='stq' class='lb' placeholder='Chercher (nom, code, emplacement)' value='"+esc(STQ)+"'></div>";
   if(!STK.produits.length)h+="<div class='muted'>Aucun produit.</div>";
   else h+="<table class='devis' style='width:100%'><tr><th>Produit</th><th>Empl.</th><th class='n'>Achat HT</th><th class='n'>Vente</th><th class='n'>Qté</th><th class='n'>Min</th><th></th></tr>"+STK.produits.map(function(p){
+    if(p.id===STEDIT)return stEditRow(p);
     return"<tr><td>"+esc(p.nom)+"<div class='muted'>"+esc(p.code)+"</div>"+(p.codes||[]).map(function(x){return"<div class='muted'>"+esc(x.code)+(x.fournisseur?" ("+esc(x.fournisseur)+")":"")+(x.denomination?" - "+esc(x.denomination):"")+" <button class='link' data-act='stCodeRet' data-id='"+p.id+"' data-c='"+esc(x.code)+"'>retirer</button></div>"}).join("")+"</td><td>"+esc(p.emplacement||"-")+"</td><td class='n'>"+(p.achatHtCents==null?"-":eur(p.achatHtCents))+"</td><td class='n'>"+eur(p.prixCents)+"</td>"
       +"<td class='n'><button class='sec' data-act='stDelta' data-id='"+p.id+"' data-d='-1'>-</button> <b>"+p.qte+"</b> <button class='sec' data-act='stDelta' data-id='"+p.id+"' data-d='1'>+</button></td>"
       +"<td class='n'>"+(p.min?(p.qte<p.min?"<span class='tag warn'>"+p.min+"</span>":p.min):"-")+"</td><td class='n'><button class='link' data-act='stEtq' data-id='"+p.id+"'>Étiquette</button> <button class='link' data-act='stCodeAdd' data-id='"+p.id+"'>+ Code</button> <button class='link' data-act='stFus' data-id='"+p.id+"'>Fusionner</button> <button class='link' data-act='stEdit' data-id='"+p.id+"'>Modifier</button> <button class='link' data-act='stDel' data-id='"+p.id+"'>Retirer</button></td></tr>"}).join("")+"</table>";
   app.innerHTML=h+"</div>";
-  if(!STQ)stFocus("sk")}
+  if(STEDIT){stFocus("e_nom")}else if(!STQ)stFocus("sk")}
 function stProd(id){return(STK&&STK.produits||[]).filter(function(p){return p.id===id})[0]}
 function stRun(p,msg){return p.then(function(d){STMSG=(d&&d.message)||msg||"";STK=null;render()}).catch(function(e){STMSG=e.message;render()})}
 ACTS.stSub=function(b){STSUB=b.dataset.s;STMSG="";STAP=null;render()};
@@ -33,13 +34,20 @@ ACTS.stSearch=function(){STQ=v("stq");api("/stock?magasin="+encodeURIComponent(M
 ACTS.stDelta=function(b){stRun(api("/stock/maj",{id:+b.dataset.id,delta:+b.dataset.d}),"")};
 ACTS.stDel=function(b){var p=stProd(+b.dataset.id);if(p&&confirm("Retirer "+p.nom+" du stock ? (récupérable en le rescannant)"))stRun(api("/stock/archiver",{id:p.id}))};
 ACTS.stEtq=function(b){var p=stProd(+b.dataset.id);if(!p)return;ETQ.push({empl:p.emplacement||"",titre:p.nom,prix:(p.prixCents/100).toFixed(2),barcode:p.code,sku:"",qte:Math.max(1,p.qte)});btnFlash(b,"✓ Ajoutée");toastOk("Étiquette ajoutée au panier d étiquettes ("+ETQ.length+")")};
-ACTS.stEdit=function(b){var p=stProd(+b.dataset.id);if(!p)return;
-  var n=prompt("Nom",p.nom);if(n===null)return;
-  var pv=prompt("Prix de vente TTC",(p.prixCents/100).toFixed(2));if(pv===null)return;
-  var a=prompt("Prix d'achat HT (vide = inconnu)",p.achatHtCents==null?"":(p.achatHtCents/100).toFixed(2));if(a===null)return;
-  var l=prompt("Emplacement",p.emplacement);if(l===null)return;
-  var mn=prompt("Stock minimum (0 = pas de suggestion de commande)",p.min||0);if(mn===null)return;
-  stRun(api("/stock/maj",{id:p.id,nom:n,prix:pv,achat:a,emplacement:l,min:mn}))};
+var STEDIT=0;
+function stEditRow(p){
+  return"<tr class='editrow'><td><input id='e_nom' class='lb' style='width:100%' value='"+esc(p.nom)+"' placeholder='Nom'><div class='muted'>"+esc(p.code)+"</div></td>"
+    +"<td><input id='e_l' class='q' style='width:70px' value='"+esc(p.emplacement||"")+"' placeholder='Empl.'></td>"
+    +"<td class='n'><input id='e_a' class='p' style='width:80px' value='"+(p.achatHtCents==null?"":(p.achatHtCents/100).toFixed(2))+"' placeholder='Achat HT'></td>"
+    +"<td class='n'><input id='e_p' class='p' style='width:80px' value='"+(p.prixCents/100).toFixed(2)+"' placeholder='Vente'></td>"
+    +"<td class='n'><b>"+p.qte+"</b></td>"
+    +"<td class='n'><input id='e_m' class='q' type='number' min='0' style='width:60px' value='"+(p.min||0)+"' title='Stock minimum'></td>"
+    +"<td class='n'><button data-act='stEditOk' data-id='"+p.id+"'>Valider</button> <button class='sec' data-act='stEditNo'>Annuler</button></td></tr>"}
+ACTS.stEdit=function(b){STEDIT=+b.dataset.id;render()};
+ACTS.stEditNo=function(){STEDIT=0;render()};
+ACTS.stEditOk=function(b){var p=stProd(+b.dataset.id);if(!p)return;
+  STEDIT=0;stRun(api("/stock/maj",{id:p.id,nom:v("e_nom"),prix:v("e_p"),achat:v("e_a"),emplacement:v("e_l"),min:v("e_m")||0}),"✓ Modifié")};
+document.addEventListener("keydown",function(e){if(!STEDIT||!e.target||!e.target.id||e.target.id.indexOf("e_")!==0)return;if(e.key==="Enter"){e.preventDefault();var ok=document.querySelector("[data-act='stEditOk']");if(ok)ok.click()}else if(e.key==="Escape"){STEDIT=0;render()}});
 ACTS.stCodeAdd=function(b){var p=stProd(+b.dataset.id);if(!p)return;
   var c=prompt("Scanne le code-barres de l autre grossiste pour : "+p.nom);if(!c)return;
   var f=prompt("Grossiste (facultatif, ex : Ewheel)","");if(f===null)f="";
