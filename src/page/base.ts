@@ -3,7 +3,7 @@ var LG={step:"mag"};
 var CUR=null,RES=[],SEARCHED=false,TAB="accueil",MSG="";
 var CONS=null,CHIF=null,EDITCONS=false,NEWCLI=false,ADDT=false,RECEP=null,EDITCLI=false,FID=null,FIDLOAD=null;
 var ST=["reçu","diagnostic","devis envoyé","en attente de pièce","en réparation","prêt","récupéré"];
-var TABS=[["accueil","Dashboard"],["enc","Atelier"],["cmd","Commandes"],["stock","Stock"],["etq","Étiquettes"],["cli","Client"],["compta","Compta"]];
+var TABS=[["accueil","Dashboard"],["enc","Atelier"],["cmd","Commandes"],["stock","Stock"],["etq","Étiquettes"],["cli","Client"],["process","Process"],["compta","Compta"]];
 var CLAB={upsell:"Upsell du jour",offre:"Offre du moment",fidelite:"Avantages de la carte fidélité",autre:"Autre consigne"};
 var RACC="",ATSUB="liste",VUE="tout",LST=null,FICHE=null,PJOUR="",PMAG="",PLAN=null,PMSG="",PSEQ=0,DRAG=null,PSEL=null,PPEND=null;
 var app=document.getElementById("app"),nav=document.getElementById("nav");
@@ -57,7 +57,7 @@ function render0(){
   renderWho();
   if(!TOK&&!PW){vLogin();return}
   nav.innerHTML=TABS.filter(function(t){return (t[0]!=="param"||ROLE==="admin")&&(t[0]!=="compta"||ROLE==="admin")}).map(function(t){return"<button data-act='tab' data-tab='"+t[0]+"'"+(TAB===t[0]?" class='on'":"")+">"+t[1]+"</button>"}).join("");
-  ({accueil:vAccueil,enc:vEnc,cmd:vCmd,stock:vStock,etq:vEtq,param:vParam,stats:vStats,compta:vCompta,retours:vRetours,chat:vChat,cli:function(){CLV.ventes=CLV.ventes;vClient();clCharge()}})[TAB]();viewSave();if(typeof chatBadge==="function")chatBadge()}
+  ({accueil:vAccueil,enc:vEnc,cmd:vCmd,stock:vStock,etq:vEtq,param:vParam,stats:vStats,compta:vCompta,retours:vRetours,chat:vChat,process:vProcess,cli:function(){CLV.ventes=CLV.ventes;vClient();clCharge()}})[TAB]();viewSave();if(typeof chatBadge==="function")chatBadge()}
 
 // Bips de scan : aigu et court = OK, grave et long = code inconnu
 var AUDIOCTX=null;

@@ -26,6 +26,7 @@ import "./routes/garantie";
 import "./routes/sav";
 import "./routes/chat";
 import "./routes/defi";
+import "./routes/process";
 import "./routes/stats";
 import "./routes/commandes";
 import "./routes/acomptes";
