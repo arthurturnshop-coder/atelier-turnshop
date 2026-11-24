@@ -376,7 +376,7 @@ const gs1Ok = (c: string) => {
   return (10 - (t % 10)) % 10 === Number(c[c.length - 1]);
 };
 // Travail de fond : on lit tout le catalogue, puis on écrit les codes par produit, avec réessais. Une seule exécution à la fois.
-type EtatCodes = { enCours: boolean; phase: string; lus: number; aFaire: number; faits: number; doublons: number; sansCode: number; erreurs: number; derniereErreur: string; fini: boolean };
+type EtatCodes = { enCours: boolean; phase: string; lus: number; aFaire: number; faits: number; doublons: number; sansCode: number; erreurs: number; derniereErreur: string; droits?: string; fini: boolean };
 let ETAT_CODES: EtatCodes = { enCours: false, phase: "", lus: 0, aFaire: 0, faits: 0, doublons: 0, sansCode: 0, erreurs: 0, derniereErreur: "", fini: false };
 const attendre = (ms: number) => new Promise((r) => setTimeout(r, ms));
 async function avecReessais<T>(f: () => Promise<T>): Promise<T> {
@@ -420,7 +420,15 @@ async function importerCodesFournisseurs() {
         const errs = r?.productVariantsBulkUpdate?.userErrors || [];
         if (errs.length) { E.erreurs += variants.length; E.derniereErreur = String(errs[0].message).slice(0, 200); }
         else E.faits += variants.length;
-      } catch (e: any) { E.erreurs += variants.length; E.derniereErreur = String(e?.message ?? e).slice(0, 200); }
+      } catch (e: any) {
+        E.erreurs += variants.length; E.derniereErreur = String(e?.message ?? e).slice(0, 200);
+        if (!E.droits && E.derniereErreur.includes("Access denied")) {
+          try {
+            const d: any = await shopifyRead(`{ currentAppInstallation { app { title } accessScopes { handle } } }`, {});
+            E.droits = "App « " + d.currentAppInstallation.app.title + " » : " + d.currentAppInstallation.accessScopes.map((x: any) => x.handle).join(", ");
+          } catch { E.droits = "(droits de l'app illisibles)"; }
+        }
+      }
       await attendre(120);
     }
     E.phase = "Terminé";

@@ -109,7 +109,7 @@ ACTS.stAssocie=async function(x,force){
     STMSG=d.message;STAS="";render()}catch(err){alert(err.message)}};
 ACTS.stCodesFourn=function(){
   if(!confirm("Copier les vrais codes-barres Ewheel dans Shopify pour tous les produits qui n en ont pas ? Ca tourne en arriere-plan : tu peux laisser la page ouverte."))return;
-  function aff(d){STMSG=(d.enCours?"⏳ ":"")+d.phase+" · lus "+d.lus+" · a ecrire "+d.aFaire+" · ecrits "+d.faits+(d.erreurs?" · erreurs "+d.erreurs+(d.derniereErreur?" ("+d.derniereErreur+")":""):"")+(d.fini?" · doublons ignores "+d.doublons+" · sans code fournisseur "+d.sansCode:"");render()}
+  function aff(d){STMSG=(d.enCours?"⏳ ":"")+d.phase+" · lus "+d.lus+" · a ecrire "+d.aFaire+" · ecrits "+d.faits+(d.erreurs?" · erreurs "+d.erreurs+(d.derniereErreur?" ("+d.derniereErreur+")":""):"")+(d.droits?" · DROITS ACTUELS DE L APP : "+d.droits:"")+(d.fini?" · doublons ignores "+d.doublons+" · sans code fournisseur "+d.sansCode:"");render()}
   function suite(){api("/stock/codes-fournisseurs").then(function(d){aff(d);if(d.enCours)setTimeout(suite,2500)}).catch(function(e){STMSG=e.message;render()})}
   api("/stock/codes-fournisseurs",{}).then(function(d){aff(d);if(d.enCours)setTimeout(suite,2500)}).catch(function(e){STMSG=e.message;render()})};
 ACTS.stCodesShopify=function(){
