@@ -25,6 +25,7 @@ import "./routes/retours";
 import "./routes/garantie";
 import "./routes/sav";
 import "./routes/chat";
+import "./routes/defi";
 import "./routes/stats";
 import "./routes/commandes";
 import "./routes/acomptes";
