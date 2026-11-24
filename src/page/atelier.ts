@@ -47,7 +47,7 @@ function dvEnvHtml(f){
   L.slice(0,3).forEach(function(e,i){
     var d=new Date(e.envoyeLe).toLocaleDateString("fr-FR");
     h+="<div class='muted'>Devis du "+d+" ("+eur(e.totalCents)+") : <b>"+(libs[e.statut]||esc(e.statut))+"</b>"+(e.commentaire?" · « "+esc(e.commentaire)+" »":"")+(e.relanceLe?" · relancé":"")
-      +(i===0&&(e.statut==="envoye"||e.statut==="accepte")?" <a href='"+esc(e.url)+"' target='_blank'>Voir la page client</a> <button class='sec' data-act='dvCopier' data-url='"+esc(e.url)+"'>Copier le lien</button>":"")+"</div>"});
+      +(i===0&&(e.statut==="envoye"||e.statut==="accepte")?" <button class='sec' data-act='dvCopier' data-url='"+esc(e.url)+"'>Copier le lien</button>":"")+"</div>"});
   return h}
 function devisHtml(f){
   var d=f.devis,mo=d.lignes.filter(function(l){return l.type==="main_oeuvre"}),pi=d.lignes.filter(function(l){return l.type==="piece"});
