@@ -119,7 +119,9 @@ function vParam(){
   S.maitres=h;
   var SEC=[['maitres','Produit maître','Un nom pour plusieurs produits, affiché sur le devis'],['garantie','Garanties fournisseur','Délai de relance dans la to-do'],['fid','Carte de fidélité et cadeaux','Règle des points, cadeaux et offres'],['brevo','Emails et rappels automatiques','Avis Google, rappel de RDV, pièce arrivée (Brevo)'],['todo','To-do récurrente','Tâches qui reviennent toutes seules'],['modeles','Modèles de trottinettes et pièces','Pneus et pièces compatibles par modèle'],['presta','Prestations et remises','Tarifs du devis et remise plusieurs prestations'],['shopify','Connexion Shopify','Test de connexion, commandes Shopify à la facturation'],['ticket','Ticket de caisse','En-tête et liens des avis Google'],['compta','Comptabilité et export','Comptes, analytique, journal des ventes (CSV)']];
   if(!PSEC){
-    app.innerHTML="<div class='card'><div class='step'>Paramètres</div>"+SEC.map(function(x){return"<button class='sec hrow' data-act='parSec' data-s='"+x[0]+"'><b>"+x[1]+"</b><br><span class='muted'>"+x[2]+"</span></button>"}).join("")+"</div>";return}
+    var POLES=[["Atelier",["presta","modeles","garantie"]],["Caisse et clients",["ticket","fid","compta"]],["Stock et catalogue",["maitres","shopify"]],["Automatisations",["brevo","todo"]]],hp="";
+    POLES.forEach(function(P){hp+="<div class='card'><div class='step'>"+P[0]+"</div>"+P[1].map(function(k){var x=SEC.filter(function(y){return y[0]===k})[0];return x?"<button class='sec hrow' data-act='parSec' data-s='"+x[0]+"'><b>"+x[1]+"</b><br><span class='muted'>"+x[2]+"</span></button>":""}).join("")+"</div>"});
+    app.innerHTML=hp;return}
   var cur=SEC.filter(function(x){return x[0]===PSEC})[0];
   app.innerHTML="<button class='sec' data-act='parBack' style='max-width:260px'>← Paramètres</button><div class='step' style='margin:10px 0'>"+(cur?cur[1]:"")+"</div>"+(S[PSEC]||"<div class='card'>Chargement…</div>")}
 `;
