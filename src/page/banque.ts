@@ -1,5 +1,5 @@
 export const BANQUE = `// ---------- Compta > Banque : relevé bancaire classé par mois, catégorie et magasin ----------
-var BQ={sens:"debit",syn:null,ops:null,mois:"",aClasser:false,msg:"",busy:false};
+var BQ={det:false,sens:"debit",syn:null,ops:null,mois:"",aClasser:false,msg:"",busy:false};
 var COMPSUB="z";
 function bqCharge(){
   api("/banque/synthese?sens="+BQ.sens).then(function(d){BQ.syn=d;if(TAB==="compta")render()}).catch(function(e){BQ.msg=e.message;BQ.syn={mois:[],aClasser:0};if(TAB==="compta")render()})}
@@ -14,6 +14,13 @@ function bqTable(m){
   h+="<tr><td><b>Total</b></td><td class='n'><b>"+eur(t[0])+"</b></td><td class='n'><b>"+eur(t[1])+"</b></td><td class='n'><b>"+eur(t[2])+"</b></td><td class='n'><b>"+eur(t[0]+t[1]+t[2])+"</b></td></tr></table>"
     +"<div class='actions'><button class='sec' data-act='bqVoir' data-m='"+esc(m.mois)+"'>Voir et classer les opérations</button></div></div>";
   return h}
+function bqResume(m,deb){
+  var h="<div class='card'><div class='step'>"+esc(bqMoisLib(m.mois))+"</div><div style='display:flex;gap:10px;flex-wrap:wrap;margin:6px 0'>"
+    +"<div style='flex:1;min-width:140px;background:#f4f6f8;border-radius:10px;padding:10px'><div class='muted'>"+(deb?"Dépenses":"Encaissé")+"</div><b style='font-size:20px;white-space:nowrap'>"+eur(m.total)+"</b></div>"
+    +"<div style='flex:1;min-width:140px;background:#eaf6ee;border-radius:10px;padding:10px'><div class='muted'>"+(deb?"TVA récupérable (estim.)":"TVA collectée (estim.)")+"</div><b style='font-size:20px;white-space:nowrap'>"+eur(m.tva)+"</b></div></div>";
+  m.lignes.slice(0,8).forEach(function(l){var t=l.amiens+l.rouen+l.commun,p=m.total?Math.round(t*100/m.total):0;
+    h+="<div style='margin:5px 0'><div style='display:flex;justify-content:space-between;font-size:13px'><span>"+esc(l.categorie)+"</span><b>"+eur(t)+" <span class='muted'>"+p+"%</span></b></div><div style='height:6px;background:#eee;border-radius:3px'><div style='height:6px;width:"+p+"%;background:#2f6fd0;border-radius:3px'></div></div></div>"});
+  return h+"</div>"}
 function bqOpsHtml(){
   if(!BQ.ops)return"";
   var o=BQ.ops,h="<div class='card'><div class='step'>"+(BQ.aClasser?"Opérations à classer":"Opérations de "+esc(bqMoisLib(BQ.mois)))+"</div>"
@@ -32,9 +39,11 @@ function vBanque(){
     +(BQ.msg?"<div class='muted' style='margin-top:6px'>"+esc(BQ.msg)+"</div>":"")
     +(s.aClasser>0?"<div style='margin-top:8px'><button class='sec' data-act='bqClasser'>⚠ "+s.aClasser+" opération(s) à classer</button></div>":"")+"</div>";
   if(!s.mois.length)h+="<div class='card muted'>Aucun relevé importé. Importe un CSV (date; libellé; débit; crédit).</div>";
-  s.mois.forEach(function(m){h+=bqTable(m)});
+  s.mois.forEach(function(m){h+=bqResume(m,BQ.sens==="debit")});
+  if(s.mois.length){h+="<div class='card'><div class='muted'>TVA estimée à 20 % sur "+(BQ.sens==="debit"?"achats, logiciels, télécom et fournitures":"les encaissements de ventes")+" (montants TTC ÷ 6). À confirmer avec le comptable.</div><button class='sec' data-act='bqDet' style='margin-top:6px'>"+(BQ.det?"Masquer":"Voir")+" le détail par magasin</button></div>";if(BQ.det)s.mois.forEach(function(m){h+=bqTable(m)})}
   return h+bqOpsHtml()}
 ACTS.compSub=function(b){COMPSUB=b.dataset.v;render()};
+ACTS.bqDet=function(){BQ.det=!BQ.det;render()};
 ACTS.bqSens=function(b){BQ.sens=b.dataset.s;BQ.syn=null;render()};
 ACTS.bqVoir=function(b){BQ.mois=b.dataset.m;BQ.aClasser=false;BQ.ops=null;bqOps()};
 ACTS.bqClasser=function(){BQ.aClasser=true;BQ.ops=null;bqOps()};

@@ -133,7 +133,12 @@ app.get("/api/banque/synthese", async (c) => {
   const [{ n: aClasser }] = (await sql`SELECT count(*)::int AS n FROM banque_ops WHERE categorie = 'À classer'`) as any[];
   const mois: Record<string, Record<string, Record<string, number>>> = {};
   for (const r of rows) { ((mois[r.mois] ??= {})[r.categorie] ??= {})[r.magasin] = r.n; }
-  return c.json({ sens, aClasser, mois: Object.keys(mois).sort().reverse().map((m) => ({ mois: m, lignes: Object.entries(mois[m]).map(([categorie, v]) => ({ categorie, amiens: v.Amiens ?? 0, rouen: v.Rouen ?? 0, commun: v.Commun ?? 0 })).sort((a, b) => (b.amiens + b.rouen + b.commun) - (a.amiens + a.rouen + a.commun)) })) });
+  // TVA estimée : montants TTC à 20 % sur les catégories concernées (estimation, à confirmer avec le comptable).
+  const avecTva = sens === "debit" ? /achats|logiciels|télécom|fournitures/i : /encaissements|ventes|dépôts|chèques|virements reçus/i;
+  return c.json({ sens, aClasser, mois: Object.keys(mois).sort().reverse().map((m) => {
+    const lignes = Object.entries(mois[m]).map(([categorie, v]) => { const total = (v.Amiens ?? 0) + (v.Rouen ?? 0) + (v.Commun ?? 0); return { categorie, amiens: v.Amiens ?? 0, rouen: v.Rouen ?? 0, commun: v.Commun ?? 0, tva: avecTva.test(categorie) ? Math.round(total / 6) : 0 }; }).sort((a, b) => (b.amiens + b.rouen + b.commun) - (a.amiens + a.rouen + a.commun));
+    return { mois: m, total: lignes.reduce((t, l) => t + l.amiens + l.rouen + l.commun, 0), tva: lignes.reduce((t, l) => t + l.tva, 0), lignes };
+  }) });
 });
 
 app.post("/api/banque/classer", async (c) => {
