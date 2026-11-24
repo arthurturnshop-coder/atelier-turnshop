@@ -74,7 +74,7 @@ export async function creerCommandeShopify(venteId: number): Promise<{ ok: boole
     const order = construireCommande(v, client, rep, lignes, paiements);
     const data = await shopifyMutate(
       `mutation($order: OrderCreateOrderInput!, $options: OrderCreateOptionsInput) { orderCreate(order: $order, options: $options) { order { id name customer { id } } userErrors { field message } } }`,
-      { order, options: { inventoryBehaviour: "DECREMENT_IGNORING_POLICY", sendReceipt: !!String(client?.email ?? "").trim(), sendFulfillmentReceipt: false } },
+      { order, options: { inventoryBehaviour: "DECREMENT_IGNORING_POLICY", sendReceipt: !!rep && !!String(client?.email ?? "").trim(), sendFulfillmentReceipt: false } },
     );
     const res = data?.orderCreate;
     if (res?.userErrors?.length) throw new Error(res.userErrors.map((e: any) => e.message).join(" · "));
