@@ -52,8 +52,8 @@ await sql`INSERT INTO parametres (cle, valeur) VALUES ('fidelite_euros_pour_pali
 await sql`CREATE TABLE IF NOT EXISTS utilisateurs (id SERIAL PRIMARY KEY, prenom TEXT UNIQUE NOT NULL, role TEXT NOT NULL CHECK (role IN ('admin', 'responsable', 'technicien')), magasins TEXT NOT NULL, mdp_hash TEXT NULL, actif BOOLEAN DEFAULT true)`;
 await sql`CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, utilisateur_id INT, magasin TEXT, cree_le TIMESTAMPTZ DEFAULT now())`;
 export const PROFILS_INITIAUX: [string, string, string][] = [
-  ["Arthur", "admin", "Amiens,Rouen"],
-  ["Antoine", "admin", "Amiens,Rouen"],
+  ["Arthur", "admin", "Amiens"],
+  ["Antoine", "admin", "Rouen"],
   ["Nico", "responsable", "Amiens"],
   ["Liam", "responsable", "Rouen"],
   ["Jonathan", "technicien", "Rouen"],
@@ -61,6 +61,9 @@ export const PROFILS_INITIAUX: [string, string, string][] = [
 for (const [prenom, role, magasins] of PROFILS_INITIAUX) {
   await sql`INSERT INTO utilisateurs (prenom, role, magasins) VALUES (${prenom}, ${role}, ${magasins}) ON CONFLICT (prenom) DO NOTHING`;
 }
+// Un profil par magasin pour les admins (Arthur = Amiens, Antoine = Rouen). Ne s'applique qu'à l'ancienne valeur « Amiens,Rouen ».
+await sql`UPDATE utilisateurs SET magasins = 'Amiens' WHERE prenom = 'Arthur' AND magasins = 'Amiens,Rouen'`;
+await sql`UPDATE utilisateurs SET magasins = 'Rouen' WHERE prenom = 'Antoine' AND magasins = 'Amiens,Rouen'`;
 await sql`ALTER TABLE devis_lignes ADD COLUMN IF NOT EXISTS barcode TEXT, ADD COLUMN IF NOT EXISTS marque TEXT`;
 await sql`ALTER TABLE commande_lignes ADD COLUMN IF NOT EXISTS barcode TEXT`;
 await sql`CREATE TABLE IF NOT EXISTS taches (id SERIAL PRIMARY KEY, texte TEXT NOT NULL, echeance DATE, epingle BOOLEAN NOT NULL DEFAULT false, priorite BOOLEAN NOT NULL DEFAULT false, fait BOOLEAN NOT NULL DEFAULT false, fait_le TIMESTAMPTZ, fait_par TEXT, cree_par TEXT, cree_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
