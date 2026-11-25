@@ -146,13 +146,14 @@ function EWB(){
     };
     next();
   };
-  if(navigator.clipboard&&navigator.clipboard.readText){navigator.clipboard.readText().then(run,function(){run(prompt("Colle la commande copiée depuis FS :"))})}else{run(prompt("Colle la commande copiée depuis FS :"))}
+  if(location.hash.indexOf("#fs=")===0){var hx=decodeURIComponent(location.hash.slice(4));history.replaceState(null,"",location.pathname);run(hx)}else if(navigator.clipboard&&navigator.clipboard.readText){navigator.clipboard.readText().then(run,function(){run(prompt("Colle la commande copiée depuis FS :"))})}else{run(prompt("Colle la commande copiée depuis FS :"))}
 }
 function ewLien(){return "javascript:("+encodeURIComponent(EWB.toString())+")()"}
 ACTS.cmdEwCopy=function(b){var f=trouveF(+b.dataset.id);if(!f)return;
   var t=f.panier.filter(function(l){return l.sku}).map(function(l){return l.sku+"\t"+l.quantite}).join("\\n");
   var sans=f.panier.filter(function(l){return !l.sku}).length;
-  if(navigator.clipboard)navigator.clipboard.writeText(t).then(function(){CMDMSG="Copié. Sur le site du fournisseur, clique sur le favori Remplir panier."+(sans?" "+sans+" ligne(s) sans référence à ajouter à la main.":"");render()},function(){alert(t)});else alert(t)};
+  var w=null;if(t&&/ewheel/i.test(f.nom))w=window.open("https://ewheel.es/cart#fs="+encodeURIComponent(t),"_blank");
+  if(navigator.clipboard)navigator.clipboard.writeText(t).then(function(){CMDMSG=(w?"eWheel ouvert. Clique sur le favori Remplir panier dans cet onglet.":"Copié. Sur le site du fournisseur, clique sur le favori Remplir panier.")+" "+(sans?" "+sans+" ligne(s) sans référence à ajouter à la main.":"");render()},function(){alert(t)});else alert(t)};
 ACTS.cmdCsv=function(b){var f=trouveF(+b.dataset.id);if(!f)return;
   var blob=new Blob([csvCommande(f)],{type:"text/csv"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="commande-"+f.nom.replace(/[^a-z0-9]+/gi,"-")+".csv";document.body.appendChild(a);a.click();a.remove()};
 document.addEventListener("change",function(e){var t=e.target;if(!t||!t.dataset||t.dataset.act!=="cmdQte")return;api("/achats/ligne/maj",{id:+t.dataset.id,quantite:t.value}).then(function(){CMD=null;CMDMSG="";}).catch(function(err){CMDMSG=err.message})});
