@@ -2,25 +2,38 @@ export const CREATION = `// ---------- Création directe : prise en charge / ren
 var CRE={mode:"prise",q:"",res:null,cli:null,msg:"",busy:false};
 function creTitre(){return CRE.mode==="devis"?"Nouveau devis":(CRE.mode==="rdv"?"Nouveau rendez-vous":"Nouvelle prise en charge")}
 function vCreer(){
-  var m=CRE.mode,h=subHtml()+"<div class='card'><div class='step'>"+creTitre()+(m==="devis"?" (un numéro PC est attribué, les lignes se saisissent ensuite)":"")+"</div>";
+  var m=CRE.mode,h=subHtml()+"<div style='margin-top:12px'><div class='step' style='font-size:20px'>"+creTitre()+"</div>"+(m==="devis"?"<div class='cre-hint'>Un numéro PC est attribué, les lignes se saisissent ensuite.</div>":"")+"</div>";
   if(CRE.msg)h+="<div class='pmsg'>"+esc(CRE.msg)+"</div>";
-  h+="<div class='lab'>1. Client</div>";
+  h+="<div class='cre'>";
+  // 1. Client
+  h+="<div class='cre-sec'><div class='cre-h'><span class='cre-n'>1</span>Client</div>";
   if(CRE.cli){
-    h+="<div class='tk' style='border-left-color:var(--vert)'><b>"+esc(CRE.cli.name)+"</b> <span class='muted'>"+esc((CRE.cli.phone||CRE.cli.telephone||""))+" "+esc(CRE.cli.email||"")+"</span> <button class='link' data-act='creAutreCli'>Changer</button></div>"}
+    h+="<div class='tk' style='border-left-color:var(--vert);margin:0'><b>"+esc(CRE.cli.name)+"</b><br><span class='muted'>"+esc((CRE.cli.phone||CRE.cli.telephone||""))+" "+esc(CRE.cli.email||"")+"</span><br><button class='link' data-act='creAutreCli'>Changer de client</button></div>"}
   else{
     h+="<div class='dl'><input id='cre-q' class='lb' placeholder='Chercher un client (nom, téléphone, email)' value='"+esc(CRE.q)+"'><button data-act='creChercher'>Chercher</button></div>";
-    if(CRE.res)h+=(CRE.res.length?CRE.res.map(function(c,i){return"<button class='sec hrow' data-act='creChoisir' data-i='"+i+"'><b>"+esc(c.name)+"</b> <span class='muted'>"+esc((c.phone||c.telephone||""))+" "+esc(c.email||"")+"</span></button>"}).join(""):"<div class='muted'>Aucun client trouvé : remplis le nouveau client ci-dessous.</div>");
-    h+="<div class='muted' style='margin-top:8px'>Ou nouveau client :</div><div class='dl'><input id='cn-pn' placeholder='Prénom'><input id='cn-nm' placeholder='Nom'><input id='cn-tel' placeholder='Téléphone'><input id='cn-em' placeholder='Email'></div>"}
-  h+="<div class='lab'>2. Trottinette</div>";
+    if(CRE.res)h+=(CRE.res.length?CRE.res.map(function(c,i){return"<button class='sec hrow' data-act='creChoisir' data-i='"+i+"'><b>"+esc(c.name)+"</b> <span class='muted'>"+esc((c.phone||c.telephone||""))+" "+esc(c.email||"")+"</span></button>"}).join(""):"<div class='muted' style='margin-bottom:8px'>Aucun client trouvé : remplis le nouveau client ci-dessous.</div>");
+    h+="<div class='cre-hint' style='margin:8px 0'>Ou nouveau client :</div><div class='cre-2'><input id='cn-pn' placeholder='Prénom'><input id='cn-nm' placeholder='Nom'><input id='cn-tel' placeholder='Téléphone'><input id='cn-em' placeholder='Email'></div>"}
+  h+="</div>";
+  // 2. Trottinette
+  h+="<div class='cre-sec'><div class='cre-h'><span class='cre-n'>2</span>Trottinette</div>";
   var ts=(CRE.cli&&CRE.cli.trottinettes)||[];
   if(ts.length)h+="<select id='ct-sel'>"+ts.map(function(t){return"<option value='"+t.id+"'>"+esc(t.marque+" "+t.modele)+(t.serie?" · "+esc(t.serie):"")+"</option>"}).join("")+"<option value='new'>Autre trottinette…</option></select>";
-  h+="<div class='dl' id='ct-new'"+(ts.length?" style='display:none'":"")+"><input id='ct-m' placeholder='Marque'><input id='ct-mo' placeholder='Modèle'><input id='ct-s' placeholder='N° de série (vide = inconnu)'></div>";
-  h+="<div class='lab'>3. "+(m==="devis"?"Objet du devis":"Panne décrite par le client")+"</div><textarea id='cr-p' rows='3' placeholder='"+(m==="devis"?"Ex : devis changement de batterie":"Panne décrite par le client")+"'></textarea>"
-    +"<input id='cr-e' placeholder='État à l arrivée'><textarea id='cr-r' rows='2' placeholder='Remarques'></textarea>"+boiteSelect("cr-b")+affairesBox("cr")+"<input id='cr-k' placeholder='🔑 Code / mot de passe de la trottinette (facultatif)'><input id='cr-d' type='date' value='"+today()+"'>"
-    +"<label class='muted' style='display:flex;gap:8px;align-items:center'><input id='cr-abs' type='checkbox' style='width:auto;margin:0'"+(m!=="prise"?" checked":"")+"> La trottinette n'est pas encore en magasin</label>"
-    +"<label class='muted' style='display:flex;gap:8px;align-items:center'><input id='cr-gar' type='checkbox' style='width:auto;margin:0'> Sous garantie</label>"
-    +(m==="prise"?"<label class='muted' style='display:flex;gap:8px;align-items:center'><input id='cr-pec' type='checkbox' checked style='width:auto;margin:0'> Imprimer le ticket de prise en charge "+pecNbSelect("cr")+"</label>":"")
-    +"<div class='actions'><button data-act='creOk'"+(CRE.busy?" disabled":"")+">"+(m==="devis"?"Créer le devis":(m==="rdv"?"Créer le rendez-vous":"Créer la prise en charge"))+"</button><button class='sec' data-act='creAnnule'>Annuler</button></div></div>";
+  h+="<div id='ct-new'"+(ts.length?" style='display:none'":"")+"><div class='cre-2'><input id='ct-m' placeholder='Marque'><input id='ct-mo' placeholder='Modèle'></div><input id='ct-s' placeholder='N° de série (vide = inconnu)' style='margin-top:10px'></div>";
+  h+="</div>";
+  // 3. Panne
+  h+="<div class='cre-sec cre-full'><div class='cre-h'><span class='cre-n'>3</span>"+(m==="devis"?"Objet du devis":"Panne décrite par le client")+"</div>"
+    +"<textarea id='cr-p' rows='3' placeholder='"+(m==="devis"?"Ex : devis changement de batterie":"Panne décrite par le client")+"'></textarea>"
+    +"<div class='cre-2'><input id='cr-e' placeholder='État à l arrivée'><textarea id='cr-r' rows='1' placeholder='Remarques' style='min-height:46px'></textarea></div></div>";
+  // 4. Rangement et affaires
+  h+="<div class='cre-sec'><div class='cre-h'><span class='cre-n'>4</span>Rangement et affaires</div>"+boiteSelect("cr-b")+affairesBox("cr")+"<div class='cre-2' style='margin-top:10px'><input id='cr-k' placeholder='🔑 Code / mot de passe (facultatif)'><input id='cr-d' type='date' value='"+today()+"'></div></div>";
+  // 5. Options
+  h+="<div class='cre-sec'><div class='cre-h'><span class='cre-n'>5</span>Options</div><div class='cre-chips'>"
+    +"<label><input id='cr-abs' type='checkbox'"+(m!=="prise"?" checked":"")+"> Pas encore en magasin (rendez-vous)</label>"
+    +"<label><input id='cr-gar' type='checkbox'> Sous garantie</label>"
+    +(m==="prise"?"<label><input id='cr-pec' type='checkbox' checked> Imprimer le ticket</label>":"")+"</div>"
+    +(m==="prise"?"<div style='display:flex;align-items:center;gap:10px'><span class='muted'>Nombre de tickets</span>"+pecNbSelect("cr")+"</div>":"")+"</div>";
+  h+="</div>";
+  h+="<div class='cre-bar'><button data-act='creOk'"+(CRE.busy?" disabled":"")+" style='min-width:260px'>"+(m==="devis"?"Créer le devis":(m==="rdv"?"Créer le rendez-vous":"Créer la prise en charge"))+"</button><button class='sec' data-act='creAnnule'>Annuler</button></div>";
   app.innerHTML=h}
 ACTS.creer=function(b){CRE={mode:b.dataset.k,q:"",res:null,cli:null,msg:"",busy:false};FICHE=null;TAB="enc";ATSUB="creer";render();setTimeout(function(){var e=document.getElementById("cre-q");if(e)e.focus()},50)};
 ACTS.creAnnule=function(){ATSUB="liste";render()};

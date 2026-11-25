@@ -199,6 +199,7 @@ button.link{padding:4px 0}
 .actions,.sub,.vues,.stbtns,.prow,.avis .row{gap:8px;flex-wrap:wrap}
 .actions button,.sub button,.vues button,.stbtns button,.avis .row button{flex:0 0 auto}
 .pecnb,.prow select{width:auto;min-height:42px;margin:0;padding:10px 12px;font-size:15px;font-weight:600;letter-spacing:.03em;background:#fff;color:var(--vert2);border:1px solid var(--vert);cursor:pointer}.pecnb:hover,.pecnb:focus,.prow select:hover,.prow select:focus{outline:1px solid #111;outline-offset:2px}
+.cre{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start;margin-top:12px}.cre-sec{background:#fff;border:1px solid #d9dfda;border-top:3px solid var(--vert);padding:18px 20px}.cre-full{grid-column:1/-1}.cre-h{display:flex;align-items:center;gap:10px;font-weight:800;font-size:16px;letter-spacing:.02em;margin:0 0 12px;color:var(--vert2)}.cre-n{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;background:var(--vert);color:#fff;font-size:14px}.cre-sec input,.cre-sec textarea,.cre-sec select{margin:0 0 10px}.cre-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.cre-2 input{margin:0}.cre-chips{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 8px}.cre-chips label,.cre-sec .actions label{display:inline-flex!important;align-items:center;gap:8px;border:1px solid #cfd8d2;background:#f6f8f6;padding:9px 14px;cursor:pointer;font-weight:600;color:#26332b}.cre-chips label:has(input:checked),.cre-sec .actions label:has(input:checked){background:var(--vert);border-color:var(--vert);color:#fff}.cre-chips input,.cre-sec .actions label input{width:auto!important;margin:0!important;accent-color:#fff}.cre-hint{font-size:13px;color:#667;margin:4px 0 0}.cre-bar{position:sticky;bottom:0;background:#fff;border-top:1px solid #d9dfda;padding:12px 16px;margin:16px -4px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap;z-index:5}.cre-bar button{margin:0}@media(max-width:900px){.cre{grid-template-columns:1fr}.cre-2{grid-template-columns:1fr}}
 .search{max-width:none;margin:0 0 10px}
 .search button,.newbtn button{width:auto}
 .newbtn{max-width:none;margin:8px 0}
@@ -228,4 +229,5 @@ a.btn{display:inline-block;background:#111;color:#fff;text-decoration:none;paddi
 nav{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}nav::-webkit-scrollbar{display:none}nav button{padding:14px 18px;white-space:nowrap}
 @media(max-width:1100px){nav button{padding:12px 11px;font-size:13px;letter-spacing:.03em}}
 </style></head><body><header><span>FS <small style='font-weight:400;font-size:14px;opacity:.9'>by TURN Shop</small></span><div id="rech" class="rech" style="display:none"><input id="rq" type="search" placeholder="Chercher : n° PC, client, modèle, produit..." autocomplete="off"><div id="rpanel" class="rpanel" style="display:none"></div></div><span id="who"></span></header><nav id="nav"></nav><main id="app">Chargement…</main>
-<script>`;
+<script>
+`;
