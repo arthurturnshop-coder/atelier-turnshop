@@ -1,10 +1,11 @@
 export const STOCK = `// ---------- Stock maison + inventaire par emplacement ----------
-var STAS="",STK=null,STMSG="",STSUB="liste",STQ="",STLIEU="",STINV={lieu:"",cur:"",scans:[],noms:{},info:{},alerte:null,ok:""},STAP=null;
+var CASI=null,STAS="",STK=null,STMSG="",STSUB="liste",STQ="",STLIEU="",STINV={lieu:"",cur:"",scans:[],noms:{},info:{},alerte:null,ok:""},STAP=null;
 function stPanneau(){return/^[A-Z]+$/.test(STINV.lieu)}
 function stSuiv(c,d){var m=String(c).match(/^([A-Z]+)([0-9]+)$/);if(!m)return c;var n=Math.max(1,Number(m[2])+d);return m[1]+n}
 function stFocus(id){setTimeout(function(){var e=document.getElementById(id);if(e)e.focus()},30)}
 function vStock(){
-  var h="<div class='pmsg'>"+esc(STMSG)+"</div><div class='actions'><button class='"+(STSUB==="liste"?"":"sec")+"' data-act='stSub' data-s='liste'>Stock</button><button class='"+(STSUB==="inv"?"":"sec")+"' data-act='stSub' data-s='inv'>Inventaire d'un emplacement</button></div>";
+  var h="<div class='pmsg'>"+esc(STMSG)+"</div><div class='actions'><button class='"+(STSUB==="liste"?"":"sec")+"' data-act='stSub' data-s='liste'>Stock</button><button class='"+(STSUB==="inv"?"":"sec")+"' data-act='stSub' data-s='inv'>Inventaire d'un emplacement</button><button class='"+(STSUB==="cas"?"":"sec")+"' data-act='stSub' data-s='cas'>Mes casiers</button></div>";
+  if(STSUB==="cas"){app.innerHTML=h+vCasiers();return}
   if(STSUB==="inv"){app.innerHTML=h+vInv();stFocus(STINV.lieu?"iscan":"ilieu");return}
   if(!STK){app.innerHTML=h+"<div class='card'>Chargement…</div>";api("/stock?magasin="+encodeURIComponent(MAG||"")).then(function(d){STK=d;render()}).catch(function(e){STMSG=e.message;STK={produits:[],lieux:[],nb:0,valeurAchatHtCents:0};render()});return}
   h+="<div class='card'><div class='step'>Ajout rapide</div><div class='muted'>Scanne l'EAN-13 (ou laisse vide : un EAN-13 interne commençant par 200 est créé, à étiqueter), tape le nom et le prix, Entrée. Si le code existe déjà, la quantité s'ajoute.</div>"
@@ -23,7 +24,7 @@ function vStock(){
   if(STEDIT){stFocus("e_nom")}else if(!STQ)stFocus("sk")}
 function stProd(id){return(STK&&STK.produits||[]).filter(function(p){return p.id===id})[0]}
 function stRun(p,msg){return p.then(function(d){STMSG=(d&&d.message)||msg||"";STK=null;render()}).catch(function(e){STMSG=e.message;render()})}
-ACTS.stSub=function(b){STSUB=b.dataset.s;STMSG="";STAP=null;render()};
+ACTS.stSub=function(b){STSUB=b.dataset.s;CASI=null;STMSG="";STAP=null;render()};
 ACTS.stAdd=function(){
   stRun(api("/stock/rapide",{magasin:MAG||"",code:v("sk"),nom:v("sn"),prix:v("sp"),achat:v("sa"),qte:v("sq")||1,min:v("sm"),emplacement:v("sl")}).then(function(d){STLIEU=v("sl")||STLIEU;return d}));
   };
@@ -144,4 +145,21 @@ ACTS.stCodesShopify=function(){
   if(!confirm("Donner un code-barres EAN-13 a tous les produits Shopify qui n en ont pas ? (ecrit dans Shopify, 100 produits a la fois)"))return;
   STMSG="Creation des codes-barres Shopify...";render();
   api("/stock/codes-shopify",{}).then(function(d){STMSG=d.faits+" produit(s) Shopify codes. "+(d.restant?"Il en reste "+d.restant+" : clique encore.":"Tout est fait.");render()}).catch(function(e){STMSG=e.message;render()})};
+
+function vCasiers(){
+  if(!CASI){api("/casiers").then(function(d){CASI=d.casiers;render()}).catch(function(e){STMSG=e.message;CASI=[];render()});return"<div class='card'>Chargement…</div>"}
+  var occ=CASI.filter(function(x){return!x.libre}).length;
+  var h="<div class='card'><div class='step'>Mes casiers</div><div class='muted'>"+occ+" occupé"+(occ>1?"s":"")+" sur "+CASI.length+" · clique une carte pour ouvrir la prise en charge</div><div class='actions'><button class='sec' data-act='casiRef'>Actualiser</button></div></div>";
+  h+="<div style='display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px'>";
+  CASI.forEach(function(x){
+    var b="<div class='card' style='margin:0"+(x.libre?";opacity:.55":"")+"'><div style='display:flex;justify-content:space-between;align-items:center'><b style='font-size:20px'>"+esc(x.nom)+"</b>"+(x.libre?"<span class='tag'>Libre</span>":"<span class='tag warn'>Occupé</span>")+"</div>";
+    if(!x.libre){
+      b+="<div style='margin-top:6px'><button class='link' data-act='casiOpen' data-id='"+x.repairId+"'><b>"+esc(x.numero)+"</b> · "+esc(x.client)+"</button></div>";
+      if(x.materiel)b+="<div class='muted'>Matériel rangé"+(x.statut?" · "+esc(x.statut):"")+(x.magasin?" · "+esc(x.magasin):"")+"</div>"+(x.panne?"<div class='muted'>"+esc(x.panne).slice(0,90)+"</div>":"");
+      if(x.pieces.length)b+="<div style='margin-top:6px'><div class='muted'>Pièces rattachées :</div>"+x.pieces.map(function(p){return"<div>• "+esc(p.libelle)+(p.quantite>1?" x"+p.quantite:"")+"</div>"}).join("")+"</div>";
+    }
+    h+=b+"</div>"});
+  return h+"</div>"}
+ACTS.casiRef=function(){CASI=null;render()};
+ACTS.casiOpen=function(b){ouvrirFiche(Number(b.dataset.id))};
 `;

@@ -254,6 +254,22 @@ app.post("/api/reparations/avis", async (c) => {
   return c.json({ message: "Pas de demande d'avis pour cette réparation." });
 });
 
+// Vue « Mes casiers » : chaque boîte avec sa prise en charge (matériel) et les pièces rangées dedans.
+app.get("/api/casiers", async (c) => {
+  const pcs = (await sql`SELECT r.id, r.boite, r.statut, r.panne, r.magasin, cl.prenom, cl.nom, cl.telephone FROM reparations r JOIN clients cl ON cl.id = r.client_id WHERE r.boite IS NOT NULL AND r.boite <> '' AND r.supprime_le IS NULL AND r.statut <> 'récupéré'`) as any[];
+  const pieces = (await sql`SELECT l.id, l.libelle, l.quantite, l.boite, l.recue_le, l.reparation_id, cl.prenom, cl.nom FROM commande_lignes l JOIN reparations r ON r.id = l.reparation_id JOIN clients cl ON cl.id = r.client_id WHERE l.boite IS NOT NULL AND l.boite <> '' AND l.remise_le IS NULL`) as any[];
+  const pn = (id: number) => "PC-" + String(id).padStart(4, "0");
+  const noms = [...new Set([...BOITES, ...pcs.map((r) => r.boite), ...pieces.map((l) => l.boite)])];
+  return c.json({ casiers: noms.map((nom) => {
+    const r = pcs.find((x) => x.boite === nom);
+    const ps = pieces.filter((l) => l.boite === nom);
+    const autre = ps.find((l) => !r || l.reparation_id !== r.id);
+    const pcId = r?.id ?? autre?.reparation_id ?? null;
+    const cli = r ? `${r.prenom} ${r.nom}`.trim() : autre ? `${autre.prenom} ${autre.nom}`.trim() : "";
+    return { nom, libre: !r && !ps.length, repairId: pcId, numero: pcId ? pn(pcId) : "", client: cli, telephone: r?.telephone ?? "", statut: r?.statut ?? "", panne: r?.panne ?? "", materiel: !!r, magasin: r?.magasin ?? "", pieces: ps.map((l) => ({ id: l.id, libelle: l.libelle, quantite: l.quantite, recueLe: l.recue_le, numero: pn(l.reparation_id) })) };
+  }) });
+});
+
 // Boîtes de rangement du matériel (C1 à C8) : libre ou occupée par quelle prise en charge.
 app.get("/api/boites", async (c) => {
   const rows = (await sql`SELECT r.id, r.boite, c.prenom, c.nom FROM reparations r JOIN clients c ON c.id = r.client_id WHERE r.boite IS NOT NULL AND r.boite <> '' AND r.supprime_le IS NULL AND r.statut <> 'récupéré'`) as any[];
