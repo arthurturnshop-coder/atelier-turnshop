@@ -48,9 +48,9 @@ function savHisto(r){
     else{ev.push([d.le,"🛠 Garantie ouverte : "+esc(d.libelle)+m,d.par]);
       if(d.demandeLe)ev.push([d.demandeLe,"🛠 Garantie : demande faite au fournisseur ("+esc(d.libelle)+")",""]);
       if(d.statut==="termine")ev.push([d.closeLe,"🛠 Garantie terminée ("+esc(d.libelle)+") : "+(d.issue==="piece_recue"?"pièce reçue":d.issue==="rembourse_fournisseur"?"remboursée par le fournisseur":d.issue==="refus"?"refusée":"clôturée"),d.closePar])}});
-  if(!ev.length)return"";
+  if(!ev.length)return"<div class='card' style='margin:0'><b>Historique</b><div class='muted'>Aucun mouvement sur cette vente.</div></div>";
   ev.sort(function(a,b){return new Date(a[0])-new Date(b[0])});
-  return"<hr><div class='rm'><b>Historique</b></div>"+ev.map(function(e){return"<div style='font-size:12px;margin-top:4px'>"+esc(dateLongue(e[0]))+(e[2]?" · "+esc(e[2]):"")+"<br>"+e[1]+"</div>"}).join("")}
+  return"<div class='card' style='margin:0'><b>Historique</b>"+ev.map(function(e){return"<div style='font-size:14px;margin-top:8px;border-top:1px solid #e3e3e3;padding-top:6px'><span class='muted'>"+esc(dateLongue(e[0]))+(e[2]?" · "+esc(e[2]):"")+"</span><br>"+e[1]+"</div>"}).join("")+"</div>"}
 function recuHtml(r){
   var ttc=r.totalCents,ht=Math.round(ttc/1.2),tva=ttc-ht,t=r.ticket||{};
   var es=entSplit(t.entete),ent=es.haut,ri=RDVI||{};
@@ -69,7 +69,6 @@ function recuHtml(r){
     +"<div class='rl rm'><span>Total HT</span><span>"+eur(ht)+"</span></div><div class='rl rm'><span>TVA 20 %</span><span>"+eur(tva)+"</span></div><hr>";
   if(acd)h+="<div class='rl'><span>Acompte déjà versé</span><span>-"+eur(acd)+"</span></div><div class='rl'><span>Reste payé aujourd'hui</span><span>"+eur(r.totalCents)+"</span></div>";
   r.paiements.forEach(function(p){h+="<div class='rl'><span>Payé en "+esc((MOY[p.moyen]||p.moyen).toLowerCase())+"</span><span>"+eur(p.cents)+"</span></div>"});
-  h+=savHisto(r);
   if(ri.siteQrSvg||ri.avisQrAmiens||ri.avisQrRouen)h+=factureQr(ri);
   else if(t.qrSvg)h+="<hr><div class='rc'><b>Laissez-nous un avis</b><br>et recevez une récompense !</div><div class='qr'>"+t.qrSvg+"</div>";
   return h+entBas(es,"Merci de votre visite !")+"</div>"}
@@ -88,7 +87,7 @@ function shopHtml(r){
 var VJ=null,VJOPEN=0,SAVF=null;
 function recuBloc(r){
   var bt="style='margin:0;width:100%;white-space:nowrap'";
-  return"<div style='display:flex;gap:16px;justify-content:center;align-items:flex-start;flex-wrap:wrap'>"+recuHtml(r)
+  return"<div style='display:flex;gap:16px;justify-content:center;align-items:flex-start;flex-wrap:wrap'><div style='flex:0 1 340px;min-width:240px'>"+savHisto(r)+"</div>"+recuHtml(r)
     +"<div style='display:flex;flex-direction:column;gap:8px;min-width:210px;flex:0 1 380px'><button class='sec' "+bt+" data-act='cPrint' data-id='"+r.id+"'>Imprimer le reçu</button><button class='sec' "+bt+" data-act='cEmail' data-id='"+r.id+"'>✉ Envoyer par email</button>"
     +(estResp()?"<button class='sec' "+bt+" data-act='svOpen' data-m='remb' data-id='"+r.id+"'>↩ Rembourser</button>":"")
     +"<button class='sec' "+bt+" data-act='svOpen' data-m='ech' data-id='"+r.id+"'>🔁 Échanger / bon d achat</button><button class='sec' "+bt+" data-act='svOpen' data-m='gar' data-id='"+r.id+"'>🛠 Garantie pièce</button>"+savForm(r)+"</div></div>"}
