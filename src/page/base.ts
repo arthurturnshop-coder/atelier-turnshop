@@ -22,7 +22,8 @@ function actActif(){return ACT&&ACT.until>Date.now()}
 function actLock(){ACT=null;if(typeof renderWho==="function")renderWho()}
 async function api(path,body){
   var h={"Content-Type":"application/json"};if(TOK)h["x-atelier-token"]=TOK;else h["x-atelier-password"]=PW;
-  if(body!==undefined&&path!=="/acteur"&&(TOK||PW)){
+  if(body!==undefined&&path!=="/acteur"&&(TOK||PW)&&body.mdpCaissier&&/^[0-9]{3}$/.test(String(body.mdpCaissier))){h["x-atelier-code"]=String(body.mdpCaissier)}
+  else if(body!==undefined&&path!=="/acteur"&&(TOK||PW)){
     if(!actActif()){var kd=await demandeCode("Qui fait cette action ?");if(!kd)throw new Error("Action annulée : code non saisi.");
       var rq=await fetch("/api/acteur",{method:"POST",headers:{"Content-Type":"application/json","x-atelier-token":TOK||"","x-atelier-password":TOK?"":PW,"x-atelier-code":kd},body:"{}"});
       var rd=await rq.json().catch(function(){return{}});if(!rq.ok)throw new Error(rd.error||"Code refusé.");
