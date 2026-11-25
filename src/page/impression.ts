@@ -284,7 +284,7 @@ document.addEventListener("input",function(e){
 
 // ----- Étiquettes produits : nom, prix, code-barres -----
 var ETQ=[],ETQF=null,ETQSKIP=0;
-var ETQFORMATS={"50x30":{l:"Rouleau 50 × 30 mm",w:50,h:30},"40x25":{l:"Rouleau 40 × 25 mm",w:40,h:25},"62x29":{l:"Ruban Brother 62 × 40 mm",w:62,h:40},"a4":{l:"Planche A4 3 × 8 (70 × 37 mm)",w:70,h:37,page:"A4",cols:3,rows:8},"papier":{l:"Emplacements papier A4 2 × 4 (105 × 70 mm)",w:105,h:70,page:"A4",cols:2,rows:4}};
+var ETQFORMATS={"50x30":{l:"Rouleau 50 × 30 mm",w:50,h:30},"40x25":{l:"Rouleau 40 × 25 mm",w:40,h:25},"62x29":{l:"Ruban Brother 62 × 40 mm",w:62,h:40},"a4":{l:"Planche A4 3 × 8 (70 × 37 mm)",w:70,h:37,page:"A4",cols:3,rows:8},"papier":{l:"Emplacements papier A4 2 × 4 (105 × 68 mm)",w:105,h:68,mt:12,page:"A4",cols:2,rows:4}};
 function etqFormat(){
   if(!ETQF){try{ETQF=localStorage.getItem("etqf")||""}catch(e){ETQF=""}}
   if(!ETQFORMATS[ETQF])ETQF="62x29";return ETQF}
@@ -314,7 +314,7 @@ function etqLabel(it,F){
     +"</div></div>"}
 function etqToutes(){var out=[];ETQ.forEach(function(it){for(var i=0;i<(it.qte||1);i++)out.push(it)});return out}
 function etqCss(F){
-  if(F.page)return"@page{size:A4;margin:0}@media print{body>*:not(#impzone){display:none!important}#impzone{position:absolute;left:0;top:0;width:210mm}.etqgrid{display:grid;grid-template-columns:repeat("+F.cols+","+F.w+"mm);grid-auto-rows:"+F.h+"mm;margin-left:0;margin-top:5mm}.etqempty{width:"+F.w+"mm;height:"+F.h+"mm}}";
+  if(F.page)return"@page{size:A4;margin:0}@media print{body>*:not(#impzone){display:none!important}#impzone{position:absolute;left:0;top:0;width:210mm}.etqgrid{display:grid;grid-template-columns:repeat("+F.cols+","+F.w+"mm);grid-auto-rows:"+F.h+"mm;margin-left:0;margin-top:"+(F.mt!==undefined?F.mt:5)+"mm}.etqempty{width:"+F.w+"mm;height:"+F.h+"mm}}";
   return"@page{size:"+F.w+"mm "+F.h+"mm;margin:0}@media print{body>*:not(#impzone){display:none!important}#impzone{position:absolute;left:0;top:0;width:"+F.w+"mm}.etq{break-after:page;page-break-after:always}.etq:last-child{break-after:auto;page-break-after:auto}}"}
 function etqImprimer(items,fkey){
   var key=fkey||etqFormat(),F=ETQFORMATS[key],L=items||etqToutes();
