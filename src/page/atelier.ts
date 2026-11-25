@@ -80,7 +80,7 @@ function prPopHtml(l){
   var n=Object.keys(PRPOP.sel).length;
   return"<div class='prpop' data-act='prFond'><div class='prbox'><div class='step'>Toutes les prestations</div><input id='pr-q' placeholder='Rechercher une prestation…' autocomplete='off'><div class='prlist'>"
     +PRFAM.map(function(F,fi){var L=l.filter(function(x){return prFam(x.nom)===fi});if(!L.length)return"";
-      return"<div class='prfam' style='color:"+F[1]+";border-color:"+F[1]+"'>"+F[0]+"</div>"+L.map(function(x){var on=PRPOP.sel[x.id];return"<button class='prrow"+(on?" on":"")+"' style='border-left:5px solid "+F[1]+";"+(on?"":"background:"+F[2])+"' data-act='prTog' data-id='"+x.id+"' data-n='"+esc(x.nom.toLowerCase())+"' data-f='"+fi+"'><span>"+(on?"✓ ":"")+esc(x.nom)+"</span><span class='muted'>"+eur(x.prixCents)+(x.avecPiece?" + "+esc(x.pieceAide||"pièce"):"")+"</span></button>"}).join("")}).join("")
+      return"<div class='prfam' style='color:"+F[1]+";border-color:"+F[1]+"'>"+F[0]+"</div>"+L.map(function(x){var on=PRPOP.sel[x.id];return"<button class='prrow"+(on?" on":"")+"' style='border:3px solid "+F[1]+";"+(on?"background:"+F[1]+";color:#fff":"background:"+F[2])+"' data-act='prTog' data-id='"+x.id+"' data-n='"+esc(x.nom.toLowerCase())+"' data-f='"+fi+"'><span>"+(on?"✓ ":"")+esc(x.nom)+"</span><span class='muted'>"+eur(x.prixCents)+(x.avecPiece?" + "+esc(x.pieceAide||"pièce"):"")+"</span></button>"}).join("")}).join("")
     +"</div><div class='actions'><button data-act='prAjoute'"+(n?"":" disabled")+">Ajouter la sélection ("+n+")</button><button class='sec' data-act='prFerme'>Fermer</button></div></div></div>"}
 function prestaBox(f){
   prestaLoad();
