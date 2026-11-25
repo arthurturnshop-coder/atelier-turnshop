@@ -168,7 +168,7 @@ function cloTotaux(t){
   return h}
 var CNT=[[50000,"Billet 500 €"],[20000,"Billet 200 €"],[10000,"Billet 100 €"],[5000,"Billet 50 €"],[2000,"Billet 20 €"],[1000,"Billet 10 €"],[500,"Billet 5 €"],[200,"Pièce 2 €"],[100,"Pièce 1 €"],[50,"Pièce 50 c"],[20,"Pièce 20 c"],[10,"Pièce 10 c"],[5,"Pièce 5 c"],[2,"Pièce 2 c"],[1,"Pièce 1 c"]];
 function cntHtml(cible){
-  return"<details class='card' style='margin:8px 0'><summary style='cursor:pointer;font-weight:700'>🧮 Compter par billets et pièces</summary><div class='muted'>Tape le nombre de chaque billet ou pièce : le total se met tout seul dans le montant.</div>"
+  return"<details open class='card' style='margin:8px 0'><summary style='cursor:pointer;font-weight:700'>🧮 Compter par billets et pièces</summary><div class='muted'>Tape le nombre de chaque billet ou pièce : le total se met tout seul dans le montant.</div>"
     +"<div style='display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:8px'>"
     +CNT.map(function(x){return"<label class='muted' style='display:flex;flex-direction:column;gap:2px'>"+x[1]+"<input type='number' min='0' step='1' inputmode='numeric' placeholder='0' data-cnt='"+cible+"' data-c='"+x[0]+"' style='margin:0'></label>"}).join("")
     +"</div><div style='margin-top:8px'>Total compté : <b id='cnt-tot-"+cible+"'>0,00 €</b></div></details>"}
@@ -204,8 +204,8 @@ function cloHist(){
 function cloHtml(){
   var blq=caisseBloquee();
   if(!CLO.open&&!blq)return"<div class='actions' style='margin-top:12px'><button class='sec' data-act='cloOuvre'>Caisse : ouvrir / clôturer</button></div>";
-  var d=CLO.d;if(!d)return"<div class='card'>Chargement...</div>";
-  var h="<div class='card'><div class='step'>Caisse · "+esc(d.magasin)+"</div>";
+  var d=CLO.d;if(!d)return"<div class='card' id='clo-card'>Chargement...</div>";
+  var h="<div class='card' id='clo-card'><div class='step'>Caisse · "+esc(d.magasin)+"</div>";
   if(d.ouverte){
     var o=d.ouverte,att=o.fondCents+d.live.especesNettes;
     if(o.perimee)h+="<div class='card' style='border:2px solid #b00'><b style='color:#b00'>La caisse du "+esc(o.jour.split("-").reverse().join("/"))+" n est pas fermée.</b><div class='muted'>Compte le tiroir et ferme-la : impossible d ouvrir la caisse du jour ou d encaisser tant que ce n est pas fait.</div></div>";
@@ -232,9 +232,16 @@ function vCompta(){
   var sub="<div class='actions'><button class='"+(COMPSUB==="z"?"":"sec")+"' data-act='compSub' data-v='z'>Caisse (tickets Z)</button><button class='"+(COMPSUB==="banque"?"":"sec")+"' data-act='compSub' data-v='banque'>Banque</button></div>";
   if(COMPSUB==="banque"){app.innerHTML="<div class='caisse'><h3>Compta · banque</h3>"+sub+vBanque()+"</div>";return}
   app.innerHTML="<div class='caisse'><h3>Compta · tickets Z et encaissements</h3>"+sub+(CLO.msg?"<div class='muted'>"+esc(CLO.msg)+"</div>":"")+cloHist()+"</div>"}
-function cloCharge(){return api("/caisse/session").then(function(d){CLO.d=d;render()}).catch(function(e){CLO.msg=e.message;render()})}
+function cloCharge(){return api("/caisse/session").then(function(d){CLO.d=d;render();if(CLO.scroll){CLO.scroll=false;cloVa()}}).catch(function(e){CLO.msg=e.message;render()})}
 function cloHistCharge(){if(!estResp())return;api("/caisse/cloture-historique?periode="+CLO.per).then(function(h){var y=window.scrollY;CLO.h=h;render();window.scrollTo(0,y)}).catch(function(e){CLO.msg=e.message;render()})}
-ACTS.cloOuvre=function(){CLO={open:true,d:null,h:null,per:CLO.per||"30j",msg:"",aj:null};render();cloCharge();cloHistCharge()};
+function cloVa(){var e=document.getElementById("clo-card");if(e)e.scrollIntoView({block:"start"});var i=document.querySelector("input[data-cnt='clo-compte']");if(i)i.focus({preventScroll:true})}
+ACTS.cloOuvre=function(){CLO={open:true,d:null,h:null,per:CLO.per||"30j",msg:"",aj:null,scroll:true};render();cloVa();cloCharge();cloHistCharge()};
+document.addEventListener("keydown",function(e){
+  var t=e.target;if(e.key!=="Enter"||!t||!t.dataset||!t.dataset.cnt)return;
+  e.preventDefault();
+  var L=Array.prototype.slice.call(document.querySelectorAll("input[data-cnt='"+t.dataset.cnt+"']")),i=L.indexOf(t);
+  if(i>=0&&i<L.length-1){L[i+1].focus();L[i+1].select()}
+  else{var n=document.getElementById("clo-note");if(n)n.focus()}});
 ACTS.cloFerme=function(){CLO={open:false,d:CLO.d,h:null,per:CLO.per,msg:"",aj:null};render()};
 ACTS.cloPer=function(b){CLO.per=b.dataset.v;var y=window.scrollY;render();window.scrollTo(0,y);cloHistCharge()};
 ACTS.cloOuvrir=function(){
