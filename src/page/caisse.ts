@@ -73,6 +73,14 @@ function shopHtml(r){
   if(s.nom)return"<div class='muted'>Commande Shopify "+esc(s.nom)+" créée (visible sur le compte du client).</div>";
   return"<div class='muted'>"+(s.erreur?"Pas partie vers Shopify : "+esc(s.erreur):"Pas envoyée à Shopify.")+"</div><div class='actions'><button class='sec' data-act='cShopRetry' data-id='"+r.id+"'>Envoyer vers Shopify</button></div>"}
 var VJ=null,VJOPEN=0,SAVF=null;
+function savTags(r){
+  var a=r.sav||[];if(!a.length)return"";
+  var remb=0,ech=0,gar=[];a.forEach(function(d){if(d.type==="remboursement")remb+=d.montantCents;else if(d.type==="echange")ech+=d.montantCents;else gar.push(d)});
+  var t=[];
+  if(remb)t.push(remb>=r.totalCents?"↩ Remboursé":"↩ Partiellement remboursé ("+eur(remb)+")");
+  if(ech)t.push("🔁 Échangé / bon d'achat ("+eur(ech)+")");
+  gar.forEach(function(d){t.push("🛠 Garantie : "+esc(d.libelle)+" · "+(d.statut==="a_traiter"?"à traiter":d.statut==="demande_faite"?"demande faite au fournisseur":d.issue==="piece_recue"?"pièce reçue":d.issue==="rembourse_fournisseur"?"remboursée par le fournisseur":d.issue==="refus"?"refusée":"terminée"))});
+  return t.map(function(x){return"<span class='tag' style='margin-left:6px'>"+x+"</span>"}).join("")}
 function savForm(r){
   var f=SAVF;if(!f||f.vid!==r.id)return"";
   var opts=r.lignes.map(function(l,i){return"<option value='"+i+"'>"+esc(l.quantite+" x "+l.libelle)+" : "+eur(l.prixCents*l.quantite)+"</option>"}).join("");
@@ -94,7 +102,7 @@ function vjHtml(){
   if(!VJ.length)h+="<div class='muted'>Aucune vente aujourd hui.</div>";
   VJ.forEach(function(r){
     var res=r.lignes.slice(0,3).map(function(l){return esc(l.libelle)}).join(", ")+(r.lignes.length>3?"…":"");
-    h+="<div style='display:flex;gap:8px;align-items:stretch;margin-top:6px'><button class='sec hrow' style='flex:1;margin:0' data-act='cVjRecu' data-id='"+r.id+"'><b>"+esc(dateLongue(r.date))+"</b> · "+eur(r.totalCents)+" · "+esc(r.client||"sans client")+(r.numero?" · "+esc(r.numero):"")+"<br><span class='muted'>"+res+"</span></button>"+(r.clientId?"<button class='sec' style='margin:0;font-size:22px;padding:0 16px' title='Ouvrir le profil de "+esc(r.client||"ce client")+"' data-act='cVjClient' data-cid='"+r.clientId+"'>👤</button>":"")+"</div>";
+    h+="<div style='display:flex;gap:8px;align-items:stretch;margin-top:6px'><button class='sec hrow' style='flex:1;margin:0' data-act='cVjRecu' data-id='"+r.id+"'><b>"+esc(dateLongue(r.date))+"</b> · "+eur(r.totalCents)+" · "+esc(r.client||"sans client")+(r.numero?" · "+esc(r.numero):"")+savTags(r)+"<br><span class='muted'>"+res+"</span></button>"+(r.clientId?"<button class='sec' style='margin:0;font-size:22px;padding:0 16px' title='Ouvrir le profil de "+esc(r.client||"ce client")+"' data-act='cVjClient' data-cid='"+r.clientId+"'>👤</button>":"")+"</div>";
     if(VJOPEN===r.id)h+=recuHtml(r)+"<div class='actions'><button class='sec' data-act='cPrint' data-id='"+r.id+"'>Imprimer le reçu</button><button class='sec' data-act='cEmail' data-id='"+r.id+"'>✉ Envoyer par email</button></div><div class='actions'>"+(estResp()?"<button class='sec' data-act='svOpen' data-m='remb' data-id='"+r.id+"'>↩ Rembourser</button>":"")+"<button class='sec' data-act='svOpen' data-m='ech' data-id='"+r.id+"'>🔁 Échanger</button><button class='sec' data-act='svOpen' data-m='gar' data-id='"+r.id+"'>🛠 Garantie pièce</button></div>"+savForm(r)});
   return h+"<div class='actions'><button data-act='cVjFerme'>Fermer</button></div></div>"}
 function histoHtml(){
@@ -103,7 +111,7 @@ function histoHtml(){
   if(!CHIST.length)h+="<div class='muted'>Aucun achat en caisse pour le moment.</div>";
   CHIST.forEach(function(r){
     var res=r.lignes.slice(0,2).map(function(l){return esc(l.libelle)}).join(", ")+(r.lignes.length>2?"…":"");
-    h+="<button class='sec hrow' data-act='cRecu' data-id='"+r.id+"'><b>"+esc(dateLongue(r.date))+"</b> · "+eur(r.totalCents)+(CCLI?"":" · "+esc(r.client||"sans client"))+"<br><span class='muted'>"+res+"</span></button>";
+    h+="<button class='sec hrow' data-act='cRecu' data-id='"+r.id+"'><b>"+esc(dateLongue(r.date))+"</b> · "+eur(r.totalCents)+(CCLI?"":" · "+esc(r.client||"sans client"))+savTags(r)+"<br><span class='muted'>"+res+"</span></button>";
     if(CHOPEN===r.id)h+=recuHtml(r)+shopHtml(r)+"<div class='actions'><button class='sec' data-act='cPrint' data-id='"+r.id+"'>Imprimer le reçu</button><button class='sec' data-act='cEmail' data-id='"+r.id+"'>✉ Envoyer par email</button></div>"});
   return h+"</div>"}
 function caisseHtml(){
