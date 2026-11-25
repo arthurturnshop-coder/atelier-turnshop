@@ -11,22 +11,25 @@ function blocConsignes(){
   return T+(ROLE==="admin"?"<button class='sec cons-e' data-act='editCons'>Modifier</button>":"")+"</div>"+(ks.length?"<div class='cons-g'>"+ks.map(function(k){
       return"<div class='ct ct-"+k+"'><div class='ct-l'>"+CICO[k]+" "+esc(CLAB[k])+"</div><div class='ct-t'>"+esc(CONS[k])+"</div></div>"}).join("")+"</div>"
     :"<div class='muted'>Aucune consigne pour l'instant.</div>")+"</div>"}
-var TACH=null,TACHBUSY=false,TREC=null,TRECBUSY=false,TTAB="ponct";
+var TACH=null,TACHBUSY=false,TREC=null,TRECBUSY=false,TTAB="ponct",TRECP=null,TRECPB=false,PRF={txt:"",f:"m1"};
 var TSEQ=0;
 function tacheLoad(){if(TACH===null&&!TACHBUSY){TACHBUSY=true;var s=++TSEQ;api("/taches").then(function(d){if(s!==TSEQ)return;TACH=d;TACHBUSY=false;render()}).catch(function(){if(s!==TSEQ)return;TACH=[];TACHBUSY=false;render()})}}
 function tacheRecharge(){TSEQ++;TACH=null;TACHBUSY=false;render()}
+function trecpLoad(){if(TRECP===null&&!TRECPB){TRECPB=true;api("/taches/recurrentes?prive=1").then(function(d){TRECP=d;TRECPB=false;render()}).catch(function(){TRECP=[];TRECPB=false;render()})}}
 function trecLoad(){if(TREC===null&&!TRECBUSY){TRECBUSY=true;api("/taches/recurrentes").then(function(d){TREC=d;TRECBUSY=false;render()}).catch(function(){TREC=[];TRECBUSY=false;render()})}}
 function jourCourt(d){return d?d.slice(8,10)+"/"+d.slice(5,7):""}
 function blocTaches(){
   tacheLoad();
-  var rec=TTAB==="rec",pec=TTAB==="pec",l=(TACH||[]).filter(function(t){return rec?t.recurrente:pec?(!t.recurrente&&t.reparationId):(!t.recurrente&&!t.reparationId)}),nPec=(TACH||[]).filter(function(t){return !t.recurrente&&t.reparationId&&!t.fait}).length,auj=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
-  var h="<div class='card taches'><div class='ttabs'><button class='"+(rec||pec?"sec":"")+"' data-act='tTab' data-v='ponct'>À faire</button><button class='"+(pec?"":"sec")+"' data-act='tTab' data-v='pec'>Prise en charge"+(nPec?" ("+nPec+")":"")+"</button><button class='"+(rec?"":"sec")+"' data-act='tTab' data-v='rec'>Récurrentes</button></div>";
+  var rec=TTAB==="rec",pec=TTAB==="pec",pri=TTAB==="pri",l=(TACH||[]).filter(function(t){return pri?t.prive:t.prive?false:rec?t.recurrente:pec?(!t.recurrente&&t.reparationId):(!t.recurrente&&!t.reparationId)}),nPec=(TACH||[]).filter(function(t){return !t.prive&&!t.recurrente&&t.reparationId&&!t.fait}).length,auj=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
+  var h="<div class='card taches'><div class='ttabs'><button class='"+(rec||pec||pri?"sec":"")+"' data-act='tTab' data-v='ponct'>À faire</button><button class='"+(pec?"":"sec")+"' data-act='tTab' data-v='pec'>Prise en charge"+(nPec?" ("+nPec+")":"")+"</button><button class='"+(rec?"":"sec")+"' data-act='tTab' data-v='rec'>Récurrentes</button><button class='"+(pri?"":"sec")+"' data-act='tTab' data-v='pri' title='Privé (visible que par toi)' aria-label='Privé'>&#128065;</button></div>";
   if(pec)h+="<div class='muted' style='margin-top:8px'>Tout ce qui concerne l'atelier : rendez-vous à confirmer, relances de devis, garanties, pièces à rappeler.</div>";
+  else if(pri){
+    h+="<div class='dl' style='margin-top:8px'><input id='tt-txt' class='lb' placeholder='Nouvelle tâche privée'><input id='tt-date' type='date' class='p'><button data-act='tAddP'>Ajouter</button></div>"}
   else if(!rec){
     h+="<div class='dl' style='margin-top:8px'><input id='tt-txt' class='lb' placeholder='Nouvelle tâche (ex : commander pneus Kukirin)'><input id='tt-date' type='date' class='p'><button data-act='tAdd'>Ajouter</button></div>"
       +"<div class='muted' style='display:flex;gap:16px'><label><input type='checkbox' id='tt-prio' style='width:auto;margin:0'> Priorité</label><label><input type='checkbox' id='tt-pin' style='width:auto;margin:0'> Épingler en haut</label></div>"}
-  else h+="<div class='muted' style='margin-top:8px'>Tâches qui reviennent toutes seules. Elles se modifient uniquement dans ⚙ Paramètres.</div>";
-  if(!l.length)h+="<div class='muted' style='margin-top:8px'>"+(rec?"Aucune tâche récurrente à faire pour l'instant.":pec?"Rien à traiter côté atelier.":"Rien à faire. Les papiers volants peuvent partir.")+"</div>";
+  else if(rec)h+="<div class='muted' style='margin-top:8px'>Tâches qui reviennent toutes seules. Elles se modifient uniquement dans ⚙ Paramètres.</div>";
+  if(!l.length)h+="<div class='muted' style='margin-top:8px'>"+(pri?"Rien de privé à faire.":rec?"Aucune tâche récurrente à faire pour l'instant.":pec?"Rien à traiter côté atelier.":"Rien à faire. Les papiers volants peuvent partir.")+"</div>";
   l.forEach(function(t){
     var late=!t.fait&&t.echeance&&t.echeance<auj;
     h+="<div class='tache"+(t.fait?" fait":"")+((t.priorite||t.epingle)&&!t.fait?" top":"")+"'>"
@@ -35,12 +38,17 @@ function blocTaches(){
       +(t.echeance?" <span class='tag"+(late?" warn":"")+"'>"+jourCourt(t.echeance)+"</span>":"")
       +"<div class='muted'>"+(t.fait&&t.faitPar?"Fait par "+esc(t.faitPar):(t.creePar?"Par "+esc(t.creePar):""))+"</div>"
       +(t.reparationId&&!t.fait?"<div class='actions' style='margin:4px 0'>"+(t.tel?"<a class='btn' href='tel:"+esc(t.tel.replace(/ /g,""))+"'>Appeler "+esc(t.tel)+"</a><a class='btn' href='sms:"+esc(t.tel.replace(/ /g,""))+"?&body="+encodeURIComponent("Bonjour, petit rappel de votre rendez-vous chez TURN Shop pour votre "+(t.trott||"trottinette")+". À bientôt !")+"'>Envoyer un SMS</a>":"")+"<button class='sec' data-act='ouvrirFiche' data-id='"+t.reparationId+"'>Ouvrir la fiche</button></div>":"")+"</div>"
-      +(rec?"":"<div class='tbtn'>"+(t.fait?"":"<button class='link' data-act='tPrio' data-id='"+t.id+"' data-v='"+(t.priorite?"0":"1")+"'>"+(t.priorite?"Retirer priorité":"Priorité")+"</button> <button class='link' data-act='tPin' data-id='"+t.id+"' data-v='"+(t.epingle?"0":"1")+"'>"+(t.epingle?"Désépingler":"Épingler")+"</button> ")+"<button class='link' data-act='tSuppr' data-id='"+t.id+"'>Suppr.</button></div>")+"</div>"});
+      +(rec?"":"<div class='tbtn'>"+(t.fait||pri?"":"<button class='link' data-act='tPrio' data-id='"+t.id+"' data-v='"+(t.priorite?"0":"1")+"'>"+(t.priorite?"Retirer priorité":"Priorité")+"</button> <button class='link' data-act='tPin' data-id='"+t.id+"' data-v='"+(t.epingle?"0":"1")+"'>"+(t.epingle?"Désépingler":"Épingler")+"</button> ")+"<button class='link' data-act='tSuppr' data-id='"+t.id+"'>Suppr.</button></div>")+"</div>"});
   if(rec){
     trecLoad();
     var act=(TREC||[]).filter(function(r){return r.actif});
     if(act.length){h+="<div class='step' style='margin-top:12px'>Planning des récurrences</div>";
       act.forEach(function(r){h+="<div class='muted'>"+esc(r.texte)+" · "+esc(r.libelle)+" · prochaine fois : "+jourCourt(r.prochaine)+"</div>"})}}
+  if(pri){
+    trecpLoad();
+    h+="<div class='step' style='margin-top:12px'>Mes récurrences privées</div>";
+    (TRECP||[]).forEach(function(r){h+="<div class='avrow'><div><b>"+esc(r.texte)+"</b>"+(r.actif?"":" <span class='tag'>désactivée</span>")+"<div class='muted'>"+esc(r.libelle)+" · prochaine fois : "+jourCourt(r.prochaine)+"</div></div><div class='actions'><button class='danger' data-act='rcpSuppr' data-id='"+r.id+"'>Supprimer</button></div></div>"});
+    h+="<div class='dl' style='margin-top:6px'><input id='rp-txt' class='lb' placeholder='Ex : relevé de compte dans le logiciel' value='"+esc(PRF.txt)+"'><select id='rp-f'>"+rcOptions().map(function(o){return"<option value='"+o[0]+"'"+(o[0]===PRF.f?" selected":"")+">"+esc(o[1])+"</option>"}).join("")+"</select><button data-act='rcpAdd'>Ajouter</button></div>"}
   return h+"</div>"}
 var PCR=null,PCRB=false,PCRO=null,PCRPOP=false;
 function pPopRender(){

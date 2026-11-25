@@ -6,9 +6,18 @@ import "./auth";
 import { lireAuto, numeroSms } from "../brevo";
 import { AppError, clean, exigeAdmin } from "../util";
 
-const vers = (r: any) => ({ reparationId: r.reparation_id ?? null, tel: r.telephone ?? "", client: r.client ?? "", trott: r.trott ?? "", recurrente: r.recurrente_id != null, id: r.id, texte: r.texte, echeance: r.echeance ?? null, epingle: r.epingle === true, priorite: r.priorite === true, fait: r.fait === true, faitPar: r.fait_par ?? "", creePar: r.cree_par ?? "" });
+const vers = (r: any) => ({ reparationId: r.reparation_id ?? null, tel: r.telephone ?? "", client: r.client ?? "", trott: r.trott ?? "", recurrente: r.recurrente_id != null, prive: r.prive_pour != null, id: r.id, texte: r.texte, echeance: r.echeance ?? null, epingle: r.epingle === true, priorite: r.priorite === true, fait: r.fait === true, faitPar: r.fait_par ?? "", creePar: r.cree_par ?? "" });
 
 await sql`ALTER TABLE taches ADD COLUMN IF NOT EXISTS ligne_id INT`;
+// Tâches privées : visibles uniquement par la personne dont c'est le prénom (NULL = tâche partagée).
+await sql`ALTER TABLE taches ADD COLUMN IF NOT EXISTS prive_pour TEXT`;
+await sql`ALTER TABLE taches_rec ADD COLUMN IF NOT EXISTS prive_pour TEXT`;
+const moi = (c: any) => String(c.get("user")?.prenom ?? "");
+async function exigeProprio(table: "taches" | "taches_rec", id: number, c: any) {
+  const [r] = (table === "taches" ? await sql`SELECT prive_pour FROM taches WHERE id = ${id}` : await sql`SELECT prive_pour FROM taches_rec WHERE id = ${id}`) as any[];
+  if (r?.prive_pour != null && r.prive_pour !== moi(c)) throw new AppError(404, "Tâche introuvable.");
+  return r?.prive_pour != null;
+}
 // Commande pas arrivée depuis plus d'une semaine : une tâche « vérifier la commande » (une à la fois par ligne, renouvelée chaque semaine).
 async function genererCommandesEnRetard() {
   const rows = (await sql`SELECT l.id, l.libelle, COALESCE(l.suivi, co.suivi) AS suivi, l.reparation_id, f.nom AS fournisseur, trim(c.prenom || ' ' || c.nom) AS client
@@ -52,13 +61,13 @@ const libelleFreq = (r: any) => r.unite === "jours" ? (r.intervalle === 1 ? "Cha
 // Crée les tâches arrivées à échéance (une seule tâche ouverte à la fois par récurrence).
 async function genererRecurrentes() {
   const auj = await AUJ();
-  const dues = (await sql`SELECT id, texte, unite, intervalle, jour_semaine, jour_mois, priorite, to_char(prochaine, 'YYYY-MM-DD') AS prochaine FROM taches_rec WHERE actif = true AND prochaine <= ${auj}::date`) as any[];
+  const dues = (await sql`SELECT id, texte, unite, intervalle, jour_semaine, jour_mois, priorite, prive_pour, to_char(prochaine, 'YYYY-MM-DD') AS prochaine FROM taches_rec WHERE actif = true AND prochaine <= ${auj}::date`) as any[];
   for (const r of dues) {
     const suiv = suivante(r, r.prochaine, auj);
     const [pris] = (await sql`UPDATE taches_rec SET prochaine = ${suiv}::date WHERE id = ${r.id} AND prochaine = ${r.prochaine}::date RETURNING id`) as any[];
     if (!pris) continue;
     const [ouverte] = (await sql`SELECT id FROM taches WHERE recurrente_id = ${r.id} AND fait = false LIMIT 1`) as any[];
-    if (!ouverte) await sql`INSERT INTO taches (texte, echeance, priorite, cree_par, recurrente_id) VALUES (${r.texte}, ${r.prochaine}::date, ${r.priorite}, 'Récurrente', ${r.id})`;
+    if (!ouverte) await sql`INSERT INTO taches (texte, echeance, priorite, cree_par, recurrente_id, prive_pour) VALUES (${r.texte}, ${r.prochaine}::date, ${r.priorite}, 'Récurrente', ${r.id}, ${r.prive_pour ?? null})`;
   }
 }
 
@@ -85,13 +94,18 @@ async function genererRappels() {
 const versRec = (r: any) => ({ id: r.id, texte: r.texte, unite: r.unite, intervalle: r.intervalle, jourSemaine: r.jour_semaine, jourMois: r.jour_mois, priorite: r.priorite === true, actif: r.actif === true, prochaine: r.prochaine, libelle: libelleFreq(r) });
 
 app.get("/api/taches/recurrentes", async (c) => {
-  const rows = (await sql`SELECT id, texte, unite, intervalle, jour_semaine, jour_mois, priorite, actif, to_char(prochaine, 'YYYY-MM-DD') AS prochaine FROM taches_rec ORDER BY texte`) as any[];
+  const prive = c.req.query("prive") === "1";
+  const rows = (prive
+    ? await sql`SELECT id, texte, unite, intervalle, jour_semaine, jour_mois, priorite, actif, to_char(prochaine, 'YYYY-MM-DD') AS prochaine FROM taches_rec WHERE prive_pour = ${moi(c)} ORDER BY texte`
+    : await sql`SELECT id, texte, unite, intervalle, jour_semaine, jour_mois, priorite, actif, to_char(prochaine, 'YYYY-MM-DD') AS prochaine FROM taches_rec WHERE prive_pour IS NULL ORDER BY texte`) as any[];
   return c.json(rows.map(versRec));
 });
 
 app.post("/api/recurrentes", async (c) => {
-  exigeAdmin(c);
   const b = await c.req.json().catch(() => ({}));
+  const id0 = Number(b.id);
+  const prive = id0 > 0 ? await exigeProprio("taches_rec", id0, c) : b.prive === true;
+  if (!prive) exigeAdmin(c);
   const texte = clean(b.texte, 300);
   if (!texte) throw new AppError(400, "Écris la tâche.");
   const unite = ["jours", "semaines", "mois"].includes(b.unite) ? b.unite : "jours";
@@ -102,18 +116,18 @@ app.post("/api/recurrentes", async (c) => {
   const prochaine = premiere(regle, await AUJ());
   const id = Number(b.id);
   if (id > 0) await sql`UPDATE taches_rec SET texte = ${texte}, unite = ${unite}, intervalle = ${intervalle}, jour_semaine = ${jourSemaine}, jour_mois = ${jourMois}, priorite = ${b.priorite === true}, prochaine = ${prochaine}::date WHERE id = ${id}`;
-  else await sql`INSERT INTO taches_rec (texte, unite, intervalle, jour_semaine, jour_mois, priorite, prochaine) VALUES (${texte}, ${unite}, ${intervalle}, ${jourSemaine}, ${jourMois}, ${b.priorite === true}, ${prochaine}::date)`;
+  else await sql`INSERT INTO taches_rec (texte, unite, intervalle, jour_semaine, jour_mois, priorite, prochaine, prive_pour) VALUES (${texte}, ${unite}, ${intervalle}, ${jourSemaine}, ${jourMois}, ${b.priorite === true}, ${prochaine}::date, ${prive ? moi(c) : null})`;
   return c.json({ message: "Tâche récurrente enregistrée." });
 });
 app.post("/api/recurrentes/etat", async (c) => {
-  exigeAdmin(c);
   const b = await c.req.json().catch(() => ({}));
+  if (!(await exigeProprio("taches_rec", Number(b.id), c))) exigeAdmin(c);
   await sql`UPDATE taches_rec SET actif = ${b.actif === true} WHERE id = ${Number(b.id)}`;
   return c.json({ ok: true });
 });
 app.post("/api/recurrentes/supprimer", async (c) => {
-  exigeAdmin(c);
   const b = await c.req.json().catch(() => ({}));
+  if (!(await exigeProprio("taches_rec", Number(b.id), c))) exigeAdmin(c);
   await sql`DELETE FROM taches WHERE recurrente_id = ${Number(b.id)} AND fait = false`;
   await sql`UPDATE taches SET recurrente_id = NULL WHERE recurrente_id = ${Number(b.id)}`;
   await sql`DELETE FROM taches_rec WHERE id = ${Number(b.id)}`;
@@ -126,10 +140,10 @@ app.get("/api/taches", async (c) => {
   await genererRappels();
   await genererCommandesEnRetard();
   await genererRelancesGarantie();
-  const rows = (await sql`SELECT k.id, k.recurrente_id, k.reparation_id, k.texte, to_char(k.echeance, 'YYYY-MM-DD') AS echeance, k.epingle, k.priorite, k.fait, k.fait_par, k.cree_par,
+  const rows = (await sql`SELECT k.id, k.recurrente_id, k.reparation_id, k.texte, to_char(k.echeance, 'YYYY-MM-DD') AS echeance, k.epingle, k.priorite, k.fait, k.fait_par, k.cree_par, k.prive_pour,
       cl.telephone, trim(cl.prenom || ' ' || cl.nom) AS client, t.marque || ' ' || t.modele AS trott
     FROM taches k LEFT JOIN reparations r ON r.id = k.reparation_id LEFT JOIN clients cl ON cl.id = r.client_id LEFT JOIN trottinettes t ON t.id = r.trottinette_id
-    WHERE k.fait = false OR k.fait_le > now() - interval '2 days'
+    WHERE (k.fait = false OR k.fait_le > now() - interval '2 days') AND (k.prive_pour IS NULL OR k.prive_pour = ${moi(c)})
     ORDER BY k.fait, (k.epingle OR k.priorite) DESC, k.echeance NULLS LAST, k.id`) as any[];
   return c.json(rows.map(vers));
 });
@@ -140,7 +154,7 @@ app.post("/api/taches", async (c) => {
   if (!texte) throw new AppError(400, "Écris la tâche.");
   const u = c.get("user");
   const e = /^\d{4}-\d{2}-\d{2}$/.test(String(b.echeance ?? "")) ? String(b.echeance) : null;
-  await sql`INSERT INTO taches (texte, echeance, epingle, priorite, cree_par) VALUES (${texte}, ${e}, ${b.epingle === true}, ${b.priorite === true}, ${u?.prenom ?? ""})`;
+  await sql`INSERT INTO taches (texte, echeance, epingle, priorite, cree_par, prive_pour) VALUES (${texte}, ${e}, ${b.epingle === true}, ${b.priorite === true}, ${u?.prenom ?? ""}, ${b.prive === true ? moi(c) : null})`;
   return c.json({ message: "Tâche ajoutée." });
 });
 
@@ -148,6 +162,7 @@ app.post("/api/taches/maj", async (c) => {
   const b = await c.req.json().catch(() => ({}));
   const id = Number(b.id);
   const u = c.get("user");
+  await exigeProprio("taches", id, c);
   if (typeof b.fait === "boolean") await sql`UPDATE taches SET fait = ${b.fait}, fait_le = ${b.fait ? sql`now()` : null}, fait_par = ${b.fait ? (u?.prenom ?? "") : null} WHERE id = ${id}`;
   if (typeof b.epingle === "boolean") await sql`UPDATE taches SET epingle = ${b.epingle} WHERE id = ${id}`;
   if (typeof b.priorite === "boolean") await sql`UPDATE taches SET priorite = ${b.priorite} WHERE id = ${id}`;
@@ -156,6 +171,20 @@ app.post("/api/taches/maj", async (c) => {
 
 app.post("/api/taches/supprimer", async (c) => {
   const b = await c.req.json().catch(() => ({}));
+  await exigeProprio("taches", Number(b.id), c);
   await sql`DELETE FROM taches WHERE id = ${Number(b.id)}`;
   return c.json({ ok: true });
 });
+
+// Récurrences privées de départ pour Arthur (une seule fois, s'il n'en a aucune).
+{
+  const [deja] = (await sql`SELECT id FROM taches_rec WHERE prive_pour = 'Arthur' LIMIT 1`) as any[];
+  const [u] = (await sql`SELECT 1 FROM utilisateurs WHERE prenom = 'Arthur' LIMIT 1`) as any[];
+  if (!deja && u) {
+    const auj = await AUJ();
+    for (const [texte, jm] of [["Relevé de compte dans le logiciel", 1], ["Envoyer au cabinet", 5]] as [string, number][]) {
+      const prochaine = premiere({ unite: "mois", jour_semaine: 1, jour_mois: jm }, auj);
+      await sql`INSERT INTO taches_rec (texte, unite, intervalle, jour_semaine, jour_mois, priorite, prochaine, prive_pour) VALUES (${texte}, 'mois', 1, 1, ${jm}, false, ${prochaine}::date, 'Arthur')`;
+    }
+  }
+}

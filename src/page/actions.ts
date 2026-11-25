@@ -169,7 +169,7 @@ var ACTS={
   actLock:function(){actLock()},
   vueTous:function(){VTOUS=!VTOUS;try{sessionStorage.setItem("atelierTous",VTOUS?"1":"0")}catch(e){}viewSave();location.reload()},
   brvTest:async function(){var em=v("bv-te");BRVTE=em;BRVMSG="Envoi…";render();try{var d=await api("/brevo/test",{email:em});BRVMSG=d.message}catch(e){BRVMSG=e.message}render()},
-  tTab:function(b){TTAB=b.dataset.v;TACH=null;TREC=null;render()},
+  tTab:function(b){TTAB=b.dataset.v;TACH=null;TREC=null;TRECP=null;render()},
   rcSave:async function(){try{var f=v("rc-f"),b={id:RCEDIT,texte:v("rc-txt"),priorite:!!document.getElementById("rc-p").checked};
       if(f.charAt(0)==="j"){b.unite="jours";b.intervalle=+f.slice(1)}
       else if(f.charAt(0)==="s"){b.unite="semaines";b.intervalle=1;b.jourSemaine=+f.slice(1)}
@@ -179,6 +179,13 @@ var ACTS={
   rcEdit:function(b){var x=(TREC||[]).filter(function(r){return r.id===+b.dataset.id})[0];if(!x)return;RCEDIT=x.id;RCF={txt:x.texte,f:rcValeur(x),p:x.priorite,raw:x};RCMSG="";render()},
   rcEtat:async function(b){try{await api("/recurrentes/etat",{id:+b.dataset.id,actif:b.dataset.v==="1"});TREC=null;TACH=null;render()}catch(e){alert(e.message)}},
   rcSuppr:async function(b){if(!confirm("Supprimer cette tâche récurrente ?"))return;try{await api("/recurrentes/supprimer",{id:+b.dataset.id});TREC=null;TACH=null;render()}catch(e){alert(e.message)}},
+  tAddP:async function(){var t=v("tt-txt");if(!t)return;try{await api("/taches",{texte:t,echeance:v("tt-date"),prive:true});tacheRecharge()}catch(e){alert(e.message)}},
+  rcpAdd:async function(){var t=v("rp-txt");if(!t)return;try{var f=v("rp-f"),b={texte:t,prive:true};
+      if(f.charAt(0)==="j"){b.unite="jours";b.intervalle=+f.slice(1)}
+      else if(f.charAt(0)==="s"){b.unite="semaines";b.intervalle=1;b.jourSemaine=+f.slice(1)}
+      else if(f.charAt(0)==="m"){b.unite="mois";b.intervalle=1;b.jourMois=+f.slice(1)}
+      await api("/recurrentes",b);PRF.txt="";TRECP=null;tacheRecharge()}catch(e){alert(e.message)}},
+  rcpSuppr:async function(b){if(!confirm("Supprimer cette récurrence privée ?"))return;try{await api("/recurrentes/supprimer",{id:+b.dataset.id});TRECP=null;tacheRecharge()}catch(e){alert(e.message)}},
   tAdd:async function(){var t=v("tt-txt");if(!t)return;try{await api("/taches",{texte:t,echeance:v("tt-date"),priorite:!!document.getElementById("tt-prio").checked,epingle:!!document.getElementById("tt-pin").checked});tacheRecharge()}catch(e){alert(e.message)}},
   tFait:async function(b){try{await api("/taches/maj",{id:+b.dataset.id,fait:b.dataset.v==="1"});tacheRecharge()}catch(e){alert(e.message)}},
   tPin:async function(b){try{await api("/taches/maj",{id:+b.dataset.id,epingle:b.dataset.v==="1"});tacheRecharge()}catch(e){alert(e.message)}},
