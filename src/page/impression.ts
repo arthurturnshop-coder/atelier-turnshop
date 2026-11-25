@@ -300,13 +300,14 @@ function etqFormat(){
 var ETQES="papier";
 function etqBig(it,F){
   var t=esc(it.big);
+  var bc=code128Svg(it.big,7);
   if(it.style==="simple"){
-    var fs=Math.round(F.h*0.62*10)/10;
-    return"<div class='etq' style='width:"+F.w+"mm;height:"+F.h+"mm;box-sizing:border-box;padding:1.2mm;font-family:Arial,Helvetica,sans-serif;color:#000;background:#fff'><div style='width:100%;height:100%;border:0.6mm solid #000;border-radius:2mm;display:flex;align-items:center;justify-content:center;font-size:"+fs+"pt;font-weight:900;line-height:1'>"+t+"</div></div>"}
+    var fs=Math.round(F.h*0.42*10)/10;
+    return"<div class='etq' style='width:"+F.w+"mm;height:"+F.h+"mm;box-sizing:border-box;padding:1.2mm;font-family:Arial,Helvetica,sans-serif;color:#000;background:#fff'><div style='width:100%;height:100%;border:0.6mm solid #000;border-radius:2mm;display:flex;flex-direction:column;align-items:center;justify-content:center'><div style='flex:1;display:flex;align-items:center;justify-content:center;font-size:"+fs+"pt;font-weight:900;line-height:1'>"+t+"</div><div style='height:9mm;width:90%;flex:none;text-align:center'>"+bc+"</div></div></div>"}
   return"<div class='etq' style='width:"+F.w+"mm;height:"+F.h+"mm;box-sizing:border-box;padding:3mm;font-family:Arial,Helvetica,sans-serif;background:#fff'><div style='width:100%;height:100%;border-radius:5mm;overflow:hidden;display:flex;flex-direction:column;background:#1e8449;color:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact'>"
     +"<div style='padding:2.5mm 5mm;font-size:9pt;font-weight:800;letter-spacing:.25em;text-transform:uppercase;opacity:.95'>TURN Shop</div>"
-    +"<div style='flex:1;margin:0 4mm;background:#fff;color:#145c35;border-radius:3mm;display:flex;align-items:center;justify-content:center;font-size:"+Math.round(F.h*0.78)+"pt;font-weight:900;line-height:1;-webkit-print-color-adjust:exact;print-color-adjust:exact'>"+t+"</div>"
-    +"<div style='height:5mm;flex:none'></div></div></div>"}
+    +"<div style='flex:1;margin:0 4mm;background:#fff;color:#145c35;border-radius:3mm;display:flex;align-items:center;justify-content:center;font-size:"+Math.round(F.h*0.6)+"pt;font-weight:900;line-height:1;-webkit-print-color-adjust:exact;print-color-adjust:exact'>"+t+"</div>"
+    +"<div style='height:13mm;flex:none;margin:2mm 4mm 3mm;background:#fff;border-radius:2mm;padding:1mm 2mm;text-align:center;-webkit-print-color-adjust:exact;print-color-adjust:exact'>"+bc+"</div></div></div>"}
 function etqLabel(it,F){
   if(it.big)return etqBig(it,F);
   var code=it.barcode||it.sku||"";

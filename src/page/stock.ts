@@ -1,5 +1,5 @@
 export const STOCK = `// ---------- Stock maison + inventaire par emplacement ----------
-var STAS="",STK=null,STMSG="",STSUB="liste",STQ="",STLIEU="",STINV={lieu:"",cur:"",scans:[],noms:{}},STAP=null;
+var STAS="",STK=null,STMSG="",STSUB="liste",STQ="",STLIEU="",STINV={lieu:"",cur:"",scans:[],noms:{},info:{},alerte:null,ok:""},STAP=null;
 function stPanneau(){return/^[A-Z]+$/.test(STINV.lieu)}
 function stSuiv(c,d){var m=String(c).match(/^([A-Z]+)([0-9]+)$/);if(!m)return c;var n=Math.max(1,Number(m[2])+d);return m[1]+n}
 function stFocus(id){setTimeout(function(){var e=document.getElementById(id);if(e)e.focus()},30)}
@@ -61,6 +61,8 @@ ACTS.stFus=function(b){var p=stProd(+b.dataset.id);if(!p)return;
 function vInv(){
   var h="<div class='card'><div class='step'>Inventaire partiel</div><div class='muted'>Un rayon (A11) ou tout un panneau (tape juste A : il couvre A11, A12, A22…). Dans un panneau, tape ou scanne d'abord le rayon (A11), puis les produits de ce rayon, puis le rayon suivant. Ce qui était rangé là mais n'est pas scanné sera retiré du stock.</div>";
   h+="<div class='dl' style='margin-top:6px'><input id='ilieu' class='q' placeholder='A11 ou A' value='"+esc(STINV.lieu)+"'><input id='iscan' class='lb' placeholder='"+(stPanneau()?"Rayon (A11) ou produit":"Scanne un produit")+"'></div></div>";
+  if(STINV.alerte){var al=STINV.alerte;h+="<div class='card' style='border:2px solid "+(al.kind==="inconnu"?"#b00":"#e0a200")+";background:#fff8e6'><b>"+esc(al.txt)+"</b>"+(al.kind==="autre"?"<div class='actions'><button data-act='iDeplace'>Déplacer ici</button><button class='sec' data-act='iRemet'>Remettre en "+esc(al.de)+"</button></div>":"")+"</div>"}
+  else if(STINV.ok)h+="<div class='card' style='border:2px solid #1e8449;background:#eef8f1'><b>"+esc(STINV.ok)+"</b></div>";
   if(STAP){
     var a=STAP;
     h+="<div class='card'><div class='step'>Contrôle avant validation : "+esc(a.emplacement)+"</div>"
@@ -86,17 +88,34 @@ ACTS.iLieu=function(){STINV.lieu=v("ilieu").toUpperCase().replace(/ /g,"");STINV
 function iCurLire(){var e=document.getElementById("icur");if(e&&e.value.trim())STINV.cur=e.value.toUpperCase().replace(/ /g,"")}
 ACTS.iSuiv=function(){iCurLire();STINV.cur=stSuiv(STINV.cur,1);render()};
 ACTS.iPrec=function(){iCurLire();STINV.cur=stSuiv(STINV.cur,-1);render()};
+function iRayon(){return stPanneau()?(STINV.cur||STINV.lieu+"1"):STINV.lieu}
+function iFeed(c){
+  var d=STINV.info[c],r=iRayon();STINV.alerte=null;STINV.ok="";
+  if(!d||(!d.produit&&!d.shopify)){bipKo();STINV.alerte={kind:"inconnu",code:c,txt:"❓ Code inconnu : "+c+" (retiré de la liste si tu veux : − dans la liste)"};return}
+  if(!d.produit){bipOk();STINV.ok="🆕 "+d.shopify.nom+" : nouvelle référence, ajoutée en "+r;return}
+  var p=d.produit;
+  if(!p.emplacement){bipOk();STINV.ok="🆕 "+p.nom+" : pas encore rangé, sera mis en "+r;return}
+  if(p.emplacement===r){bipOk();STINV.ok="✓ "+p.nom+" : OK, déjà en "+r;return}
+  bipKo();STINV.alerte={kind:"autre",code:c,txt:"⚠ "+p.nom+" : rangé en "+p.emplacement+", tu es en "+r+". Déplacer ici ou remettre en "+p.emplacement+" ?",de:p.emplacement,vers:r}}
 ACTS.iScan=function(){
   var c=v("iscan").replace(/ /g,"");if(!c)return;
-  if(!STINV.lieu){STINV.lieu=v("ilieu").toUpperCase().replace(/ /g,"");if(!STINV.lieu){STMSG="Indique d'abord l'emplacement.";render();return}}
-  if(stPanneau()&&/^[A-Za-z]{1,3}[0-9]{1,3}$/.test(c)&&c.toUpperCase().indexOf(STINV.lieu)===0){STINV.cur=c.toUpperCase();STMSG="";render();return}
+  if(!STINV.lieu){STINV.lieu=v("ilieu").toUpperCase().replace(/ /g,"");}
+  if(!STINV.lieu&&/^[A-Za-z]{1,3}$/.test(c)){STINV.lieu=c.toUpperCase();STINV.cur=STINV.lieu+"1";STMSG="Panneau "+STINV.lieu+" : scanne le rayon (ex : "+STINV.lieu+"1) puis les produits.";STINV.alerte=null;STINV.ok="";render();return}
+  if(!STINV.lieu){STMSG="Scanne ou tape d'abord l'emplacement (A pour un panneau, A11 pour un rayon).";render();return}
+  if(stPanneau()&&/^[A-Za-z]{1,3}$/.test(c)&&c.toUpperCase()!==STINV.lieu){STINV.lieu=c.toUpperCase();STINV.cur=STINV.lieu+"1";STMSG="Panneau "+STINV.lieu+" : scanne le rayon puis les produits. Les scans déjà faits sont gardés.";STINV.alerte=null;STINV.ok="";render();return}
+  if(stPanneau()&&/^[A-Za-z]{1,3}[0-9]{1,3}$/.test(c)&&c.toUpperCase().indexOf(STINV.lieu)===0){STINV.cur=c.toUpperCase();STMSG="";STINV.alerte=null;STINV.ok="Rayon "+STINV.cur+" : scanne les produits.";render();return}
   if(stPanneau()&&!STINV.cur)STINV.cur=STINV.lieu+"1";
   if(stPanneau())iCurLire();
   STINV.scans.push({code:c,qte:1,emplacement:stPanneau()?STINV.cur:STINV.lieu});
-  if(STINV.noms[c]===undefined){STINV.noms[c]="";api("/stock/scan",{magasin:MAG||"",code:c}).then(function(d){STINV.noms[c]=d.produit?d.produit.nom:(d.shopify?d.shopify.nom+" (Shopify)":"");if(STINV.noms[c])bipOk();else bipKo();if(STSUB==="inv"&&!STAP)render()}).catch(function(){})}
-  STMSG="";render()};
+  STMSG="";
+  if(STINV.info[c]!==undefined){iFeed(c);render();return}
+  STINV.info[c]=null;STINV.noms[c]="";
+  api("/stock/scan",{magasin:MAG||"",code:c}).then(function(d){STINV.info[c]=d;STINV.noms[c]=d.produit?d.produit.nom:(d.shopify?d.shopify.nom+" (Shopify)":"");iFeed(c);if(STSUB==="inv"&&!STAP)render()}).catch(function(){});
+  render()};
+ACTS.iRemet=function(){var a=STINV.alerte;if(!a)return;for(var i=STINV.scans.length-1;i>=0;i--)if(STINV.scans[i].code===a.code){STINV.scans.splice(i,1);break}STINV.alerte=null;STINV.ok="↩ Remets-le en "+(a.de||"son rayon")+" : scan retiré, il ne bouge pas.";render()};
+ACTS.iDeplace=function(){var a=STINV.alerte;STINV.alerte=null;STINV.ok="➡ Déplacé en "+(a?a.vers:"ce rayon")+" à la validation.";render()};
 ACTS.iMoins=function(b){var c=b.dataset.c;for(var i=STINV.scans.length-1;i>=0;i--)if(STINV.scans[i].code===c){STINV.scans.splice(i,1);break}render()};
-ACTS.iReset=function(){STINV={lieu:STINV.lieu,cur:"",scans:[],noms:{}};STAP=null;render()};
+ACTS.iReset=function(){STINV={lieu:STINV.lieu,cur:"",scans:[],noms:{},info:{},alerte:null,ok:""};STAP=null;render()};
 ACTS.iBack=function(){STAP=null;render()};
 ACTS.iFin=function(){STINV.lieu=v("ilieu").toUpperCase().replace(/ /g,"")||STINV.lieu;api("/stock/inventaire",{magasin:MAG||"",emplacement:STINV.lieu,scans:STINV.scans}).then(function(d){STAP=d.apercu;render()}).catch(function(e){STMSG=e.message;render()})};
 ACTS.iOk=function(){api("/stock/inventaire",{magasin:MAG||"",emplacement:STINV.lieu,scans:STINV.scans,appliquer:true}).then(function(d){STMSG=d.message;STINV={lieu:"",cur:"",scans:[],noms:{}};STAP=null;STK=null;render()}).catch(function(e){STMSG=e.message;render()})};
