@@ -60,7 +60,9 @@ app.get("/api/clients/ca", async (c) => {
       if (n) shopifyCents = Math.round(Number(n.amountSpent?.amount ?? 0) * 100);
     }
   } catch { /* Shopify indisponible : on affiche seulement l'atelier */ }
-  return c.json({ atelierCents: a.ca, nb: a.nb, derniere: a.derniere, shopifyCents });
+  let cagnotteEuros = 0;
+  try { cagnotteEuros = (await (await import("./caisse")).soldeFidelite(id)).disponibleEuros; } catch { /* ignoré */ }
+  return c.json({ atelierCents: a.ca, nb: a.nb, derniere: a.derniere, shopifyCents, cagnotteEuros });
 });
 
 app.get("/api/fidelite", async (c) => {

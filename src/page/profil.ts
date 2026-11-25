@@ -66,7 +66,8 @@ function kpiHtml(){
   function ln(l,x){return"<tr><td style='padding:4px 14px 4px 0;color:#666'>"+l+"</td><td style='padding:4px 0;text-align:right;font-weight:700;white-space:nowrap'>"+x+"</td></tr>"}
   var t="<table style='border-collapse:collapse;font-size:15px'>";
   t+=ln("Points fidélité",f===null?"…":f.trouve?esc(f.points)+" pts":"-");
-  t+=ln("Réduction disponible",f===null?"…":f.trouve?esc(f.euros)+" €":"-");
+  t+=ln("Cagnotte caisse (bons d'achat, fidélité)",d?"<span style='color:var(--vert2)'>"+(Math.round((d.cagnotteEuros||0)*100)/100).toString().replace(".",",")+" €</span>":"…");
+  t+=ln("Réduction Shopify",f===null?"…":f.trouve?esc(f.euros)+" €":"-");
   t+=ln("CA atelier",d?eur(d.atelierCents):"…");
   t+=ln("Factures atelier",d?d.nb+(d.derniere?" <span style='font-weight:400;color:#666'>(dernière le "+esc(day(d.derniere))+")</span>":""):"…");
   t+=ln("Dépensé sur Shopify",d?(d.shopifyCents!=null?eur(d.shopifyCents):"-"):"…");
