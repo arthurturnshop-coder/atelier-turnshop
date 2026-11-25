@@ -177,7 +177,7 @@ function acompteHtml(f){
     h+="<div class='step' style='margin-top:14px'>Encaisser (acompte ou solde)</div>"+moyBtns(ACM,"acMoy")
       +"<div class='dl'><input id='ac-m' style='flex:0 0 180px;width:180px' placeholder='Montant €' value='"+esc(def)+"'>"
       +(due>0?"<button class='sec' data-act='acSolde' data-v='"+String(due/100).replace(".",",")+"'>Solde : "+eur(due)+"</button>"+(net===0&&due>=200?"<button class='sec' data-act='acSolde' data-v='"+String(Math.round(due/2)/100).replace(".",",")+"'>50 % : "+eur(Math.round(due/2))+"</button>":""):"")+"</div>"
-      +(ACM==="especes"?"<div class='dl'><input id='ac-r' style='flex:0 0 230px;width:230px' placeholder='Donné par le client €' value='"+esc(ACR)+"'><div id='ac-rendu' class='big' style='color:#b00;margin:0'></div></div>":"")
+      +(ACM==="especes"?"<div class='dl'><input id='ac-r' style='flex:0 0 300px;width:300px' placeholder='Espèces remises par le client €' value='"+esc(ACR)+"'><div id='ac-rendu' class='big' style='color:#b00;margin:0'></div></div>":"")
       +"<button data-act='acompte' data-id='"+f.id+"' style='width:100%;min-height:52px'>Encaisser le paiement</button>";
     if(tot>0&&(f.devis.lignes||[]).length)h+="<div class='step' style='margin-top:14px'>Facture finale</div>"
       +"<button data-act='acSolder' data-id='"+f.id+"' style='width:100%;min-height:52px'>"+(due>0?"✅ Encaisser le solde ("+eur(due)+") et facturer":"✅ Facturer (déjà soldé)")+"</button>"

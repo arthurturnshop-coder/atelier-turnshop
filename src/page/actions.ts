@@ -57,7 +57,8 @@ var ACTS={
       if(f.garde&&f.garde.fraisCents>0)PAN.push({libelle:"Gardiennage ("+f.garde.joursFrais+" jours x "+(f.garde.prixCents/100)+" EUR)",quantite:f.garde.joursFrais,prix:String(f.garde.prixCents/100).replace(".",","),type:"article",variantId:"",sku:""});
       CACO=f.acompte?f.acompte.resteCents:0;
       CCLI=d.client;CFID=d.fidelite;CUSE=false;CAVOFF=[];CREC=null;CHOPEN=0;CREP=f.id;CAFF=f.affaires||[];CRAFF=[];CPAY={carte:"",especes:"",virement:"",bon_achat:""};CMSG="";
-      FICHE=null;CUR=null;TAB="accueil";await chargeHisto()}catch(e){alert(e.message)}},
+      CPOP=true;await chargeHisto()}catch(e){alert(e.message)}},
+  cpFerme:function(){var id=FICHE?FICHE.id:0;CPOP=false;if(!CREC){CREP=null;CAFF=[];CACO=0;PAN=[];CPAY={carte:"",especes:"",virement:"",bon_achat:""}}CREC=null;if(id)recharger(id);else render()},
   acMoy:function(b){ACM=b.dataset.m;render()},
   acSolde:function(b){ACV=b.dataset.v;render()},
   rbMoy:function(b){RBM=b.dataset.m;render()},
@@ -79,7 +80,7 @@ var ACTS={
     var P=payInfo(FICHE),mt=v("rb-m"),cents=mt?pxCents(mt):P.a.resteCents;
     if(!confirm("Rembourser "+eur(cents)+" au client ?"))return;
     try{var d=await api("/reparations/rembourser",{repairId:+b.dataset.id,moyen:RBM,montant:mt});RBM="";alert(d.message);await recharger(+b.dataset.id)}catch(e){alert(e.message)}},
-  cAnnuleRep:function(){CREP=null;CAFF=[];CACO=0;PAN=[];lirePay();render()},
+  cAnnuleRep:function(){CPOP=false;CREP=null;CAFF=[];CACO=0;PAN=[];lirePay();render()},
   cShopRetry:async function(b){try{var d=await api("/caisse/shopify",{venteId:+b.dataset.id});if(!d.ok)alert(d.erreur);await chargeHisto();if(CREC&&CREC.id===+b.dataset.id){var h=await api("/caisse/historique"+(CCLI?"?clientId="+CCLI.id:""));var m=h.ventes.filter(function(x){return x.id===CREC.id})[0];if(m){CREC=m;render()}}}catch(e){alert(e.message)}},
   tickSave:async function(){try{var d=await api("/reglages/ticket",{entete:v("tk-ent"),avisAmiens:v("tk-am"),avisRouen:v("tk-ro"),rdvUrl:v("tk-rdv"),siteUrl:v("tk-site"),coordAmiens:v("tk-ca"),coordRouen:v("tk-cr")});TICKMSG=d.message;TICK=null;render()}catch(e){TICKMSG=e.message;render()}},
   shopCmd:async function(b){try{await api("/reglages/commandes",{actif:b.dataset.v==="1"});SHOPCMD=null;render()}catch(e){alert(e.message)}},
@@ -125,7 +126,7 @@ var ACTS={
   pTab:function(b){PTAB=b.dataset.t;render()},
   pAchOpen:function(b){var id=+b.dataset.id;PACHOPEN=PACHOPEN===id?0:id;render()},
   cRecu:function(b){var id=+b.dataset.id;CHOPEN=CHOPEN===id?0:id;lirePay();render()},
-  cFermeRecu:function(){CREC=null;lirePay();render()},
+  cFermeRecu:function(){CREC=null;if(CPOP){CPOP=false;if(FICHE){recharger(FICHE.id);return}}lirePay();render()},
   cPrint:function(b){btnFlash(b);var r=document.querySelector("[data-recu='"+b.dataset.id+"']");if(!r)return;var c=r.cloneNode(true);c.className="printme";impImprimer(c.outerHTML,"","",true)},
   cCase:function(b){return cCaseFn(b)},
   cEncaisser:async function(){await rdvInfos();lirePay();var pay=["carte","especes","virement","bon_achat"].map(function(m){return{moyen:m,montant:CPAY[m]}}).filter(function(p){return p.montant});

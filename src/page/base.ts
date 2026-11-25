@@ -48,11 +48,20 @@ function viewRestoreOpen(){
   if(VIEWC){var c=VIEWC;VIEWC=0;rechOpen(c)}}
 var CMDP="";
 document.addEventListener("input",function(e){if(e.target&&e.target.id==="c-mdp")CMDP=e.target.value});
+var CPOP=false;
+function cPopRender(pst){
+  var o=document.getElementById("cpop");
+  if(!CPOP){if(o)o.remove();return}
+  if(!o){o=document.createElement("div");o.id="cpop";o.className="cpop";document.body.appendChild(o)}
+  o.innerHTML="<div class='cpbox'><button class='cpx' data-act='cpFerme' title='Fermer et revenir à la prise en charge'>✕</button>"+caisseHtml()+"</div>";
+  caisseBind();if(pst&&o.firstChild)o.firstChild.scrollTop=pst}
 function render(){
   var dr0=document.querySelector(".dright"),st0=dr0?dr0.scrollTop:0;
   // Le champ de scan garde le curseur et ce qui y est tape, meme si un rendu le recree (ex : emplacements charges apres un scan).
   var ae=document.activeElement,fps=ae&&ae.dataset&&ae.dataset.ps?ae.dataset.ps:"",fid=!fps&&ae&&ae.id==="cq"?"cq":"",fval=ae&&(fps||fid)?ae.value:"";
+  var po0=document.getElementById("cpop"),pst=po0&&po0.firstChild?po0.firstChild.scrollTop:0;
   render0();
+  cPopRender(pst);
   if(st0){var dr1=document.querySelector(".dright");if(dr1)dr1.scrollTop=st0}
   if(fps||fid){var ne=fid?document.getElementById(fid):document.querySelector("[data-ps='"+fps+"']");if(ne&&document.activeElement!==ne){if(!ne.value&&fval)ne.value=fval;ne.focus({preventScroll:true})}}}
 function render0(){
