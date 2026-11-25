@@ -10,8 +10,8 @@ await sql`CREATE TABLE IF NOT EXISTS messages_envoyes (id SERIAL PRIMARY KEY, ty
 export type Quand = "avis" | "rdv" | "piece" | "pret" | "garde" | "anniv" | "bonexp";
 export const QUAND: Quand[] = ["avis", "rdv", "piece", "pret", "garde", "anniv", "bonexp"];
 // Types de messages : les trois emails de gardiennage dépendent du même réglage « garde ».
-export type MsgType = Quand | "garde4" | "garde_hebdo" | "abandon";
-const REGLAGE = (t: MsgType): Quand => (t === "garde4" || t === "garde_hebdo" || t === "abandon" ? "garde" : t);
+export type MsgType = Quand | "garde4" | "garde_hebdo" | "abandon" | "cmdclient";
+const REGLAGE = (t: MsgType): Quand => (t === "garde4" || t === "garde_hebdo" || t === "abandon" ? "garde" : t === "cmdclient" ? "piece" : t);
 export type Canal = "off" | "email" | "sms" | "both";
 
 export async function lireAuto(): Promise<Record<Quand, Canal>> {

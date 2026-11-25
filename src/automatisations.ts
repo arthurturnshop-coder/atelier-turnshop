@@ -31,6 +31,13 @@ export async function envoyerPieceArrivee(repId: number) {
   await notifier("piece", { clientId: r.client_id, reparationId: repId, sujet: "Votre pièce est arrivée - TURN Shop", texte: `Bonjour${prenomDe(r.prenom)}, la pièce pour votre ${trott} est arrivée. Nous poursuivons la réparation et nous vous prévenons dès qu'elle est prête. L'équipe TURN Shop` });
 }
 
+export async function envoyerCommandeArrivee(repId: number, libelles: string[]) {
+  const r = await repInfo(repId);
+  if (!r) return;
+  const liste = libelles.slice(0, 5).join(", ");
+  await notifier("cmdclient", { clientId: r.client_id, reparationId: repId, sujet: "Votre commande est arrivée - TURN Shop", texte: `Bonjour${prenomDe(r.prenom)}, votre commande (${liste}) est arrivée en boutique. Vous pouvez venir la récupérer quand vous voulez. L'équipe TURN Shop` });
+}
+
 export async function envoyerPret(repId: number) {
   const r = await repInfo(repId);
   if (!r) return;

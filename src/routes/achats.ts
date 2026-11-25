@@ -2,7 +2,7 @@ import { app } from "../app";
 import { sql } from "../db";
 // Doit passer après la protection /api/* (voir auth.ts).
 import "./auth";
-import { envoyerPieceArrivee } from "../automatisations";
+import { envoyerPieceArrivee, envoyerCommandeArrivee } from "../automatisations";
 import { shopifyRead } from "../shopify";
 import { entreeStock, alertesSoeurs, produitParCode } from "./stock";
 import { AppError, clean, signature } from "../util";
@@ -264,7 +264,7 @@ app.post("/api/achats/recevoir", async (c) => {
   const b = await c.req.json().catch(() => ({}));
   const ids: number[] = (Array.isArray(b.ids) ? b.ids : [b.id]).map(Number).filter((n: number) => n > 0);
   if (!ids.length) throw new AppError(400, "Rien à réceptionner.");
-  const rows = (await sql`UPDATE commande_lignes SET statut = 'recue', recue_le = now() WHERE id = ANY(${ids}) AND statut = 'commandee' RETURNING reparation_id, variant_id, sku, barcode, libelle, quantite`) as any[];
+  const rows = (await sql`UPDATE commande_lignes SET statut = 'recue', recue_le = now() WHERE id = ANY(${ids}) AND statut = 'commandee' RETURNING reparation_id, variant_id, sku, barcode, libelle, quantite, devis_ligne_id`) as any[];
   // Produit hors catalogue (saisie libre, AliExpress…) commandé pour le stock : il entre dans le stock maison à la réception.
   // Si la ligne porte un code-barres déjà connu d'une fiche (code principal ou supplémentaire), c'est cette fiche qui est créditée,
   // sans la renommer avec le libellé du fournisseur.
@@ -280,6 +280,14 @@ app.post("/api/achats/recevoir", async (c) => {
     await sql`UPDATE reparations SET piece_a_valider = true, maj_le = now() WHERE id = ${rid}`;
     await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${rid}, 'note', ${`📦 Pièce arrivée : à valider dans l'atelier pour passer dans « À faire »${signature(c)}`})`;
     prets++;
+  }
+  // Commande client (pièce « pour le client ») : email « votre commande est arrivée » dès la réception.
+  const dlIds = rows.map((r) => r.devis_ligne_id).filter((x) => x);
+  if (dlIds.length) {
+    const cc = (await sql`SELECT reparation_id, libelle FROM devis_lignes WHERE id = ANY(${dlIds}) AND remise_client`) as any[];
+    const parRep = new Map<number, string[]>();
+    for (const x of cc) parRep.set(x.reparation_id, [...(parRep.get(x.reparation_id) ?? []), x.libelle]);
+    for (const [rid, libs] of parRep) void envoyerCommandeArrivee(rid, libs);
   }
   // Les tâches « toujours pas arrivé » de ces lignes n'ont plus lieu d'être.
   await sql`UPDATE taches SET fait = true, fait_le = now(), fait_par = 'Réception' WHERE fait = false AND ligne_id = ANY(${ids})`;
