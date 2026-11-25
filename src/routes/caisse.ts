@@ -22,7 +22,7 @@ export async function soldeFidelite(clientId: number) {
   const [avant] = (await sql`SELECT COALESCE(sum(total_cents + acompte_deduit_cents), 0)::int AS n FROM ventes WHERE client_id = ${clientId} AND type = 'vente' AND cree_le < date_trunc('day', now() AT TIME ZONE 'Europe/Paris') AT TIME ZONE 'Europe/Paris'`) as any[];
   const depenseEuros = dep.n / 100;
   const gagneEuros = Math.floor(avant.n / 100 / p.eurosPourPalier) * p.remiseEuros;
-  const [bons] = (await sql`SELECT COALESCE(sum(montant_cents), 0)::int AS n FROM bons_achat WHERE client_id = ${clientId}`) as any[];
+  const [bons] = (await sql`SELECT COALESCE(sum(montant_cents), 0)::int AS n FROM bons_achat WHERE client_id = ${clientId} AND cree_le > now() - interval '12 months'`) as any[];
   const disponibleEuros = Math.max(0, gagneEuros + bons.n / 100 - uti.n / 100);
   const prochainPalierIn = p.eurosPourPalier - (depenseEuros % p.eurosPourPalier);
   return { depenseEuros, disponibleEuros, prochainPalierIn, regle: p };

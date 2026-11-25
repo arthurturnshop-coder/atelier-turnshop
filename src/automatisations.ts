@@ -86,6 +86,20 @@ async function cycle() {
         AND NOT EXISTS (SELECT 1 FROM messages_envoyes m WHERE m.type = 'anniv' AND m.client_id = clients.id AND m.cree_le > now() - interval '300 days') LIMIT 40`) as any[];
       for (const r of rows) await notifier("anniv", { clientId: r.id, sujet: "C'est l'anniversaire de votre carte TURN Shop : une offre pour vous", texte: `Bonjour${prenomDe(r.prenom)}, cela fait un an que vous êtes client TURN Shop, merci pour votre confiance ! Pour fêter ça, nous vous offrons la révision de votre trottinette à ${prix} € (au lieu du tarif habituel).\n\nPrésentez-vous en boutique ou prenez rendez-vous, et dites simplement que c'est l'anniversaire de votre carte. L'équipe TURN Shop` });
     }
+    // Bons d'achat : valables 12 mois. Emails de prévenance 6 mois, 3 mois puis 1 mois avant l'expiration (un seul envoi par étape).
+    if (auto.bonexp !== "off" && h.h >= 9 && h.h < 19) {
+      const bons = (await sql`SELECT b.id, b.client_id, b.montant_cents, b.rappels, c.prenom,
+          to_char((b.cree_le + interval '12 months') AT TIME ZONE 'Europe/Paris', 'DD/MM/YYYY') AS expire,
+          CASE WHEN b.cree_le <= now() - interval '11 months' THEN 3 WHEN b.cree_le <= now() - interval '9 months' THEN 2 WHEN b.cree_le <= now() - interval '6 months' THEN 1 ELSE 0 END AS etape
+        FROM bons_achat b JOIN clients c ON c.id = b.client_id
+        WHERE b.montant_cents > 0 AND b.cree_le > now() - interval '12 months' AND c.email <> '' AND b.rappels < 3 AND b.cree_le <= now() - interval '6 months' LIMIT 40`) as any[];
+      for (const b of bons) {
+        if (b.etape <= b.rappels) continue;
+        const reste = b.etape === 1 ? "6 mois" : b.etape === 2 ? "3 mois" : "1 mois";
+        const r = await notifier("bonexp", { clientId: b.client_id, sujet: `Votre bon d'achat TURN Shop expire dans ${reste}`, texte: `Bonjour${prenomDe(b.prenom)}, vous avez un bon d'achat de ${(b.montant_cents / 100).toFixed(2).replace(".", ",")} € chez TURN Shop. Il est valable jusqu'au ${b.expire}, soit dans ${reste}. Passez en boutique pour l'utiliser avant cette date, il sera déduit directement à l'encaissement.\n\nL'équipe TURN Shop` });
+        if (r === "envoye") await sql`UPDATE bons_achat SET rappels = ${b.etape} WHERE id = ${b.id}`;
+      }
+    }
     if (auto.avis !== "off") {
       const rows = (await sql`SELECT r.id, r.client_id, r.magasin, c.prenom FROM reparations r JOIN clients c ON c.id = r.client_id WHERE r.avis_statut = 'programme' AND r.avis_envoi_le <= now() AND r.supprime_le IS NULL LIMIT 20`) as any[];
       for (const r of rows) {

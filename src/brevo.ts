@@ -7,8 +7,8 @@ export const brevoConfigure = () => !!Bun.env.BREVO_API_KEY;
 
 await sql`CREATE TABLE IF NOT EXISTS messages_envoyes (id SERIAL PRIMARY KEY, type TEXT NOT NULL, canal TEXT NOT NULL, client_id INT, reparation_id INT, vente_id INT, destinataire TEXT NOT NULL DEFAULT '', statut TEXT NOT NULL, erreur TEXT, cree_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
 
-export type Quand = "avis" | "rdv" | "piece" | "pret" | "garde" | "anniv";
-export const QUAND: Quand[] = ["avis", "rdv", "piece", "pret", "garde", "anniv"];
+export type Quand = "avis" | "rdv" | "piece" | "pret" | "garde" | "anniv" | "bonexp";
+export const QUAND: Quand[] = ["avis", "rdv", "piece", "pret", "garde", "anniv", "bonexp"];
 // Types de messages : les trois emails de gardiennage dépendent du même réglage « garde ».
 export type MsgType = Quand | "garde4" | "garde_hebdo" | "abandon";
 const REGLAGE = (t: MsgType): Quand => (t === "garde4" || t === "garde_hebdo" || t === "abandon" ? "garde" : t);

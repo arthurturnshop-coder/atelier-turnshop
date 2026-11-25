@@ -77,6 +77,7 @@ await sql`ALTER TABLE remboursements ADD CONSTRAINT remboursements_moyen_check C
 await sql`ALTER TABLE remboursements ADD COLUMN IF NOT EXISTS gift_card_id TEXT`;
 await sql`ALTER TABLE remboursements ADD COLUMN IF NOT EXISTS gift_card_fin TEXT`;
 await sql`CREATE TABLE IF NOT EXISTS bons_achat (id SERIAL PRIMARY KEY, client_id INT NOT NULL REFERENCES clients(id), montant_cents INT NOT NULL, motif TEXT NOT NULL DEFAULT '', cree_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
+await sql`ALTER TABLE bons_achat ADD COLUMN IF NOT EXISTS rappels INT NOT NULL DEFAULT 0`;
 await sql`ALTER TABLE reparations ADD COLUMN IF NOT EXISTS pret_le TIMESTAMPTZ, ADD COLUMN IF NOT EXISTS abandonnee_le TIMESTAMPTZ`;
 await sql`UPDATE reparations SET pret_le = maj_le WHERE statut = 'prêt' AND pret_le IS NULL`;
 await sql`ALTER TABLE reparations ADD COLUMN IF NOT EXISTS autorisations JSONB NOT NULL DEFAULT '[]'::jsonb`;
