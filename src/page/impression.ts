@@ -284,15 +284,22 @@ document.addEventListener("input",function(e){
 
 // ----- Étiquettes produits : nom, prix, code-barres -----
 var ETQ=[],ETQF=null,ETQSKIP=0;
-var ETQFORMATS={"50x30":{l:"Rouleau 50 × 30 mm",w:50,h:30},"40x25":{l:"Rouleau 40 × 25 mm",w:40,h:25},"62x29":{l:"Ruban Brother 62 × 40 mm",w:62,h:40},"a4":{l:"Planche A4 3 × 8 (70 × 37 mm)",w:70,h:37,page:"A4",cols:3,rows:8}};
+var ETQFORMATS={"50x30":{l:"Rouleau 50 × 30 mm",w:50,h:30},"40x25":{l:"Rouleau 40 × 25 mm",w:40,h:25},"62x29":{l:"Ruban Brother 62 × 40 mm",w:62,h:40},"a4":{l:"Planche A4 3 × 8 (70 × 37 mm)",w:70,h:37,page:"A4",cols:3,rows:8},"papier":{l:"Emplacements papier A4 2 × 4 (105 × 74 mm)",w:105,h:74,page:"A4",cols:2,rows:4}};
+function etqSeulEmpl(){return ETQ.length>0&&ETQ.every(function(x){return x.big&&x.style==='papier'})}
 function etqFormat(){
+  if(etqSeulEmpl())return"papier";
   if(!ETQF){try{ETQF=localStorage.getItem("etqf")||""}catch(e){ETQF=""}}
   if(!ETQFORMATS[ETQF])ETQF="62x29";return ETQF}
+var ETQES="papier";
 function etqBig(it,F){
-  var fs=Math.round(F.h*0.55*10)/10,bh=Math.round(F.h*0.3*10)/10;
-  return"<div class='etq' style='width:"+F.w+"mm;height:"+F.h+"mm;box-sizing:border-box;padding:1.5mm 2mm;overflow:hidden;font-family:Arial,Helvetica,sans-serif;color:#000;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center'>"
-    +"<div style='font-size:"+fs+"pt;font-weight:900;line-height:1;white-space:nowrap'>"+esc(it.big)+"</div>"
-    +"<div style='height:"+bh+"mm;width:"+Math.round(F.w*0.6)+"mm;margin-top:1mm'>"+code128Svg(it.big,6)+"</div></div>"}
+  var t=esc(it.big);
+  if(it.style==="simple"){
+    var fs=Math.round(F.h*0.62*10)/10;
+    return"<div class='etq' style='width:"+F.w+"mm;height:"+F.h+"mm;box-sizing:border-box;padding:1.2mm;font-family:Arial,Helvetica,sans-serif;color:#000;background:#fff'><div style='width:100%;height:100%;border:0.6mm solid #000;border-radius:2mm;display:flex;align-items:center;justify-content:center;font-size:"+fs+"pt;font-weight:900;line-height:1'>"+t+"</div></div>"}
+  return"<div class='etq' style='width:"+F.w+"mm;height:"+F.h+"mm;box-sizing:border-box;padding:3mm;font-family:Arial,Helvetica,sans-serif;background:#fff'><div style='width:100%;height:100%;border-radius:5mm;overflow:hidden;display:flex;flex-direction:column;background:#1e8449;color:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact'>"
+    +"<div style='padding:2.5mm 5mm;font-size:9pt;font-weight:800;letter-spacing:.25em;text-transform:uppercase;opacity:.95'>TURN Shop</div>"
+    +"<div style='flex:1;margin:0 4mm;background:#fff;color:#145c35;border-radius:3mm;display:flex;align-items:center;justify-content:center;font-size:"+Math.round(F.h*0.78)+"pt;font-weight:900;line-height:1;-webkit-print-color-adjust:exact;print-color-adjust:exact'>"+t+"</div>"
+    +"<div style='height:5mm;flex:none'></div></div></div>"}
 function etqLabel(it,F){
   if(it.big)return etqBig(it,F);
   var code=it.barcode||it.sku||"";
@@ -331,7 +338,7 @@ function etqEmpl(){
   Promise.all(todo.map(function(it){return api("/stock/scan",{magasin:MAG||"",code:it.barcode||it.sku,local:true}).then(function(r){if(r.produit&&r.produit.emplacement)it.empl=r.produit.emplacement}).catch(function(){})})).then(function(){if(TAB==="etq")render()})}
 function vEtq(){etqEmpl();
   var F=ETQFORMATS[etqFormat()],nb=etqToutes().length;
-  var gen="<div class='card'><div class='step'>Étiquettes d'emplacements et de casiers</div><div class='muted'>Génère une série (ex. A1 à A12, C1 à C20) : grosse écriture + code-barres. Elles s'ajoutent à la liste ci-dessous.</div>"
+  var gen="<div class='card'><div class='step'>Étiquettes d'emplacements et de casiers</div><div class='muted'>Génère une série (ex. A1 à A12, C1 à C20). Choisis le style, elles s'ajoutent à la liste ci-dessous.</div><div class='seg' style='margin:6px 0'><button class='"+(ETQES==="papier"?"on":"")+"' data-act='etqEs' data-s='papier'>📄 Emplacement design (papier A4, vert)</button><button class='"+(ETQES==="simple"?"on":"")+"' data-act='etqEs' data-s='simple'>🏷 Étiquette simple</button></div>"
     +"<div class='dl' style='flex-wrap:wrap'><input id='eg-p' placeholder='Lettre (A)' maxlength='6' style='max-width:110px'><input id='eg-a' type='number' min='0' placeholder='De' style='max-width:90px'><input id='eg-b' type='number' min='0' placeholder='À' style='max-width:90px'><input id='eg-q' type='number' min='1' max='20' value='1' title='Exemplaires' style='max-width:90px'><button data-act='etqGen'>Ajouter la série</button></div>"
     +"<div class='dl' style='flex-wrap:wrap;margin-top:6px'><input id='eg-l' placeholder='Ou une liste : A1, A2, B7, C3' style='flex:1;min-width:200px'><button class='sec' data-act='etqGenListe'>Ajouter</button></div></div>";
   var h=subHtml()+gen+"<div class='card'><div class='step'>Étiquettes produits</div><div class='muted'>Cherche un produit, ajoute-le, choisis le nombre d'étiquettes puis imprime. Chaque étiquette : nom, prix et code-barres.</div>"+prodBox("etq")+"</div>";
@@ -346,7 +353,8 @@ function vEtq(){etqEmpl();
   if(ETQ.length)h+="<div class='actions'><button data-act='etqPrint'>Imprimer</button><button class='sec' data-act='etqVider'>Tout vider</button></div>"
     +"<div class='step' style='margin-top:10px'>Aperçu</div><div style='overflow:auto;background:#eee;padding:8px'>"+etqLabel(ETQ[0],F)+"</div>";
   app.innerHTML=h+"</div>"}
-function etqAjout(codes,q){codes.forEach(function(c){c=String(c).trim().toUpperCase();if(c)ETQ.push({big:c,empl:"",titre:c,prix:"",barcode:c,sku:"",qte:q})});render()}
+ACTS.etqEs=function(b){ETQES=b.dataset.s;render()};
+function etqAjout(codes,q){codes.forEach(function(c){c=String(c).trim().toUpperCase();if(c)ETQ.push({big:c,style:ETQES,empl:"",titre:c,prix:"",barcode:"",sku:"",qte:q})});render()}
 ACTS.etqGen=function(){var p=(v("eg-p")||"").trim(),a=parseInt(v("eg-a"),10),b=parseInt(v("eg-b"),10),q=Math.max(1,parseInt(v("eg-q"),10)||1);
   if(isNaN(a))return alert("Indique le numéro de départ.");if(isNaN(b))b=a;if(b<a){var t=a;a=b;b=t}if(b-a>299)return alert("300 étiquettes maximum à la fois.");
   var L=[];for(var i=a;i<=b;i++)L.push(p+i);etqAjout(L,q)};
