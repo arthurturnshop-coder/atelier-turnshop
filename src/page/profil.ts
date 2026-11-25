@@ -15,6 +15,16 @@ function factRep(r){
   if(!PACH||!CUR||PACH.id!==CUR.id)return"";
   var f=PACH.list.filter(function(x){return x.reparationId===r.id});
   return f.map(function(x){return"<button class='sec' data-act='pFact' data-id='"+x.id+"'>🧾 Facture "+esc(x.numero||"n° "+x.id)+" · "+eur(x.totalCents)+"</button>"}).join("")}
+function payeLib(r){
+  if(!PACH||!CUR||PACH.id!==CUR.id)return"";
+  var f=PACH.list.filter(function(x){return x.reparationId===r.id});
+  if(f.length){var tot=0;f.forEach(function(x){tot+=x.totalCents});return"<span class='tag ok'>✓ Payé "+eur(tot)+"</span>"}
+  return r.statut==="récupéré"?"<span class='tag warn'>Aucune facture trouvée</span>":"<span class='tag'>Pas encore payé</span>"}
+function repLigne(r){
+  var j=(r.journal||[]).map(function(x){return"<div class='hist'>"+esc(dayHour(x.date))+" · "+esc(x.texte)+"</div>"}).join("");
+  return"<div class='rep'><div class='st'><b>"+esc(day(r.date_depot))+"</b><span class='tag'>"+esc(r.statut)+"</span>"+payeLib(r)+(r.sous_garantie?"<span class='tag ok'>Sous garantie</span>":"")+"</div><div>"+esc(r.panne)+"</div>"
+    +"<button class='sec' data-act='ouvrirFiche' data-id='"+r.id+"'>Ouvrir la fiche</button>"+factRep(r)
+    +(j?"<details style='margin-top:6px'><summary class='muted' style='cursor:pointer'>Journal du passage</summary>"+j+"</details>":"")+"</div>"}
 function recepForm(t){
   return"<div class='rep'><div class='step'>Nouvelle prise en charge pour "+esc(t.marque+" "+t.modele)+"</div>"
     +"<textarea id='p' rows='3' placeholder='Panne décrite par le client'></textarea><input id='e' placeholder='État à l arrivée'><textarea id='r' rows='2' placeholder='Remarques'></textarea>"+boiteSelect("b")+affairesBox("a")+"<input id='k' placeholder='🔑 Code / mot de passe de la trottinette (facultatif)'><input id='d' type='date' value='"+today()+"'>"
@@ -96,7 +106,11 @@ function vProfil(){
   var nbR=0;c.trottinettes.forEach(function(t){nbR+=t.reparations.length});
   h+="<div class='dl' style='margin-top:14px'><button class='"+(PTAB==="rep"?"":"sec")+"' data-act='pTab' data-t='rep'>🔧 Réparations ("+nbR+")</button><button class='"+(PTAB==="ach"?"":"sec")+"' data-act='pTab' data-t='ach'>🛒 Achats"+(PACH&&PACH.id===c.id?" ("+PACH.list.length+")":"")+"</button></div>";
   if(PTAB==="ach"){h+=achatsHtml();app.innerHTML=h;if((!PACH||PACH.id!==c.id)&&PACHLOAD!==c.id)loadAch();if(FID===null&&FIDLOAD!==c.id)loadFid();if((CACLI===null||CACLI.id!==c.id)&&CALOAD!==c.id)loadCa();return}
-  h+="<div class='step' style='margin-top:14px'>Trottinettes</div>";
+  h+="<div class='step' style='margin-top:14px'>🛠 Prise en charge d'aujourd'hui et réparations en cours</div>";
+  var encours=[];c.trottinettes.forEach(function(t){t.reparations.forEach(function(r){if(r.statut!=="récupéré")encours.push({t:t,r:r})})});
+  if(!encours.length)h+="<div class='card muted'>Rien en cours pour ce client. Pour une nouvelle prise en charge, clique sur « Réception » sur le véhicule ci-dessous.</div>";
+  encours.forEach(function(x){h+="<div class='card'><b>"+esc(x.t.marque+" "+x.t.modele)+"</b> <span class='tag'>N° "+esc(x.t.serie)+"</span>"+repHtml(x.r)+"</div>"});
+  h+="<div class='step' style='margin-top:18px'>🛴 Mes véhicules</div>";
   if(!c.trottinettes.length)h+="<div class='card muted'>Aucune trottinette associée. Ajoute-la ci-dessus.</div>";
   c.trottinettes.forEach(function(t){
     var open=t.reparations.filter(function(r){return r.statut!=="récupéré"}).length;
@@ -110,7 +124,8 @@ function vProfil(){
     if(RECEP===t.id)h+=recepForm(t);
     else h+="<button data-act='openRecep' data-t='"+t.id+"'>Réception</button>";
     if(!t.reparations.length)h+="<div class='muted' style='margin-top:8px'>Aucun passage à l'atelier.</div>";
-    t.reparations.forEach(function(r){h+=repHtml(r)});
+    if(t.reparations.length)h+="<div class='step' style='margin-top:10px'>Historique du véhicule</div>";
+    t.reparations.forEach(function(r){h+=repLigne(r)});
     h+="</div>"});
   app.innerHTML=h;
   if(FID===null&&FIDLOAD!==c.id)loadFid();
