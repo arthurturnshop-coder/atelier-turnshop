@@ -103,7 +103,7 @@ app.post("/api/depots", async (c) => {
   }
   const date = new Date().toISOString().slice(0, 10);
   const panne = "Dépôt-vente : révision complète obligatoire + remplacement de toutes les pièces en état critique";
-  const [r] = (await sql`INSERT INTO reparations (client_id, trottinette_id, panne, etat, remarques, date_depot, en_magasin, sous_garantie) VALUES (${clientId}, ${trottId}, ${panne}, ${clean(b.etat, 500)}, ${"Trottinette en dépôt-vente. " + clean(b.note, 500)}, ${date}, true, false) RETURNING id`) as any[];
+  const [r] = (await sql`INSERT INTO reparations (client_id, trottinette_id, panne, etat, remarques, date_depot, en_magasin, sous_garantie, magasin) VALUES (${clientId}, ${trottId}, ${panne}, ${clean(b.etat, 500)}, ${"Trottinette en dépôt-vente. " + clean(b.note, 500)}, ${date}, true, false, ${c.get("user")?.magasin ?? null}) RETURNING id`) as any[];
   const [d] = (await sql`INSERT INTO depots_vente (client_id, trottinette_id, reparation_id, marque, modele, annee, km, etat, note, emplacement, prix_cents, cree_par, magasin, options)
     VALUES (${clientId}, ${trottId}, ${r.id}, ${marque}, ${modele}, ${clean(b.annee, 20)}, ${clean(b.km, 20)}, ${clean(b.etat, 500)}, ${clean(b.note, 1000)}, ${clean(b.emplacement, 80)}, ${prix}, ${c.get("user")?.prenom ?? ""}, ${magasinDe(c)}, ${JSON.stringify(opts(b.options))}::jsonb) RETURNING id`) as any[];
   await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${r.id}, 'note', ${`Dépôt-vente DV-${d.id} : prix souhaité ${(prix / 100).toFixed(2)} €. Révision obligatoire + pièces critiques${signature(c)}`})`;

@@ -5,7 +5,7 @@ import "./auth";
 import { envoyerPieceArrivee, envoyerCommandeArrivee } from "../automatisations";
 import { shopifyRead } from "../shopify";
 import { entreeStock, alertesSoeurs, produitParCode } from "./stock";
-import { AppError, clean, signature } from "../util";
+import { AppError, clean, signature, magDe } from "../util";
 
 await sql`ALTER TABLE commande_lignes ADD COLUMN IF NOT EXISTS suivi TEXT`;
 await sql`ALTER TABLE commande_lignes ADD COLUMN IF NOT EXISTS boite TEXT`;
@@ -321,7 +321,7 @@ const pcnP = (id: number) => "PC-" + String(id).padStart(4, "0");
 app.get("/api/commandes-clients", async (c) => {
   const rows = (await sql`SELECT l.id, l.libelle, l.quantite, l.statut, l.commandee_le, l.recue_le, l.remise_le, l.boite, l.reparation_id, f.nom AS fournisseur, cl.prenom, cl.nom
     FROM commande_lignes l JOIN devis_lignes dl ON dl.id = l.devis_ligne_id AND dl.remise_client JOIN reparations r ON r.id = l.reparation_id JOIN clients cl ON cl.id = r.client_id LEFT JOIN fournisseurs f ON f.id = l.fournisseur_id
-    WHERE r.supprime_le IS NULL AND (l.remise_le IS NULL OR l.remise_le > now() - interval '30 days') ORDER BY (l.remise_le IS NOT NULL), l.id DESC LIMIT 200`) as any[];
+    WHERE r.supprime_le IS NULL AND (${magDe(c)}::text IS NULL OR r.magasin IS NULL OR r.magasin = ${magDe(c)}) AND (l.remise_le IS NULL OR l.remise_le > now() - interval '30 days') ORDER BY (l.remise_le IS NOT NULL), l.id DESC LIMIT 200`) as any[];
   return c.json({ commandes: rows.map((l) => ({ id: l.id, libelle: l.libelle, quantite: l.quantite, statut: l.remise_le ? "remise" : l.statut, fournisseur: l.fournisseur ?? "", commandeeLe: l.commandee_le, recueLe: l.recue_le, remiseLe: l.remise_le, boite: l.boite ?? "", repairId: l.reparation_id, numero: pcnP(l.reparation_id), client: `${l.prenom} ${l.nom}`.trim() })) });
 });
 
@@ -336,7 +336,7 @@ app.get("/api/pieces-a-remettre", async (c) => {
   const rows = (await sql`SELECT l.id, l.libelle, l.quantite, l.reparation_id, l.boite, l.recue_le, l.devis_ligne_id, r.client_id, r.boite AS boite_pc, cl.prenom, cl.nom, cl.telephone
     FROM commande_lignes l JOIN reparations r ON r.id = l.reparation_id JOIN clients cl ON cl.id = r.client_id
     JOIN devis_lignes dl ON dl.id = l.devis_ligne_id AND dl.remise_client
-    WHERE l.statut = 'recue' AND l.remise_le IS NULL AND r.supprime_le IS NULL ORDER BY l.recue_le`) as any[];
+    WHERE l.statut = 'recue' AND l.remise_le IS NULL AND r.supprime_le IS NULL AND (${magDe(c)}::text IS NULL OR r.magasin IS NULL OR r.magasin = ${magDe(c)}) ORDER BY l.recue_le`) as any[];
   const { acomptesDe } = await import("./acomptes");
   const out: any[] = [];
   for (const l of rows) {
@@ -347,9 +347,9 @@ app.get("/api/pieces-a-remettre", async (c) => {
       versetCents: ac.verseCents - ac.rembourseCents, totalCents: dv.t, facture: !!ac.facture,
       autres: autres.map((a) => ({ id: a.id, numero: pcnP(a.id), panne: a.panne, statut: a.statut })) });
   }
-  const occ = (await sql`SELECT boite, id AS rid FROM reparations WHERE boite IS NOT NULL AND boite <> '' AND supprime_le IS NULL AND statut <> 'récupéré'`) as any[];
-  const occL = (await sql`SELECT boite, reparation_id AS rid FROM commande_lignes WHERE boite IS NOT NULL AND boite <> '' AND remise_le IS NULL`) as any[];
-  const enCours = (await sql`SELECT l.id, l.libelle, l.statut, l.commandee_le, l.reparation_id, cl.prenom, cl.nom FROM commande_lignes l JOIN devis_lignes dl ON dl.id = l.devis_ligne_id AND dl.remise_client JOIN reparations r ON r.id = l.reparation_id JOIN clients cl ON cl.id = r.client_id WHERE l.statut IN ('panier','commandee') AND r.supprime_le IS NULL ORDER BY l.id DESC`) as any[];
+  const occ = (await sql`SELECT boite, id AS rid FROM reparations r WHERE boite IS NOT NULL AND boite <> '' AND supprime_le IS NULL AND statut <> 'récupéré' AND (${magDe(c)}::text IS NULL OR r.magasin IS NULL OR r.magasin = ${magDe(c)})`) as any[];
+  const occL = (await sql`SELECT l.boite, l.reparation_id AS rid FROM commande_lignes l JOIN reparations r ON r.id = l.reparation_id WHERE l.boite IS NOT NULL AND l.boite <> '' AND l.remise_le IS NULL AND (${magDe(c)}::text IS NULL OR r.magasin IS NULL OR r.magasin = ${magDe(c)})`) as any[];
+  const enCours = (await sql`SELECT l.id, l.libelle, l.statut, l.commandee_le, l.reparation_id, cl.prenom, cl.nom FROM commande_lignes l JOIN devis_lignes dl ON dl.id = l.devis_ligne_id AND dl.remise_client JOIN reparations r ON r.id = l.reparation_id JOIN clients cl ON cl.id = r.client_id WHERE l.statut IN ('panier','commandee') AND r.supprime_le IS NULL AND (${magDe(c)}::text IS NULL OR r.magasin IS NULL OR r.magasin = ${magDe(c)}) ORDER BY l.id DESC`) as any[];
   return c.json({ enCours: enCours.map((l) => ({ id: l.id, libelle: l.libelle, statut: l.statut, commandeeLe: l.commandee_le, numero: pcnP(l.reparation_id), client: `${l.prenom} ${l.nom}`.trim() })), pieces: out, cases: BOITES_P.map((n) => ({ nom: n, rid: (occ.find((o) => o.boite === n) ?? occL.find((o) => o.boite === n))?.rid ?? null })) });
 });
 
@@ -359,8 +359,8 @@ app.post("/api/pieces/boite", async (c) => {
   const [l] = (await sql`SELECT id, reparation_id, libelle FROM commande_lignes WHERE id = ${id} AND statut = 'recue' AND remise_le IS NULL`) as any[];
   if (!l) throw new AppError(404, "Pièce introuvable.");
   if (nv) {
-    const [p1] = (await sql`SELECT id FROM reparations WHERE boite = ${nv} AND supprime_le IS NULL AND statut <> 'récupéré' AND id <> ${l.reparation_id}`) as any[];
-    const [p2] = (await sql`SELECT reparation_id FROM commande_lignes WHERE boite = ${nv} AND remise_le IS NULL AND reparation_id <> ${l.reparation_id} LIMIT 1`) as any[];
+    const [p1] = (await sql`SELECT id FROM reparations r WHERE boite = ${nv} AND supprime_le IS NULL AND statut <> 'récupéré' AND id <> ${l.reparation_id} AND (${magDe(c)}::text IS NULL OR r.magasin IS NULL OR r.magasin = ${magDe(c)})`) as any[];
+    const [p2] = (await sql`SELECT l2.reparation_id FROM commande_lignes l2 JOIN reparations r ON r.id = l2.reparation_id WHERE l2.boite = ${nv} AND l2.remise_le IS NULL AND l2.reparation_id <> ${l.reparation_id} AND (${magDe(c)}::text IS NULL OR r.magasin IS NULL OR r.magasin = ${magDe(c)}) LIMIT 1`) as any[];
     if (p1 || p2) throw new AppError(400, `La case ${nv} est déjà utilisée par ${pcnP(p1?.id ?? p2.reparation_id)}.`);
   }
   await sql`UPDATE commande_lignes SET boite = ${nv || null} WHERE id = ${id}`;

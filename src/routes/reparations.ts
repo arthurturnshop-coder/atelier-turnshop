@@ -7,7 +7,7 @@ import { remiseMulti } from "./prestations";
 import { acomptesDe } from "./acomptes";
 import { trouverMaitre } from "./maitres";
 import { GARDE, infosGarde } from "../garde";
-import { AppError, clean, exigeResponsable, signature } from "../util";
+import { AppError, clean, exigeResponsable, magDe, signature } from "../util";
 
 export async function devisDe(repId: number) {
   const lignes = (await sql`SELECT d.id, d.type, d.libelle, d.quantite, d.prix_unitaire_cents, d.shopify_variant_id, d.sku, d.barcode, d.marque, d.remise_client, (SELECT statut FROM commande_lignes cl WHERE cl.devis_ligne_id = d.id ORDER BY cl.id DESC LIMIT 1) AS cmd FROM devis_lignes d WHERE d.reparation_id = ${repId} ORDER BY d.type DESC, d.id`) as any[];
@@ -59,7 +59,7 @@ export function ligneListe(r: any, journal: any[]) {
 // Liste des réparations : vue = rdv | afaire | commande | pretes | garantie | tout. Compteurs renvoyés avec.
 app.get("/api/reparations", async (c) => {
   const vue = clean(c.req.query("vue"), 20) || "tout";
-  const rows = (await sql`SELECT r.*, c.prenom, c.nom, c.telephone, c.email, t.marque, t.modele, t.serie FROM reparations r JOIN clients c ON c.id = r.client_id JOIN trottinettes t ON t.id = r.trottinette_id WHERE r.supprime_le IS NULL AND r.statut <> 'récupéré' ORDER BY r.maj_le DESC, r.id DESC LIMIT 300`) as any[];
+  const rows = (await sql`SELECT r.*, c.prenom, c.nom, c.telephone, c.email, t.marque, t.modele, t.serie FROM reparations r JOIN clients c ON c.id = r.client_id JOIN trottinettes t ON t.id = r.trottinette_id WHERE r.supprime_le IS NULL AND r.statut <> 'récupéré' AND (${magDe(c)}::text IS NULL OR r.magasin IS NULL OR r.magasin = ${magDe(c)}) ORDER BY r.maj_le DESC, r.id DESC LIMIT 300`) as any[];
   const compteurs = {
     rdv: rows.filter((r) => r.en_magasin === false).length,
     afaire: rows.filter((r) => r.en_magasin !== false && ["reçu", "diagnostic", "devis envoyé", "à faire", "en réparation"].includes(r.statut)).length,
@@ -104,7 +104,7 @@ app.post("/api/reparations", async (c) => {
   const date = /^\d{4}-\d{2}-\d{2}$/.test(b.dateDepot ?? "") ? b.dateDepot : new Date().toISOString().slice(0, 10);
   const enMagasin = b.enMagasin !== false;
   const garantie = b.sousGarantie === true;
-  const [r] = await sql`INSERT INTO reparations (client_id, trottinette_id, panne, etat, remarques, date_depot, en_magasin, sous_garantie) VALUES (${clientId}, ${trottId}, ${panne}, ${clean(b.etat, 500)}, ${clean(b.remarques, 1000)}, ${date}, ${enMagasin}, ${garantie}) RETURNING id`;
+  const [r] = await sql`INSERT INTO reparations (client_id, trottinette_id, panne, etat, remarques, date_depot, en_magasin, sous_garantie, magasin) VALUES (${clientId}, ${trottId}, ${panne}, ${clean(b.etat, 500)}, ${clean(b.remarques, 1000)}, ${date}, ${enMagasin}, ${garantie}, ${magDe(c)}) RETURNING id`;
   if (clean(b.codeAcces, 60)) await sql`UPDATE trottinettes SET code_acces = ${clean(b.codeAcces, 60)} WHERE id = ${trottId}`;
   const affNouv = affairesClean(b.affaires);
   if (affNouv.length) {
@@ -113,8 +113,8 @@ app.post("/api/reparations", async (c) => {
   }
   const boiteNouv = clean(b.boite, 10).toUpperCase();
   if (boiteNouv) {
-    const [pris] = (await sql`SELECT id FROM reparations WHERE boite = ${boiteNouv} AND supprime_le IS NULL AND statut <> 'récupéré' AND id <> ${r.id}`) as any[];
-    const [prisL] = (await sql`SELECT reparation_id FROM commande_lignes WHERE boite = ${boiteNouv} AND remise_le IS NULL AND reparation_id <> ${r.id} LIMIT 1`) as any[];
+    const [pris] = (await sql`SELECT id FROM reparations WHERE boite = ${boiteNouv} AND supprime_le IS NULL AND statut <> 'récupéré' AND id <> ${r.id} AND (${magDe(c)}::text IS NULL OR magasin IS NULL OR magasin = ${magDe(c)})`) as any[];
+    const [prisL] = (await sql`SELECT l.reparation_id FROM commande_lignes l JOIN reparations rr ON rr.id = l.reparation_id WHERE l.boite = ${boiteNouv} AND l.remise_le IS NULL AND l.reparation_id <> ${r.id} AND (${magDe(c)}::text IS NULL OR rr.magasin IS NULL OR rr.magasin = ${magDe(c)}) LIMIT 1`) as any[];
     if (!pris && !prisL) { await sql`UPDATE reparations SET boite = ${boiteNouv} WHERE id = ${r.id}`; await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${r.id}, 'note', ${"Matériel rangé dans la boîte " + boiteNouv + signature(c)})`; }
   }
   const texte = enMagasin ? "Reçu à l'atelier" : "Prise en charge créée, trottinette pas encore en magasin";
@@ -175,8 +175,8 @@ app.post("/api/reparations/maj", async (c) => {
   if (typeof b.boite === "string" && clean(b.boite, 10).toUpperCase() !== (r.boite ?? "")) {
     const nv = clean(b.boite, 10).toUpperCase();
     if (nv) {
-      const [pris] = (await sql`SELECT id FROM reparations WHERE boite = ${nv} AND supprime_le IS NULL AND statut <> 'récupéré' AND id <> ${id}`) as any[];
-      const [prisL] = (await sql`SELECT reparation_id FROM commande_lignes WHERE boite = ${nv} AND remise_le IS NULL AND reparation_id <> ${id} LIMIT 1`) as any[];
+      const [pris] = (await sql`SELECT id FROM reparations WHERE boite = ${nv} AND supprime_le IS NULL AND statut <> 'récupéré' AND id <> ${id} AND (${magDe(c)}::text IS NULL OR magasin IS NULL OR magasin = ${magDe(c)})`) as any[];
+      const [prisL] = (await sql`SELECT l.reparation_id FROM commande_lignes l JOIN reparations rr ON rr.id = l.reparation_id WHERE l.boite = ${nv} AND l.remise_le IS NULL AND l.reparation_id <> ${id} AND (${magDe(c)}::text IS NULL OR rr.magasin IS NULL OR rr.magasin = ${magDe(c)}) LIMIT 1`) as any[];
       if (pris || prisL) throw new AppError(400, `La boîte ${nv} est déjà utilisée par PC-${String((pris?.id ?? prisL.reparation_id)).padStart(4, "0")}.`);
     }
     await sql`UPDATE reparations SET boite = ${nv || null}, maj_le = now() WHERE id = ${id}`;
@@ -256,8 +256,8 @@ app.post("/api/reparations/avis", async (c) => {
 
 // Vue « Mes casiers » : chaque boîte avec sa prise en charge (matériel) et les pièces rangées dedans.
 app.get("/api/casiers", async (c) => {
-  const pcs = (await sql`SELECT r.id, r.boite, r.statut, r.panne, r.magasin, cl.prenom, cl.nom, cl.telephone FROM reparations r JOIN clients cl ON cl.id = r.client_id WHERE r.boite IS NOT NULL AND r.boite <> '' AND r.supprime_le IS NULL AND r.statut <> 'récupéré'`) as any[];
-  const pieces = (await sql`SELECT l.id, l.libelle, l.quantite, l.boite, l.recue_le, l.reparation_id, cl.prenom, cl.nom FROM commande_lignes l JOIN reparations r ON r.id = l.reparation_id JOIN clients cl ON cl.id = r.client_id WHERE l.boite IS NOT NULL AND l.boite <> '' AND l.remise_le IS NULL`) as any[];
+  const pcs = (await sql`SELECT r.id, r.boite, r.statut, r.panne, r.magasin, cl.prenom, cl.nom, cl.telephone FROM reparations r JOIN clients cl ON cl.id = r.client_id WHERE r.boite IS NOT NULL AND r.boite <> '' AND r.supprime_le IS NULL AND r.statut <> 'récupéré' AND (${magDe(c)}::text IS NULL OR r.magasin IS NULL OR r.magasin = ${magDe(c)})`) as any[];
+  const pieces = (await sql`SELECT l.id, l.libelle, l.quantite, l.boite, l.recue_le, l.reparation_id, cl.prenom, cl.nom FROM commande_lignes l JOIN reparations r ON r.id = l.reparation_id JOIN clients cl ON cl.id = r.client_id WHERE l.boite IS NOT NULL AND l.boite <> '' AND l.remise_le IS NULL AND (${magDe(c)}::text IS NULL OR r.magasin IS NULL OR r.magasin = ${magDe(c)})`) as any[];
   const pn = (id: number) => "PC-" + String(id).padStart(4, "0");
   const noms = [...new Set([...BOITES, ...pcs.map((r) => r.boite), ...pieces.map((l) => l.boite)])];
   return c.json({ casiers: noms.map((nom) => {
@@ -272,8 +272,8 @@ app.get("/api/casiers", async (c) => {
 
 // Boîtes de rangement du matériel (C1 à C8) : libre ou occupée par quelle prise en charge.
 app.get("/api/boites", async (c) => {
-  const rows = (await sql`SELECT r.id, r.boite, c.prenom, c.nom FROM reparations r JOIN clients c ON c.id = r.client_id WHERE r.boite IS NOT NULL AND r.boite <> '' AND r.supprime_le IS NULL AND r.statut <> 'récupéré'`) as any[];
-  const lp = (await sql`SELECT l.boite, l.reparation_id AS id, cl.prenom, cl.nom FROM commande_lignes l JOIN reparations r ON r.id = l.reparation_id JOIN clients cl ON cl.id = r.client_id WHERE l.boite IS NOT NULL AND l.boite <> '' AND l.remise_le IS NULL`) as any[];
+  const rows = (await sql`SELECT r.id, r.boite, c.prenom, c.nom FROM reparations r JOIN clients c ON c.id = r.client_id WHERE r.boite IS NOT NULL AND r.boite <> '' AND r.supprime_le IS NULL AND r.statut <> 'récupéré' AND (${magDe(c)}::text IS NULL OR r.magasin IS NULL OR r.magasin = ${magDe(c)})`) as any[];
+  const lp = (await sql`SELECT l.boite, l.reparation_id AS id, cl.prenom, cl.nom FROM commande_lignes l JOIN reparations r ON r.id = l.reparation_id JOIN clients cl ON cl.id = r.client_id WHERE l.boite IS NOT NULL AND l.boite <> '' AND l.remise_le IS NULL AND (${magDe(c)}::text IS NULL OR r.magasin IS NULL OR r.magasin = ${magDe(c)})`) as any[];
   for (const x of lp) if (!rows.find((r) => r.boite === x.boite)) rows.push(x);
   const noms = [...BOITES, ...rows.map((r) => r.boite).filter((b) => !BOITES.includes(b))];
   return c.json({ boites: noms.map((nom) => { const r = rows.find((x) => x.boite === nom); return { nom, repairId: r?.id ?? null, client: r ? `${r.prenom} ${r.nom}`.trim() : "" }; }) });

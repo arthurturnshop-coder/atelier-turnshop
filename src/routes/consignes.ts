@@ -2,7 +2,7 @@ import { app } from "../app";
 import { CONSIGNES } from "../config";
 import { sql } from "../db";
 import { FIDELITE_QUERY, shopifyRead } from "../shopify";
-import { clean } from "../util";
+import { clean, magDe } from "../util";
 
 // ---------- Consignes, chiffres, fidélité ----------
 app.get("/api/consignes", async (c) => {
@@ -25,14 +25,14 @@ app.post("/api/consignes", async (c) => {
 });
 
 app.get("/api/chiffres", async (c) => {
-  const [recues] = await sql`SELECT count(*)::int AS n FROM reparations WHERE date_depot = CURRENT_DATE AND supprime_le IS NULL`;
-  const [encours] = await sql`SELECT count(*)::int AS n FROM reparations WHERE statut <> 'récupéré' AND supprime_le IS NULL`;
-  const [pretes] = await sql`SELECT count(*)::int AS n FROM reparations WHERE statut = 'prêt' AND supprime_le IS NULL`;
-  const [recup] = await sql`SELECT count(*)::int AS n FROM reparations WHERE statut = 'récupéré' AND maj_le::date = CURRENT_DATE AND supprime_le IS NULL`;
+  const [recues] = await sql`SELECT count(*)::int AS n FROM reparations WHERE date_depot = CURRENT_DATE AND supprime_le IS NULL AND (${magDe(c)}::text IS NULL OR magasin IS NULL OR magasin = ${magDe(c)})`;
+  const [encours] = await sql`SELECT count(*)::int AS n FROM reparations WHERE statut <> 'récupéré' AND supprime_le IS NULL AND (${magDe(c)}::text IS NULL OR magasin IS NULL OR magasin = ${magDe(c)})`;
+  const [pretes] = await sql`SELECT count(*)::int AS n FROM reparations WHERE statut = 'prêt' AND supprime_le IS NULL AND (${magDe(c)}::text IS NULL OR magasin IS NULL OR magasin = ${magDe(c)})`;
+  const [recup] = await sql`SELECT count(*)::int AS n FROM reparations WHERE statut = 'récupéré' AND maj_le::date = CURRENT_DATE AND supprime_le IS NULL AND (${magDe(c)}::text IS NULL OR magasin IS NULL OR magasin = ${magDe(c)})`;
   const [clients] = await sql`SELECT count(*)::int AS n FROM clients WHERE cree_le::date = CURRENT_DATE`;
-  const [avis] = await sql`SELECT count(*)::int AS n FROM reparations WHERE avis_statut = 'programme' AND supprime_le IS NULL`;
-  const [ca] = await sql`SELECT COALESCE(sum(total_cents), 0)::int AS n FROM ventes WHERE cree_le::date = CURRENT_DATE`;
-  const [mois] = await sql`SELECT COALESCE(sum(total_cents + acompte_deduit_cents), 0)::int AS n FROM ventes WHERE type = 'vente' AND date_trunc('month', cree_le AT TIME ZONE 'Europe/Paris') = date_trunc('month', now() AT TIME ZONE 'Europe/Paris')`;
+  const [avis] = await sql`SELECT count(*)::int AS n FROM reparations WHERE avis_statut = 'programme' AND supprime_le IS NULL AND (${magDe(c)}::text IS NULL OR magasin IS NULL OR magasin = ${magDe(c)})`;
+  const [ca] = await sql`SELECT COALESCE(sum(total_cents), 0)::int AS n FROM ventes WHERE cree_le::date = CURRENT_DATE AND (${magDe(c)}::text IS NULL OR magasin IS NULL OR magasin = ${magDe(c)})`;
+  const [mois] = await sql`SELECT COALESCE(sum(total_cents + acompte_deduit_cents), 0)::int AS n FROM ventes WHERE type = 'vente' AND date_trunc('month', cree_le AT TIME ZONE 'Europe/Paris') = date_trunc('month', now() AT TIME ZONE 'Europe/Paris') AND (${magDe(c)}::text IS NULL OR magasin IS NULL OR magasin = ${magDe(c)})`;
   return c.json({
     caMoisCents: mois.n,
     receptionsAujourdhui: recues.n,
