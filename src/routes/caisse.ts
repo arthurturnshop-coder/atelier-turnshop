@@ -13,6 +13,25 @@ import { vendeurParMdp } from "./caissier";
 import { createHmac } from "node:crypto";
 import { brevoConfigure, envoiEmail } from "../brevo";
 
+// Bons d'achat valables 12 mois. Chaque remise utilisée en caisse consomme d'abord le bon valable le plus ancien (celui qui expire en premier),
+// puis seulement la remise fidélité. Un bon expiré n'est jamais « consommé » à la place d'un bon récent.
+export async function bonsRestants(clientId: number) {
+  const bons = (await sql`SELECT id, montant_cents, cree_le, (cree_le > now() - interval '12 months') AS valide FROM bons_achat WHERE client_id = ${clientId} ORDER BY cree_le, id`) as any[];
+  const usages = (await sql`SELECT remise_cents, cree_le FROM ventes WHERE client_id = ${clientId} AND remise_cents > 0 ORDER BY cree_le, id`) as any[];
+  const reste = bons.map((b) => ({ id: b.id as number, restantCents: b.montant_cents as number, valide: !!b.valide, debut: new Date(b.cree_le).getTime(), fin: new Date(b.cree_le).getTime() + 365 * 86400000 }));
+  let fidUtiliseCents = 0;
+  for (const u of usages) {
+    let r = u.remise_cents as number;
+    const t = new Date(u.cree_le).getTime();
+    for (const b of reste) {
+      if (r <= 0) break;
+      if (b.debut <= t && t < b.fin && b.restantCents > 0) { const x = Math.min(r, b.restantCents); b.restantCents -= x; r -= x; }
+    }
+    fidUtiliseCents += r;
+  }
+  return { restants: reste, fidUtiliseCents };
+}
+
 // Les points Shopify (lecture seule) restent affichés à part dans le profil.
 export async function soldeFidelite(clientId: number) {
   const p = await lireParametres();
@@ -22,8 +41,9 @@ export async function soldeFidelite(clientId: number) {
   const [avant] = (await sql`SELECT COALESCE(sum(total_cents + acompte_deduit_cents), 0)::int AS n FROM ventes WHERE client_id = ${clientId} AND type = 'vente' AND cree_le < date_trunc('day', now() AT TIME ZONE 'Europe/Paris') AT TIME ZONE 'Europe/Paris'`) as any[];
   const depenseEuros = dep.n / 100;
   const gagneEuros = Math.floor(avant.n / 100 / p.eurosPourPalier) * p.remiseEuros;
-  const [bons] = (await sql`SELECT COALESCE(sum(montant_cents), 0)::int AS n FROM bons_achat WHERE client_id = ${clientId} AND cree_le > now() - interval '12 months'`) as any[];
-  const disponibleEuros = Math.max(0, gagneEuros + bons.n / 100 - uti.n / 100);
+  const { restants, fidUtiliseCents } = await bonsRestants(clientId);
+  const bonsValidesCents = restants.filter((b) => b.valide).reduce((t, b) => t + b.restantCents, 0);
+  const disponibleEuros = Math.max(0, gagneEuros - fidUtiliseCents / 100) + bonsValidesCents / 100;
   const prochainPalierIn = p.eurosPourPalier - (depenseEuros % p.eurosPourPalier);
   return { depenseEuros, disponibleEuros, prochainPalierIn, regle: p };
 }

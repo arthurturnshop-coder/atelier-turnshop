@@ -95,6 +95,10 @@ async function cycle() {
         WHERE b.montant_cents > 0 AND b.cree_le > now() - interval '12 months' AND c.email <> '' AND b.rappels < 3 AND b.cree_le <= now() - interval '6 months' LIMIT 40`) as any[];
       for (const b of bons) {
         if (b.etape <= b.rappels) continue;
+        const { restants } = await (await import("./routes/caisse")).bonsRestants(b.client_id);
+        const rest = restants.find((x) => x.id === b.id)?.restantCents ?? 0;
+        if (rest <= 0) { await sql`UPDATE bons_achat SET rappels = 3 WHERE id = ${b.id}`; continue; }
+        b.montant_cents = rest;
         const reste = b.etape === 1 ? "6 mois" : b.etape === 2 ? "3 mois" : "1 mois";
         const r = await notifier("bonexp", { clientId: b.client_id, sujet: `Votre bon d'achat TURN Shop expire dans ${reste}`, texte: `Bonjour${prenomDe(b.prenom)}, vous avez un bon d'achat de ${(b.montant_cents / 100).toFixed(2).replace(".", ",")} € chez TURN Shop. Il est valable jusqu'au ${b.expire}, soit dans ${reste}. Passez en boutique pour l'utiliser avant cette date, il sera déduit directement à l'encaissement.\n\nL'équipe TURN Shop` });
         if (r === "envoye") await sql`UPDATE bons_achat SET rappels = ${b.etape} WHERE id = ${b.id}`;
