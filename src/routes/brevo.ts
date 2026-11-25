@@ -15,6 +15,7 @@ app.post("/api/brevo", async (c) => {
   exigeAdmin(c);
   const b = await c.req.json().catch(() => ({}));
   for (const q of QUAND) {
+    if (b[q] === undefined) continue; // un réglage absent de la demande reste tel quel
     const v = ["off", "email", "sms", "both"].includes(b[q]) ? b[q] : "off";
     await sql`INSERT INTO reglages (cle, valeur) VALUES (${"brevo_" + q}, ${v}) ON CONFLICT (cle) DO UPDATE SET valeur = EXCLUDED.valeur`;
   }
