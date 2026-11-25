@@ -7,6 +7,9 @@ import { entreeStock, alertesSoeurs, produitParCode } from "./stock";
 import { AppError, clean, signature } from "../util";
 
 await sql`ALTER TABLE commande_lignes ADD COLUMN IF NOT EXISTS suivi TEXT`;
+await sql`ALTER TABLE commande_lignes ADD COLUMN IF NOT EXISTS boite TEXT`;
+await sql`ALTER TABLE commande_lignes ADD COLUMN IF NOT EXISTS remise_le TIMESTAMPTZ`;
+await sql`ALTER TABLE commande_lignes ADD COLUMN IF NOT EXISTS remise_par TEXT`;
 await sql`ALTER TABLE fournisseurs ADD COLUMN IF NOT EXISTS mode TEXT NOT NULL DEFAULT 'groupe'`;
 await sql`UPDATE fournisseurs SET mode = 'unitaire' WHERE mode = 'groupe' AND nom ~* 'aliexpress|amazon|ebay|temu|banggood' AND NOT EXISTS (SELECT 1 FROM commandes c WHERE c.fournisseur_id = fournisseurs.id)`;
 await sql`ALTER TABLE commandes ADD COLUMN IF NOT EXISTS suivi TEXT`;
@@ -220,4 +223,68 @@ app.post("/api/reparations/valider-piece", async (c) => {
   await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${id}, 'statut', ${`Pièce validée : ${r.statut} → à faire. Client à prévenir${signature(c)}`})`;
   void envoyerPieceArrivee(id);
   return c.json({ message: "Pièce validée : la réparation passe dans « À faire »." });
+});
+
+// ---------- Pièces commandées exprès pour un client : arrivées, rangées dans une case, à remettre ----------
+const BOITES_P = ["C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8"];
+const pcnP = (id: number) => "PC-" + String(id).padStart(4, "0");
+
+app.get("/api/pieces-a-remettre", async (c) => {
+  const rows = (await sql`SELECT l.id, l.libelle, l.quantite, l.reparation_id, l.boite, l.recue_le, l.devis_ligne_id, r.client_id, r.boite AS boite_pc, cl.prenom, cl.nom, cl.telephone
+    FROM commande_lignes l JOIN reparations r ON r.id = l.reparation_id JOIN clients cl ON cl.id = r.client_id
+    WHERE l.statut = 'recue' AND l.remise_le IS NULL AND r.supprime_le IS NULL ORDER BY l.recue_le`) as any[];
+  const { acomptesDe } = await import("./acomptes");
+  const out: any[] = [];
+  for (const l of rows) {
+    const ac = await acomptesDe(l.reparation_id);
+    const [dv] = (await sql`SELECT COALESCE(sum(quantite * prix_unitaire_cents), 0)::int AS t FROM devis_lignes WHERE reparation_id = ${l.reparation_id}`) as any[];
+    const autres = (await sql`SELECT id, panne, statut FROM reparations WHERE client_id = ${l.client_id} AND id <> ${l.reparation_id} AND supprime_le IS NULL AND statut <> 'récupéré' ORDER BY id DESC LIMIT 8`) as any[];
+    out.push({ id: l.id, libelle: l.libelle, quantite: l.quantite, repairId: l.reparation_id, numero: pcnP(l.reparation_id), client: `${l.prenom} ${l.nom}`.trim(), telephone: l.telephone ?? "", boite: l.boite ?? "", boitePc: l.boite_pc ?? "", recueLe: l.recue_le,
+      versetCents: ac.verseCents - ac.rembourseCents, totalCents: dv.t, facture: !!ac.facture,
+      autres: autres.map((a) => ({ id: a.id, numero: pcnP(a.id), panne: a.panne, statut: a.statut })) });
+  }
+  const occ = (await sql`SELECT boite, id AS rid FROM reparations WHERE boite IS NOT NULL AND boite <> '' AND supprime_le IS NULL AND statut <> 'récupéré'`) as any[];
+  const occL = (await sql`SELECT boite, reparation_id AS rid FROM commande_lignes WHERE boite IS NOT NULL AND boite <> '' AND remise_le IS NULL`) as any[];
+  return c.json({ pieces: out, cases: BOITES_P.map((n) => ({ nom: n, rid: (occ.find((o) => o.boite === n) ?? occL.find((o) => o.boite === n))?.rid ?? null })) });
+});
+
+app.post("/api/pieces/boite", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const id = Number(b.id), nv = clean(b.boite, 10).toUpperCase();
+  const [l] = (await sql`SELECT id, reparation_id, libelle FROM commande_lignes WHERE id = ${id} AND statut = 'recue' AND remise_le IS NULL`) as any[];
+  if (!l) throw new AppError(404, "Pièce introuvable.");
+  if (nv) {
+    const [p1] = (await sql`SELECT id FROM reparations WHERE boite = ${nv} AND supprime_le IS NULL AND statut <> 'récupéré' AND id <> ${l.reparation_id}`) as any[];
+    const [p2] = (await sql`SELECT reparation_id FROM commande_lignes WHERE boite = ${nv} AND remise_le IS NULL AND reparation_id <> ${l.reparation_id} LIMIT 1`) as any[];
+    if (p1 || p2) throw new AppError(400, `La case ${nv} est déjà utilisée par ${pcnP(p1?.id ?? p2.reparation_id)}.`);
+  }
+  await sql`UPDATE commande_lignes SET boite = ${nv || null} WHERE id = ${id}`;
+  await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${l.reparation_id}, 'note', ${`Pièce « ${l.libelle} » ${nv ? "rangée dans la case " + nv : "sortie de sa case"}${signature(c)}`})`;
+  return c.json({ message: nv ? `Rangée dans ${nv}.` : "Case libérée." });
+});
+
+app.post("/api/pieces/rattacher", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const id = Number(b.id), cible = Number(b.repairId);
+  const [l] = (await sql`SELECT l.id, l.reparation_id, l.libelle, l.devis_ligne_id, r.client_id FROM commande_lignes l JOIN reparations r ON r.id = l.reparation_id WHERE l.id = ${id} AND l.statut = 'recue' AND l.remise_le IS NULL`) as any[];
+  if (!l) throw new AppError(404, "Pièce introuvable.");
+  const [t] = (await sql`SELECT id, client_id FROM reparations WHERE id = ${cible} AND supprime_le IS NULL`) as any[];
+  if (!t) throw new AppError(404, "Prise en charge ou devis introuvable.");
+  if (t.client_id !== l.client_id) throw new AppError(400, "Ce devis appartient à un autre client.");
+  if (t.id === l.reparation_id) throw new AppError(400, "Déjà rattachée à cette prise en charge.");
+  await sql`UPDATE commande_lignes SET reparation_id = ${cible} WHERE id = ${id}`;
+  if (l.devis_ligne_id) await sql`UPDATE devis_lignes SET reparation_id = ${cible} WHERE id = ${l.devis_ligne_id}`;
+  await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${l.reparation_id}, 'note', ${`Pièce « ${l.libelle} » rattachée à ${pcnP(cible)}${signature(c)}`})`;
+  await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${cible}, 'note', ${`Pièce « ${l.libelle} » ajoutée depuis ${pcnP(l.reparation_id)}${signature(c)}`})`;
+  return c.json({ message: `Pièce rattachée à ${pcnP(cible)}.` });
+});
+
+app.post("/api/pieces/remettre", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const id = Number(b.id);
+  const [l] = (await sql`SELECT id, reparation_id, libelle FROM commande_lignes WHERE id = ${id} AND statut = 'recue' AND remise_le IS NULL`) as any[];
+  if (!l) throw new AppError(404, "Pièce introuvable.");
+  await sql`UPDATE commande_lignes SET remise_le = now(), remise_par = ${c.get("user")?.prenom ?? ""}, boite = NULL WHERE id = ${id}`;
+  await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${l.reparation_id}, 'note', ${`Pièce « ${l.libelle} » remise au client${signature(c)}`})`;
+  return c.json({ message: "Pièce remise au client." });
 });

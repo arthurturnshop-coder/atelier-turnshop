@@ -22,7 +22,7 @@ function vCreer(){
     h+="<div class='cre-hint' style='margin:8px 0'>Ou nouveau client :</div><div class='cre-2'><input id='cn-pn' placeholder='Prénom'><input id='cn-nm' placeholder='Nom'><input id='cn-tel' placeholder='Téléphone'><input id='cn-em' placeholder='Email'></div>"}
   h+="</div>";
   // 2. Trottinette
-  h+="<div class='cre-sec'><div class='cre-h'><span class='cre-n'>2</span>Trottinette</div>";
+  h+="<div class='cre-sec'><div class='cre-h'><span class='cre-n'>2</span>Trottinette</div>"+(m==="devis"?"<div class='cre-chips'><label><input id='cr-sv' type='checkbox'> Pas de trottinette (achat de pièces ou d accessoires)</label></div>":"");
   var ts=(CRE.cli&&CRE.cli.trottinettes)||[];
   if(ts.length)h+="<select id='ct-sel'>"+ts.map(function(t){return"<option value='"+t.id+"'>"+esc(t.marque+" "+t.modele)+(t.serie?" · "+esc(t.serie):"")+"</option>"}).join("")+"<option value='new'>Autre trottinette…</option></select>";
   h+="<div id='ct-new'"+(ts.length?" style='display:none'":"")+"><div class='cre-2'><input id='ct-m' placeholder='Marque'><input id='ct-mo' placeholder='Modèle'></div><input id='ct-s' placeholder='N° de série (vide = inconnu)' style='margin-top:10px'></div>";
@@ -62,8 +62,9 @@ ACTS.creOk=async function(){
     if(CRE.cli)cid=CRE.cli.id;
     else{if(!v("cn-nm")){throw new Error("Choisis un client ou renseigne au moins le nom du nouveau client.")}
       var dc=await api("/clients",{prenom:v("cn-pn"),nom:v("cn-nm"),telephone:v("cn-tel"),email:v("cn-em")});cid=dc.id}
-    var tid;
-    if(sel&&sel.value!=="new")tid=Number(sel.value);
+    var tid,sv=document.getElementById("cr-sv");
+    if(sv&&sv.checked){var dsv=await api("/trottinettes",{customerId:cid,marque:"Sans véhicule",modele:"Achat de pièces / accessoires",serie:"NC-"+Date.now()});tid=dsv.id}
+    else if(sel&&sel.value!=="new")tid=Number(sel.value);
     else{if(!v("ct-m")||!v("ct-mo"))throw new Error("Indique la marque et le modèle de la trottinette.");
       var dt=await api("/trottinettes",{customerId:cid,marque:v("ct-m"),modele:v("ct-mo"),serie:v("ct-s")||("NC-"+Date.now())});tid=dt.id}
     var d=await api("/reparations",{customerId:cid,trottinetteId:tid,panne:(m==="devis"?"Devis : ":"")+pn,etat:v("cr-e"),remarques:v("cr-r"),boite:v("cr-b"),affaires:affairesLire("cr"),codeAcces:v("cr-k"),dateDepot:v("cr-d"),enMagasin:!(abs&&abs.checked),sousGarantie:!!(gar&&gar.checked)});

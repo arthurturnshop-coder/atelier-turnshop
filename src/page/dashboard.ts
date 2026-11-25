@@ -42,6 +42,21 @@ function blocTaches(){
     if(act.length){h+="<div class='step' style='margin-top:12px'>Planning des récurrences</div>";
       act.forEach(function(r){h+="<div class='muted'>"+esc(r.texte)+" · "+esc(r.libelle)+" · prochaine fois : "+jourCourt(r.prochaine)+"</div>"})}}
   return h+"</div>"}
+var PCR=null,PCRB=false,PCRO=null;
+function pcrLoad(){if(PCR===null&&!PCRB){PCRB=true;api("/pieces-a-remettre").then(function(d){PCR=d;PCRB=false;render()}).catch(function(){PCR={pieces:[],cases:[]};PCRB=false})}}
+function blocPieces(){
+  pcrLoad();if(!PCR||!PCR.pieces.length)return"";
+  var h="<div class='card pcr'><b>📦 Pièces à remettre aux clients ("+PCR.pieces.length+")</b><div class='muted'>Commandées exprès, arrivées, rangées en boutique.</div>";
+  PCR.pieces.forEach(function(p){
+    var reste=p.totalCents-p.versetCents,open=PCRO&&PCRO.id===p.id;
+    h+="<div class='pcrrow'><div><b>"+esc(p.quantite>1?p.quantite+" × ":"")+esc(p.libelle)+"</b> · "+esc(p.client)+(p.telephone?" <span class='muted'>"+esc(p.telephone)+"</span>":"")+"</div>"
+      +"<div class='muted'>"+esc(p.numero)+" · arrivée le "+esc(dateLongue(p.recueLe))+" · "+(p.boite||p.boitePc?"<span class='tag'>📦 Case "+esc(p.boite||p.boitePc)+"</span>":"<span class='tag warn'>Pas encore rangée</span>")+" · "
+      +(p.facture?"<span class='tag ok'>Facturé</span>":(p.totalCents>0&&reste<=0?"<span class='tag ok'>Payé</span>":"Versé "+eur(p.versetCents)+" / "+eur(p.totalCents)+(reste>0?" · <b>reste "+eur(reste)+"</b>":"")))+"</div>"
+      +"<div class='actions'><button class='sec' data-act='pcrOpen' data-id='"+p.id+"' data-m='case'>📦 Case</button>"+(p.autres.length?"<button class='sec' data-act='pcrOpen' data-id='"+p.id+"' data-m='ratt'>🔗 Rattacher à un autre devis</button>":"")+"<button data-act='pcrRemis' data-id='"+p.id+"'>✅ Remise au client</button></div>";
+    if(open&&PCRO.m==="case")h+="<div class='seg'>"+PCR.cases.map(function(c){var occ=c.rid&&c.rid!==p.repairId,moi=(p.boite||p.boitePc)===c.nom;return"<button class='"+(moi?"on":"")+"'"+(occ?" disabled style='opacity:.4'":"")+" data-act='pcrCase' data-id='"+p.id+"' data-b='"+c.nom+"'>"+c.nom+(occ?"<br><span style='font-size:11px'>PC-"+String(c.rid).padStart(4,"0")+"</span>":"")+"</button>"}).join("")+(p.boite?"<button data-act='pcrCase' data-id='"+p.id+"' data-b=''>Retirer</button>":"")+"</div>";
+    if(open&&PCRO.m==="ratt")h+="<div class='muted'>Rattacher à :</div><div class='seg'>"+p.autres.map(function(a){return"<button data-act='pcrRatt' data-id='"+p.id+"' data-r='"+a.id+"'>"+esc(a.numero)+"<br><span style='font-size:12px;font-weight:500'>"+esc((a.panne||"").slice(0,40))+"</span></button>"}).join("")+"</div>";
+    h+="</div>"});
+  return h+"</div>"}
 var SAV=null,SAVED=0;
 function savReload(){return api("/sav/dossiers").then(function(d){SAV=d.dossiers;render()}).catch(function(){})}
 function savDate(x){return x?x.slice(8,10)+"/"+x.slice(5,7):""}
@@ -87,7 +102,7 @@ function vAccueil(){
     h+="<div class='card'><b>"+esc(c.name||"Sans nom")+"</b>"+(enCours?" <span class='tag'>"+enCours+" en cours</span>":"")
       +"<div class='muted'>"+esc(c.phone||"")+(c.phone&&c.email?" · ":"")+esc(c.email||"")+"</div>"
       +"<div class='actions'><button class='sec' data-act='open' data-i='"+i+"'>Voir le profil</button><button data-act='priseEnCharge' data-i='"+i+"'>Créer une prise en charge</button></div></div>"});
-  h+="</div>"+blocConsignes()+"</div>"+blocTaches()+blocGaranties()+blocChiffres()+blocDefi()+"</div><div class='dright'>"+caisseHtml()+"</div></div>";
+  h+="</div>"+blocConsignes()+"</div>"+blocTaches()+blocPieces()+blocGaranties()+blocChiffres()+blocDefi()+"</div><div class='dright'>"+caisseHtml()+"</div></div>";
   app.innerHTML=h;caisseBind();
   var q=document.getElementById("q");if(q)q.addEventListener("keydown",function(e){if(e.key==="Enter")ACTS.search()});
   if(!CONS||!CHIF)loadAccueil()}

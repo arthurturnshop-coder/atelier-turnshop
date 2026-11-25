@@ -114,7 +114,8 @@ app.post("/api/reparations", async (c) => {
   const boiteNouv = clean(b.boite, 10).toUpperCase();
   if (boiteNouv) {
     const [pris] = (await sql`SELECT id FROM reparations WHERE boite = ${boiteNouv} AND supprime_le IS NULL AND statut <> 'récupéré' AND id <> ${r.id}`) as any[];
-    if (!pris) { await sql`UPDATE reparations SET boite = ${boiteNouv} WHERE id = ${r.id}`; await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${r.id}, 'note', ${"Matériel rangé dans la boîte " + boiteNouv + signature(c)})`; }
+    const [prisL] = (await sql`SELECT reparation_id FROM commande_lignes WHERE boite = ${boiteNouv} AND remise_le IS NULL AND reparation_id <> ${r.id} LIMIT 1`) as any[];
+    if (!pris && !prisL) { await sql`UPDATE reparations SET boite = ${boiteNouv} WHERE id = ${r.id}`; await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${r.id}, 'note', ${"Matériel rangé dans la boîte " + boiteNouv + signature(c)})`; }
   }
   const texte = enMagasin ? "Reçu à l'atelier" : "Prise en charge créée, trottinette pas encore en magasin";
   await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${r.id}, 'statut', ${texte + (garantie ? " (sous garantie)" : "") + signature(c)})`;
@@ -175,7 +176,8 @@ app.post("/api/reparations/maj", async (c) => {
     const nv = clean(b.boite, 10).toUpperCase();
     if (nv) {
       const [pris] = (await sql`SELECT id FROM reparations WHERE boite = ${nv} AND supprime_le IS NULL AND statut <> 'récupéré' AND id <> ${id}`) as any[];
-      if (pris) throw new AppError(400, `La boîte ${nv} est déjà utilisée par PC-${String(pris.id).padStart(4, "0")}.`);
+      const [prisL] = (await sql`SELECT reparation_id FROM commande_lignes WHERE boite = ${nv} AND remise_le IS NULL AND reparation_id <> ${id} LIMIT 1`) as any[];
+      if (pris || prisL) throw new AppError(400, `La boîte ${nv} est déjà utilisée par PC-${String((pris?.id ?? prisL.reparation_id)).padStart(4, "0")}.`);
     }
     await sql`UPDATE reparations SET boite = ${nv || null}, maj_le = now() WHERE id = ${id}`;
     await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${id}, 'note', ${(nv ? "Matériel rangé dans la boîte " + nv : "Boîte de rangement retirée") + signature(c)})`;
@@ -255,6 +257,8 @@ app.post("/api/reparations/avis", async (c) => {
 // Boîtes de rangement du matériel (C1 à C8) : libre ou occupée par quelle prise en charge.
 app.get("/api/boites", async (c) => {
   const rows = (await sql`SELECT r.id, r.boite, c.prenom, c.nom FROM reparations r JOIN clients c ON c.id = r.client_id WHERE r.boite IS NOT NULL AND r.boite <> '' AND r.supprime_le IS NULL AND r.statut <> 'récupéré'`) as any[];
+  const lp = (await sql`SELECT l.boite, l.reparation_id AS id, cl.prenom, cl.nom FROM commande_lignes l JOIN reparations r ON r.id = l.reparation_id JOIN clients cl ON cl.id = r.client_id WHERE l.boite IS NOT NULL AND l.boite <> '' AND l.remise_le IS NULL`) as any[];
+  for (const x of lp) if (!rows.find((r) => r.boite === x.boite)) rows.push(x);
   const noms = [...BOITES, ...rows.map((r) => r.boite).filter((b) => !BOITES.includes(b))];
   return c.json({ boites: noms.map((nom) => { const r = rows.find((x) => x.boite === nom); return { nom, repairId: r?.id ?? null, client: r ? `${r.prenom} ${r.nom}`.trim() : "" }; }) });
 });
