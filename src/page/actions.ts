@@ -95,7 +95,7 @@ export const ACTIONS = `var ACTS={
       if(f.mode==="remb")d=await api("/sav/rembourser",{venteId:id,montant:v("sv-m"),moyen:document.getElementById("sv-moy").value,motif:mot});
       else if(f.mode==="ech")d=await api("/sav/echange",{venteId:id,ligne:+l.value,motif:mot});
       else d=await api("/sav/garantie",{venteId:id,ligne:+l.value,motif:mot,fournisseur:v("sv-f")});
-      SAVF=null;toastOk(d.message);vjSync();savReload()}catch(e){toastKo(e.message)}},
+      SAVF=null;toastOk(d.message);PACH=null;CACLI=null;if(VJ){try{VJ=(await api("/caisse/historique?jour=1")).ventes}catch(e2){}}vjSync();savReload()}catch(e){toastKo(e.message)}},
   savTicket:async function(b){try{var c=await api("/customer?id="+b.dataset.cid);CUR=c;TAB="accueil";FICHE=null;ADDT=false;RECEP=null;EDITCLI=false;FID=null;PTAB="ach";PACHOPEN=+b.dataset.vid;PACH=null;render();window.scrollTo(0,0)}catch(e){alert(e.message)}},
   savDemOpen:function(b){SAVED=+b.dataset.id;render()},
   savDemNo:function(){SAVED=0;render()},
