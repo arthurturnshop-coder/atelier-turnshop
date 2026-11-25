@@ -160,7 +160,7 @@ function caisseHtml(){
   if(CREP)h+=affBanner(CAFF)+"<div class='card avbox'><b>Facturation de la réparation n°"+CREP+"</b><div class='muted'>Les lignes du devis sont dans le panier. À l'encaissement, la commande est créée dans Shopify.</div><button class='link' data-act='cpFerme'>↩ Retour à la prise en charge</button></div>";
   h+="<div class='card'><div class='step'>Client (scan carte, email ou téléphone)</div><div class='search'><input id='cq' placeholder='Scan carte, email ou téléphone'><button data-act='cScan'>Chercher</button></div>";
   if(CCLI)h+="<div style='margin-top:8px'><b>"+esc(CCLI.name)+"</b> <span class='muted'>"+esc(CCLI.phone||"")+"</span> <button class='link' data-act='cClient0'>Retirer</button></div><div class='actions' style='margin-top:4px'><button class='sec' data-act='cProfil'>Voir le profil</button><button class='sec' data-act='cProfilMod'>Modifier</button></div>"+(CCLI.anniversaire?"<div class='card avbox' style='margin-top:6px'><b>🎂 C'est son anniversaire !</b><div class='muted'>"+CCLI.anniversaire.annees+" an"+(CCLI.anniversaire.annees>1?"s":"")+" que le compte existe : proposer la révision à "+eur(CCLI.anniversaire.prixCents)+".</div></div>":"");
-  else h+="<div class='muted' style='margin-top:6px'>Vente sans client. <button class='link' data-act='cJour'>Voir les ventes du jour</button></div>";
+  else h+="<div class='muted' style='margin-top:6px'>Vente sans client.</div>";
   if(CCLI&&CFID){
     var gagne=Math.floor(net/100/CFID.regle.eurosPourPalier);
     h+="<div class='fidbox'><b>Fidélité</b><div>Déjà dépensé en caisse : "+(CFID.depenseEuros).toFixed(2).replace(".",",")+" € · prochain palier dans "+CFID.prochainPalierIn.toFixed(2).replace(".",",")+" €</div>"
