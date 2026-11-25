@@ -198,6 +198,7 @@ button.link{padding:4px 0}
 .card .step{text-transform:uppercase;letter-spacing:.06em;font-size:13px}
 .actions,.sub,.vues,.stbtns,.prow,.avis .row{gap:8px;flex-wrap:wrap}
 .actions button,.sub button,.vues button,.stbtns button,.avis .row button{flex:0 0 auto}
+.pecnb{width:auto;min-height:42px;margin:0;padding:10px 12px;font-size:15px;font-weight:600;letter-spacing:.03em;background:#fff;color:var(--vert2);border:1px solid var(--vert);cursor:pointer}.pecnb:hover,.pecnb:focus{outline:1px solid #111;outline-offset:2px}
 .search{max-width:none;margin:0 0 10px}
 .search button,.newbtn button{width:auto}
 .newbtn{max-width:none;margin:8px 0}
