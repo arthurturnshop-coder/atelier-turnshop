@@ -8,6 +8,7 @@ import { AppError, clean, signature } from "../util";
 
 await sql`ALTER TABLE commande_lignes ADD COLUMN IF NOT EXISTS suivi TEXT`;
 await sql`ALTER TABLE commande_lignes ADD COLUMN IF NOT EXISTS boite TEXT`;
+await sql`ALTER TABLE devis_lignes ADD COLUMN IF NOT EXISTS remise_client BOOLEAN NOT NULL DEFAULT false`;
 await sql`ALTER TABLE commande_lignes ADD COLUMN IF NOT EXISTS remise_le TIMESTAMPTZ`;
 await sql`ALTER TABLE commande_lignes ADD COLUMN IF NOT EXISTS remise_par TEXT`;
 await sql`ALTER TABLE fournisseurs ADD COLUMN IF NOT EXISTS mode TEXT NOT NULL DEFAULT 'groupe'`;
@@ -229,9 +230,16 @@ app.post("/api/reparations/valider-piece", async (c) => {
 const BOITES_P = ["C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8"];
 const pcnP = (id: number) => "PC-" + String(id).padStart(4, "0");
 
+app.post("/api/devis-lignes/remise-client", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  await sql`UPDATE devis_lignes SET remise_client = ${!!b.valeur} WHERE id = ${Number(b.id)}`;
+  return c.json({ message: b.valeur ? "Cette pièce apparaîtra dans le bloc Client à son arrivée." : "Cette pièce reste côté atelier." });
+});
+
 app.get("/api/pieces-a-remettre", async (c) => {
   const rows = (await sql`SELECT l.id, l.libelle, l.quantite, l.reparation_id, l.boite, l.recue_le, l.devis_ligne_id, r.client_id, r.boite AS boite_pc, cl.prenom, cl.nom, cl.telephone
     FROM commande_lignes l JOIN reparations r ON r.id = l.reparation_id JOIN clients cl ON cl.id = r.client_id
+    JOIN devis_lignes dl ON dl.id = l.devis_ligne_id AND dl.remise_client
     WHERE l.statut = 'recue' AND l.remise_le IS NULL AND r.supprime_le IS NULL ORDER BY l.recue_le`) as any[];
   const { acomptesDe } = await import("./acomptes");
   const out: any[] = [];

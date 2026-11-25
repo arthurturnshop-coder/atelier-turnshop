@@ -78,6 +78,7 @@ ACTS.cmdCopy=function(b){var f=trouveF(+b.dataset.id);if(!f)return;var t=texteCo
 ACTS.cmdCsv=function(b){var f=trouveF(+b.dataset.id);if(!f)return;
   var blob=new Blob([csvCommande(f)],{type:"text/csv"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="commande-"+f.nom.replace(/[^a-z0-9]+/gi,"-")+".csv";document.body.appendChild(a);a.click();a.remove()};
 document.addEventListener("change",function(e){var t=e.target;if(!t||!t.dataset||t.dataset.act!=="cmdQte")return;api("/achats/ligne/maj",{id:+t.dataset.id,quantite:t.value}).then(function(){CMD=null;CMDMSG="";}).catch(function(err){CMDMSG=err.message})});
+ACTS.remCli=async function(b){try{await api("/devis-lignes/remise-client",{id:+b.dataset.id,valeur:b.dataset.v==='1'});if(typeof recharger==='function'&&FICHE)await recharger(FICHE.id);else render()}catch(e){alert(e.message)}};
 ACTS.aCommander=async function(b){
   try{var r=await api("/achats/depuis-devis",{devisLigneId:+b.dataset.id});
     if(r.choix){
