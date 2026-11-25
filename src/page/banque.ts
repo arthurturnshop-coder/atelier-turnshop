@@ -1,6 +1,6 @@
 export const BANQUE = `// ---------- Compta > Banque : relevé bancaire classé par mois, catégorie et magasin ----------
 var BQ={pil:null,sel:"",det:false,sens:"debit",syn:null,ops:null,mois:"",aClasser:false,msg:"",busy:false};
-var COMPSUB="z";
+var COMPSUB="synth";
 function bqCharge(){
   if(!BQ.pil)api("/banque/pilotage").then(function(d){BQ.pil=d;if(TAB==="compta")render()}).catch(function(){BQ.pil={mois:[]}});
   api("/banque/synthese?sens="+BQ.sens).then(function(d){BQ.syn=d;if(TAB==="compta")render()}).catch(function(e){BQ.msg=e.message;BQ.syn={mois:[],aClasser:0};if(TAB==="compta")render()})}
@@ -77,4 +77,51 @@ document.addEventListener("change",function(e){
   var fr=new FileReader();BQ.msg="Import en cours…";render();
   fr.onload=function(){api("/banque/import",{texte:String(fr.result)}).then(function(d){BQ.msg=d.message;BQ.syn=null;BQ.pil=null;BQ.ops=null;render()}).catch(function(er){BQ.msg=er.message;render()})};
   fr.readAsText(t.files[0],"utf-8")});
+var SY={d:null,mois:"",msg:"",busy:false};
+function syCharge(){if(SY.busy)return;SY.busy=true;api("/compta/synthese"+(SY.mois?"?mois="+SY.mois:"")).then(function(d){SY.d=d;SY.mois=d.mois;SY.busy=false;if(TAB==="compta")render()}).catch(function(e){SY.msg=e.message;SY.d={liste:[],mois:""};SY.busy=false;if(TAB==="compta")render()})}
+function syN(v,cls){return"<td class='n'"+(cls?" style='"+cls+"'":"")+">"+eur(v)+"</td>"}
+function syEcart(e){var a=Math.abs(e);var col=a<100?"#1c7a3f":a<5000?"#b9770e":"#c0392b";return"<td class='n' style='color:"+col+";font-weight:700'>"+(e>0?"+":"")+eur(e)+"</td>"}
+function vSynthese(){
+  if(!SY.d){syCharge();return"<div class='card muted'>Chargement…</div>"}
+  var d=SY.d;if(!d.mois)return"<div class='card muted'>"+esc(SY.msg||"Aucune donnée pour l'instant : importe un relevé ou fais des ventes.")+"</div>";
+  var h="<div class='card'><div class='step'>Mois</div><div class='actions' style='flex-wrap:wrap'>"+d.liste.slice(0,12).map(function(m){return"<button class='"+(m===d.mois?"":"sec")+"' data-act='syMois' data-m='"+m+"'>"+esc(bqMoisLib(m))+"</button>"}).join("")+"</div>"
+    +"<div class='muted' style='margin-top:6px'>CA retenu pour la marge : "+(d.source==="logiciel"?"<b>ventes du logiciel</b> ("+d.nbVentes+" ventes ce mois-ci)":"<b>encaissements de la banque</b> (aucune vente dans le logiciel ce mois-ci)")+"."+(d.releve?"":" ⚠ Relevé bancaire de ce mois pas importé : achats, charges et rapprochement sont à 0.")+"</div></div>";
+  var L=d.caLogiciel,tot=function(k){return L.amiens[k]+L.rouen[k]+L.commun[k]};
+  h+="<div class='card'><div class='step'>1 · CA par magasin d'après le logiciel</div><table class='devis' style='width:100%'><tr><th></th><th class='n'>Amiens</th><th class='n'>Rouen</th><th class='n'>En ligne / sans magasin</th><th class='n'>Total</th></tr>"
+    +"<tr><td>CA TTC (ventes)</td>"+syN(L.amiens.ttc)+syN(L.rouen.ttc)+syN(L.commun.ttc)+syN(tot("ttc"),"font-weight:700")+"</tr>"
+    +"<tr><td>Remboursements</td>"+syN(-L.amiens.remb)+syN(-L.rouen.remb)+syN(-L.commun.remb)+syN(-tot("remb"))+"</tr>"
+    +"<tr><td><b>CA net TTC</b></td>"+syN(L.amiens.ttc-L.amiens.remb)+syN(L.rouen.ttc-L.rouen.remb)+syN(L.commun.ttc-L.commun.remb)+syN(tot("ttc")-tot("remb"),"font-weight:700")+"</tr>"
+    +"<tr><td class='muted'>Nombre de ventes</td><td class='n muted'>"+L.amiens.nb+"</td><td class='n muted'>"+L.rouen.nb+"</td><td class='n muted'>"+L.commun.nb+"</td><td class='n muted'>"+tot("nb")+"</td></tr></table></div>";
+  var B=d.caBanque;
+  h+="<div class='card'><div class='step'>2 · CA par encaissement banque</div><table class='devis' style='width:100%'><tr><th></th><th class='n'>Amiens</th><th class='n'>Rouen</th><th class='n'>Commun (non attribué)</th><th class='n'>Total</th></tr>"
+    +"<tr><td>Encaissements (CB, espèces déposées, chèques, virements, en ligne)</td>"+syN(B.amiens)+syN(B.rouen)+syN(B.commun)+syN(B.amiens+B.rouen+B.commun,"font-weight:700")+"</tr></table>"
+    +"<div class='muted'>Les encaissements du relevé ne disent pas toujours de quelle boutique ils viennent : ce qui n'est pas attribué reste dans « Commun ». Retraits d'espèces du mois (non comptés) : "+eur(B.retraitsEspeces)+".</div></div>";
+  h+="<div class='card'><div class='step'>3 · Rapprochement logiciel ↔ banque</div><div class='muted'>Écart = banque − logiciel. Vert : concordant. Orange/rouge : à vérifier (remises décalées de quelques jours, espèces pas encore déposées, encaissement non attribué à une boutique). Le bloc « Les deux ensemble » est le plus fiable.</div>";
+  [["Amiens","amiens"],["Rouen","rouen"],["Les deux ensemble","ensemble"]].forEach(function(b){
+    h+="<div class='step' style='margin-top:10px'>"+b[0]+"</div><table class='devis' style='width:100%'><tr><th></th><th class='n'>Logiciel</th><th class='n'>Banque</th><th class='n'>Écart</th></tr>";
+    d.rapprochement.forEach(function(r){var x=r[b[1]];h+="<tr><td>"+esc(r.nom)+"</td>"+syN(x.log)+syN(x.ban)+syEcart(x.ban-x.log)+"</tr>"});
+    var tl=0,tb=0;d.rapprochement.forEach(function(r){tl+=r[b[1]].log;tb+=r[b[1]].ban});
+    h+="<tr><td><b>Total</b></td>"+syN(tl,"font-weight:700")+syN(tb,"font-weight:700")+syEcart(tb-tl)+"</tr></table>"});
+  h+="</div>";
+  var T=d.tva;
+  h+="<div class='card'><div class='step'>4 · TVA estimée (20 %)</div><table class='devis' style='width:100%'>"
+    +"<tr><td>TVA collectée (sur le CA TTC retenu)</td>"+syN(T.collectee)+"</tr>"
+    +"<tr><td><b>TVA à payer SANS les achats</b></td>"+syN(T.sansAchats,"font-weight:700")+"</tr>"
+    +"<tr><td>− TVA déductible estimée (achats, logiciels, télécom, fournitures du relevé)</td>"+syN(-T.deductibleEstimee)+"</tr>"
+    +"<tr><td><b>TVA à payer AVEC TVA déductible estimée</b></td>"+syN(T.avecEstimee,"font-weight:700")+"</tr>"
+    +"<tr><td>− TVA déductible réelle (saisie)</td><td class='n'>"+(T.deductibleSaisie==null?"<span class='muted'>pas saisie</span>":eur(-T.deductibleSaisie))+"</td></tr>"
+    +"<tr><td><b>TVA à payer AVEC TVA déductible réelle</b></td><td class='n'><b>"+(T.avecSaisie==null?"—":eur(T.avecSaisie))+"</b></td></tr></table>"
+    +"<div class='dl' style='margin-top:8px'><input id='sy-tva' class='p' placeholder='TVA déductible réelle du mois (€)' value='"+(T.deductibleSaisie==null?"":esc(String(T.deductibleSaisie/100).replace(".",",")))+"'><button data-act='syTva'>Enregistrer</button></div>"
+    +"<div class='muted'>Laisse vide puis Enregistrer pour revenir à l'estimation. Estimation à confirmer avec le comptable.</div></div>";
+  var M=d.marges,P=d.poles;
+  var row=function(nom,o,gras,pc){return"<tr"+(gras?" style='background:#f4f6f8'":"")+"><td>"+(gras?"<b>"+nom+"</b>":nom)+"</td>"+syN(o.amiens,gras?"font-weight:700":"")+syN(o.rouen,gras?"font-weight:700":"")+syN(o.commun,gras?"font-weight:700":"")+syN(o.total,"font-weight:700")+"<td class='n muted'>"+(pc!=null?pc+" %":(M.caHt.total>0?Math.round(o.total*1000/M.caHt.total)/10+" %":""))+"</td></tr>"};
+  h+="<div class='card'><div class='step'>5 · Dépenses par pôle et marge (HT)</div><table class='devis' style='width:100%'><tr><th></th><th class='n'>Amiens</th><th class='n'>Rouen</th><th class='n'>TURN SHOP (commun)</th><th class='n'>Total</th><th class='n'>% du CA</th></tr>"
+    +row("Chiffre d'affaires HT",M.caHt,true,100);
+  var pieces=P.filter(function(p){return p.cle==="pieces"})[0];
+  h+=row("− "+esc(pieces.nom),{amiens:-pieces.amiens,rouen:-pieces.rouen,commun:-pieces.commun,total:-pieces.total})+row("Marge brute",M.margeBrute,true,M.margeBrute.pct);
+  P.filter(function(p){return p.cle!=="pieces"}).forEach(function(p){h+=row("− "+esc(p.nom),{amiens:-p.amiens,rouen:-p.rouen,commun:-p.commun,total:-p.total})});
+  h+=row("Marge nette (résultat)",M.net,true,M.net.pct)+"</table><div class='muted'>Les dépenses sont celles du relevé classé par pôle (achats, logiciels, télécom et fournitures passés de TTC en HT). Une dépense « À classer » se range dans « Voir et classer » de l'onglet Banque. Les retraits d'espèces et remboursements ne sont pas comptés.</div></div>";
+  return h}
+ACTS.syMois=function(b){SY.mois=b.dataset.m;SY.d=null;SY.busy=false;render()};
+ACTS.syTva=function(){api("/compta/tva-deductible",{mois:SY.mois,montant:v("sy-tva")}).then(function(r){SY.msg=r.message;SY.d=null;SY.busy=false;render()}).catch(function(e){alert(e.message)})};
 `;

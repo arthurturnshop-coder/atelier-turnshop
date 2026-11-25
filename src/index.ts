@@ -34,6 +34,7 @@ import "./routes/rdv";
 import "./routes/devis";
 import "./routes/depot";
 import "./routes/sauvegarde";
+import "./routes/synthese";
 import "./routes/caisse";
 import "./automatisations";
 import { HTML } from "./page";

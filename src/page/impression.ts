@@ -233,7 +233,8 @@ var COMPH=false;
 function vCompta(){
   if(!estResp()){app.innerHTML="<div class='caisse'><h3>Compta</h3><div class='muted'>Réservé aux responsables.</div></div>";return}
   if(!CLO.h&&!COMPH){COMPH=true;cloHistCharge()}
-  var sub="<div class='actions'><button class='"+(COMPSUB==="z"?"":"sec")+"' data-act='compSub' data-v='z'>Caisse (tickets Z)</button><button class='"+(COMPSUB==="banque"?"":"sec")+"' data-act='compSub' data-v='banque'>Banque</button></div>";
+  var sub="<div class='actions'><button class='"+(COMPSUB==="synth"?"":"sec")+"' data-act='compSub' data-v='synth'>Synthèse</button><button class='"+(COMPSUB==="z"?"":"sec")+"' data-act='compSub' data-v='z'>Caisse (tickets Z)</button><button class='"+(COMPSUB==="banque"?"":"sec")+"' data-act='compSub' data-v='banque'>Banque</button></div>";
+  if(COMPSUB==="synth"){app.innerHTML="<div class='caisse'><h3>Compta · synthèse</h3>"+sub+vSynthese()+"</div>";return}
   if(COMPSUB==="banque"){app.innerHTML="<div class='caisse'><h3>Compta · banque</h3>"+sub+vBanque()+"</div>";return}
   app.innerHTML="<div class='caisse'><h3>Compta · tickets Z et encaissements</h3>"+sub+(CLO.msg?"<div class='muted'>"+esc(CLO.msg)+"</div>":"")+cloHist()+"</div>"}
 function cloCharge(){return api("/caisse/session").then(function(d){CLO.d=d;render();if(CLO.scroll){CLO.scroll=false;cloVa()}}).catch(function(e){CLO.msg=e.message;render()})}
