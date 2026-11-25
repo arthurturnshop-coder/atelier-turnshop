@@ -96,6 +96,7 @@ export const ACTIONS = `var ACTS={
       else if(f.mode==="ech")d=await api("/sav/echange",{venteId:id,ligne:+l.value,motif:mot});
       else d=await api("/sav/garantie",{venteId:id,ligne:+l.value,motif:mot,fournisseur:v("sv-f")});
       SAVF=null;toastOk(d.message);vjSync();savReload()}catch(e){toastKo(e.message)}},
+  savTicket:async function(b){try{var c=await api("/customer?id="+b.dataset.cid);CUR=c;TAB="accueil";FICHE=null;ADDT=false;RECEP=null;EDITCLI=false;FID=null;PTAB="ach";PACHOPEN=+b.dataset.vid;PACH=null;render();window.scrollTo(0,0)}catch(e){alert(e.message)}},
   savDemOpen:function(b){SAVED=+b.dataset.id;render()},
   savDemNo:function(){SAVED=0;render()},
   savDem:async function(b){try{await api("/sav/maj",{id:+b.dataset.id,action:"demande",fournisseur:v("sv-f"),rma:v("sv-r")});SAVED=0;await savReload()}catch(e){toastKo(e.message)}},

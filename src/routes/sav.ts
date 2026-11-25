@@ -89,7 +89,7 @@ app.get("/api/sav/dossiers", async (c) => {
   const [{ auj }] = (await sql`SELECT (now() AT TIME ZONE 'Europe/Paris')::date::text AS auj`) as any[];
   return c.json({ dossiers: rows.map((d) => ({
     id: d.id, libelle: d.libelle, client: d.client_nom || "", numero: d.numero_facture ?? `Ticket n° ${d.vente_id}`, statut: d.statut, motif: d.motif, fournisseur: d.fournisseur, rma: d.rma,
-    demandeLe: d.demande_le, relanceLe: d.relance, enRetard: !!d.relance && d.relance <= auj, creeLe: d.cree_le,
+    venteId: d.vente_id, clientId: d.client_id, demandeLe: d.demande_le, relanceLe: d.relance, enRetard: !!d.relance && d.relance <= auj, creeLe: d.cree_le,
   })) });
 });
 
