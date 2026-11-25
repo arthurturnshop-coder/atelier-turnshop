@@ -104,7 +104,7 @@ app.post("/api/reparations", async (c) => {
   const date = /^\d{4}-\d{2}-\d{2}$/.test(b.dateDepot ?? "") ? b.dateDepot : new Date().toISOString().slice(0, 10);
   const enMagasin = b.enMagasin !== false;
   const garantie = b.sousGarantie === true;
-  const [r] = await sql`INSERT INTO reparations (client_id, trottinette_id, panne, etat, remarques, date_depot, en_magasin, sous_garantie, magasin) VALUES (${clientId}, ${trottId}, ${panne}, ${clean(b.etat, 500)}, ${clean(b.remarques, 1000)}, ${date}, ${enMagasin}, ${garantie}, ${magDe(c)}) RETURNING id`;
+  const [r] = await sql`INSERT INTO reparations (client_id, trottinette_id, panne, etat, remarques, date_depot, en_magasin, sous_garantie, magasin) VALUES (${clientId}, ${trottId}, ${panne}, ${clean(b.etat, 500)}, ${clean(b.remarques, 1000)}, ${date}, ${enMagasin}, ${garantie}, ${c.get("user")?.magasin ?? null}) RETURNING id`;
   if (clean(b.codeAcces, 60)) await sql`UPDATE trottinettes SET code_acces = ${clean(b.codeAcces, 60)} WHERE id = ${trottId}`;
   const affNouv = affairesClean(b.affaires);
   if (affNouv.length) {

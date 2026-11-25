@@ -29,4 +29,4 @@ export function exigeAdmin(c: any) {
 }
 
 // Magasin de la session (null = profil Secours : voit tout). Les lignes sans magasin (anciennes) restent visibles des deux côtés.
-export const magDe = (c: any): string | null => c.get("user")?.magasin ?? null;
+export const magDe = (c: any): string | null => { const u = c.get("user"); return u?.tous ? null : u?.magasin ?? null; };

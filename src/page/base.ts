@@ -16,7 +16,8 @@ function today(){return new Date().toISOString().slice(0,10)}
 function initiales(c){var s=((c.prenom||"").charAt(0)+(c.nom||"").charAt(0)).toUpperCase();return s||"?"}
 function estResp(){return ROLE==="admin"||ROLE==="responsable"}
 function saveSession(){var m={atelierToken:TOK,atelierPrenom:PRENOM,atelierRole:ROLE,atelierMagasin:MAG,atelierPw:PW};Object.keys(m).forEach(function(k){if(m[k])sessionStorage.setItem(k,m[k]);else sessionStorage.removeItem(k)})}
-function clearSession(){ACT=null;try{sessionStorage.removeItem("atelierView")}catch(e){}TOK="";PW="";PRENOM="";ROLE="";MAG="";CUR=null;RES=[];SEARCHED=false;CONS=null;CHIF=null;TAB="accueil";ADDT=false;RECEP=null;EDITCLI=false;FID=null;EDITCONS=false;NEWCLI=false;ATSUB="liste";VUE="tout";LST=null;FICHE=null;PJOUR="";PMAG="";PLAN=null;PSEL=null;PPEND=null;PMSG="";saveSession()}
+function clearSession(){ACT=null;VTOUS=false;try{sessionStorage.removeItem("atelierTous")}catch(e){}try{sessionStorage.removeItem("atelierView")}catch(e){}TOK="";PW="";PRENOM="";ROLE="";MAG="";CUR=null;RES=[];SEARCHED=false;CONS=null;CHIF=null;TAB="accueil";ADDT=false;RECEP=null;EDITCLI=false;FID=null;EDITCONS=false;NEWCLI=false;ATSUB="liste";VUE="tout";LST=null;FICHE=null;PJOUR="";PMAG="";PLAN=null;PSEL=null;PPEND=null;PMSG="";saveSession()}
+var VTOUS=false;try{VTOUS=sessionStorage.getItem("atelierTous")==="1"}catch(e){}
 var ACT=null,ACTLOCK=5*60*1000;
 function actActif(){return ACT&&ACT.until>Date.now()}
 function actLock(){ACT=null;if(typeof renderWho==="function")renderWho()}
@@ -29,6 +30,7 @@ async function api(path,body){
       var rd=await rq.json().catch(function(){return{}});if(!rq.ok)throw new Error(rd.error||"Code refusé.");
       ACT={code:kd,prenom:rd.prenom,role:rd.role,until:0};if(typeof renderWho==="function")renderWho()}
     h["x-atelier-code"]=ACT.code;ACT.until=Date.now()+ACTLOCK}
+  if(VTOUS)h["x-atelier-vue"]="tous";
   var o={headers:h};if(body!==undefined){o.method="POST";o.body=JSON.stringify(body)}
   var r=await fetch("/api"+path,o);var d=await r.json().catch(function(){return{}});
   if(r.status===401){clearSession();LG={step:"mag"};MSG="Session expirée : reconnecte-toi.";render();throw new Error(MSG)}
@@ -39,7 +41,7 @@ function renderWho(){
   if(!on){var rq=document.getElementById("rq");if(rq)rq.value="";rechHide()}
   var el=document.getElementById("who");if(!el)return;
   if(on&&typeof pcrLoad==="function")pcrLoad();
-  el.innerHTML=on?"<span>"+esc(PRENOM)+" · "+esc(MAG||"Secours")+"</span>"+(actActif()?"<button class='sec' data-act='actLock' title='Verrouiller : le prochain à agir retape son code' style='margin-left:6px'>&#128274; "+esc(ACT.prenom)+"</button>":"")+"<button class='gear"+(TAB==="chat"?" on":"")+"' data-act='tab' data-tab='chat' title='Chat équipe' style='position:relative'>&#128172;<span id='chatb' style='display:none;position:absolute;top:-6px;right:-6px;background:#c0392b;color:#fff;border-radius:10px;font-size:11px;padding:1px 6px;font-weight:700'></span></button><button class='gear"+(TAB==="retours"?" on":"")+"' data-act='tab' data-tab='retours' title='Signaler un bug ou une idée'>&#128161;</button>"+((ROLE==="admin"||ROLE==="responsable")?"<button class='gear"+(TAB==="stats"?" on":"")+"' data-act='tab' data-tab='stats' title='Statistiques'>&#128202;</button>":"")+(ROLE==="admin"?"<button class='gear"+(TAB==="param"?" on":"")+"' data-act='tab' data-tab='param' title='Paramètres'>&#9881;</button>":"")+"<button class='sec' data-act='logout'>Changer de profil</button>":""}
+  el.innerHTML=on?"<span>"+esc(PRENOM)+" · "+esc(MAG||"Secours")+"</span>"+((ROLE==="admin"||(actActif()&&ACT.role==="admin"))?"<button class='"+(VTOUS?"":"sec")+"' data-act='vueTous' title='Admin : voir Rouen et Amiens mélangés' style='margin-left:6px'>"+(VTOUS?"Vue : tous les magasins":"Vue : "+esc(MAG))+"</button>":"")+(actActif()?"<button class='sec' data-act='actLock' title='Verrouiller : le prochain à agir retape son code' style='margin-left:6px'>&#128274; "+esc(ACT.prenom)+"</button>":"")+"<button class='gear"+(TAB==="chat"?" on":"")+"' data-act='tab' data-tab='chat' title='Chat équipe' style='position:relative'>&#128172;<span id='chatb' style='display:none;position:absolute;top:-6px;right:-6px;background:#c0392b;color:#fff;border-radius:10px;font-size:11px;padding:1px 6px;font-weight:700'></span></button><button class='gear"+(TAB==="retours"?" on":"")+"' data-act='tab' data-tab='retours' title='Signaler un bug ou une idée'>&#128161;</button>"+((ROLE==="admin"||ROLE==="responsable")?"<button class='gear"+(TAB==="stats"?" on":"")+"' data-act='tab' data-tab='stats' title='Statistiques'>&#128202;</button>":"")+(ROLE==="admin"?"<button class='gear"+(TAB==="param"?" on":"")+"' data-act='tab' data-tab='param' title='Paramètres'>&#9881;</button>":"")+"<button class='sec' data-act='logout'>Changer de profil</button>":""}
 var VIEWF=0,VIEWC=0;
 function viewSave(){
   if(!TOK&&!PW)return;

@@ -84,6 +84,8 @@ app.use("/api/*", async (c, next) => {
     const a = await acteurParCode(code, base.magasin, (tok || "pw").slice(0, 24));
     base = { ...a, session: base.session ?? "Secours" };
   }
+  // Vue « Rouen + Amiens mélangés » : réservée aux admins (rôle de la personne qui agit).
+  if (c.req.header("x-atelier-vue") === "tous" && base.role === "admin") base = { ...base, tous: true };
   c.set("user", base);
   return next();
 });
