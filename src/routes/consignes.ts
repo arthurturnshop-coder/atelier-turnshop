@@ -2,7 +2,7 @@ import { app } from "../app";
 import { CONSIGNES } from "../config";
 import { sql } from "../db";
 import { FIDELITE_QUERY, shopifyRead } from "../shopify";
-import { clean, magDe } from "../util";
+import { clean, exigeAdmin, magDe } from "../util";
 
 // ---------- Consignes, chiffres, fidélité ----------
 app.get("/api/consignes", async (c) => {
@@ -14,6 +14,7 @@ app.get("/api/consignes", async (c) => {
 });
 
 app.post("/api/consignes", async (c) => {
+  exigeAdmin(c);
   const b = await c.req.json().catch(() => ({}));
   for (const k of CONSIGNES) {
     if (typeof b[k] !== "string") continue;

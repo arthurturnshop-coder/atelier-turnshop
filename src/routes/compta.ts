@@ -2,7 +2,7 @@ import { app } from "../app";
 import { sql } from "../db";
 // Doit passer après la protection /api/* (voir auth.ts).
 import "./auth";
-import { AppError, clean, exigeAdmin } from "../util";
+import { AppError, clean, exigeAdmin, magDe } from "../util";
 
 // ---- Plan de comptes (modifiable par les admins) : à valider avec le comptable ----
 await sql`CREATE TABLE IF NOT EXISTS comptes_compta (code TEXT PRIMARY KEY, libelle TEXT NOT NULL, type TEXT NOT NULL DEFAULT 'produit', actif BOOLEAN NOT NULL DEFAULT true)`;
@@ -25,6 +25,8 @@ const COMPTES: [string, string, string][] = [
   ["511", "Cartes bancaires à l'encaissement", "tresorerie"],
   ["512", "Banque", "tresorerie"],
   ["530", "Caisse", "tresorerie"],
+  ["471", "Compte d'attente (entrées / sorties de caisse à affecter)", "tiers"],
+  ["4198", "Bons d'achat et avoirs à honorer", "tiers"],
 ];
 const DEFAUTS: [string, string][] = [
   ["piece", "707"], ["article", "707"], ["main_oeuvre", "706"], ["consommable", "606"], ["port", "708"], ["remise", "709"],
@@ -84,10 +86,12 @@ app.get("/api/compta/export", async (c) => {
   exigeAdmin(c);
   const du = clean(c.req.query("du"), 10), au = clean(c.req.query("au"), 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(du) || !/^\d{4}-\d{2}-\d{2}$/.test(au)) throw new AppError(400, "Indique la période (du / au).");
+  const mq = clean(c.req.query("magasin"), 20);
+  const mg: string | null = mq === "tous" ? null : mq === "Amiens" || mq === "Rouen" ? mq : magDe(c);
   const comptes = new Map(((await sql`SELECT code, libelle FROM comptes_compta`) as any[]).map((x) => [x.code, x.libelle]));
   const def = new Map(((await sql`SELECT cle, code FROM comptes_defauts`) as any[]).map((x) => [x.cle, x.code]));
   const ana = new Map(((await sql`SELECT magasin, code FROM analytiques`) as any[]).map((x) => [x.magasin, x.code]));
-  const ventes = (await sql`SELECT v.*, c.prenom, c.nom FROM ventes v LEFT JOIN clients c ON c.id = v.client_id WHERE (v.cree_le AT TIME ZONE 'Europe/Paris')::date BETWEEN ${du}::date AND ${au}::date ORDER BY v.id`) as any[];
+  const ventes = (await sql`SELECT v.*, c.prenom, c.nom FROM ventes v LEFT JOIN clients c ON c.id = v.client_id WHERE (v.cree_le AT TIME ZONE 'Europe/Paris')::date BETWEEN ${du}::date AND ${au}::date AND (${mg}::text IS NULL OR v.magasin IS NULL OR v.magasin = ${mg}) ORDER BY v.id`) as any[];
   const L: string[] = ["Journal;Date;Pièce;Compte;Libellé du compte;Libellé;Débit;Crédit;Analytique;Client"];
   const ecr = (dt: Date, piece: string, compte: string, lib: string, deb: number, cre: number, an: string, cl: string) =>
     L.push([ "VE", jjmmaaaa(dt), piece, compte, comptes.get(compte) ?? "", lib, deb ? eur2(deb) : "", cre ? eur2(cre) : "", an, cl ].map(csv).join(";"));
@@ -137,7 +141,7 @@ app.get("/api/compta/export", async (c) => {
     totalC += H + tva + dette;
   }
   // Reversements aux déposants (dépôt-vente) : on solde la dette 467 contre la caisse (530) ou la banque (512).
-  const rv = (await sql`SELECT d.id, d.reverse_le, d.reverse_moyen, d.reverse_cents, c.prenom, c.nom FROM depots_vente d JOIN clients c ON c.id = d.client_id WHERE d.statut = 'reverse' AND d.reverse_cents > 0 AND (d.reverse_le AT TIME ZONE 'Europe/Paris')::date BETWEEN ${du}::date AND ${au}::date ORDER BY d.reverse_le`) as any[];
+  const rv = (await sql`SELECT d.id, d.reverse_le, d.reverse_moyen, d.reverse_cents, c.prenom, c.nom FROM depots_vente d JOIN clients c ON c.id = d.client_id WHERE d.statut = 'reverse' AND d.reverse_cents > 0 AND (d.reverse_le AT TIME ZONE 'Europe/Paris')::date BETWEEN ${du}::date AND ${au}::date AND (${mg}::text IS NULL OR d.magasin IS NULL OR d.magasin = ${mg}) ORDER BY d.reverse_le`) as any[];
   for (const r of rv) {
     const dt = new Date(r.reverse_le), piece = "RV-DV" + String(r.id).padStart(5, "0"), cl = `${r.prenom ?? ""} ${r.nom ?? ""}`.trim();
     const cpt = r.reverse_moyen === "especes" ? (def.get("especes") ?? "530") : "512";
@@ -145,6 +149,29 @@ app.get("/api/compta/export", async (c) => {
     e("467", `Reversement dépôt-vente DV#${r.id} au déposant`, r.reverse_cents, 0);
     e(cpt, `Reversement dépôt-vente DV#${r.id} (${r.reverse_moyen})`, 0, r.reverse_cents);
   }
-  const nom = `journal-ventes-${du}-${au}.csv`;
+  // Remboursements clients : on annule la vente (remise 709 + TVA) ou l'acompte (4191) ; le moyen de remboursement sort de la caisse / banque / bons d'achat.
+  const cptMoyen = (m: string) => (m === "especes" ? def.get("especes") ?? "530" : m === "carte" ? def.get("carte") ?? "511" : m === "bon" ? "4198" : def.get("virement") ?? "512");
+  const rb = (await sql`SELECT r.id, r.cree_le, r.montant_cents, r.moyen, r.vente_id, COALESCE(r.magasin, rep.magasin) AS mag, c.prenom, c.nom FROM remboursements r LEFT JOIN reparations rep ON rep.id = r.reparation_id LEFT JOIN clients c ON c.id = r.client_id
+    WHERE (r.cree_le AT TIME ZONE 'Europe/Paris')::date BETWEEN ${du}::date AND ${au}::date AND (${mg}::text IS NULL OR COALESCE(r.magasin, rep.magasin) IS NULL OR COALESCE(r.magasin, rep.magasin) = ${mg}) ORDER BY r.id`) as any[];
+  for (const r of rb) {
+    const dt = new Date(r.cree_le), piece = "RB-" + String(r.id).padStart(6, "0"), cl = `${r.prenom ?? ""} ${r.nom ?? ""}`.trim(), an = ana.get(r.mag) ?? "";
+    const e = (compte: string, lib: string, deb: number, cre: number) => L.push([ "OD", jjmmaaaa(dt), piece, compte, comptes.get(compte) ?? "", lib, deb ? eur2(deb) : "", cre ? eur2(cre) : "", an, cl ].map(csv).join(";"));
+    if (r.vente_id) {
+      const ht = Math.round(r.montant_cents / 1.2);
+      e(def.get("remise") ?? "709", `Remboursement client (vente V-${String(r.vente_id).padStart(6, "0")})`, ht, 0);
+      e(def.get("tva_collectee") ?? "44571", "TVA collectée annulée 20 %", r.montant_cents - ht, 0);
+    } else e(def.get("acompte") ?? "4191", "Remboursement d'acompte", r.montant_cents, 0);
+    e(cptMoyen(r.moyen), `Remboursement client (${r.moyen})`, 0, r.montant_cents);
+  }
+  // Entrées / sorties de caisse (hors ventes) : à affecter par le comptable via le compte d'attente 471.
+  const mv = (await sql`SELECT id, magasin, sens, montant_cents, motif, par, cree_le FROM mouvements_cash WHERE (cree_le AT TIME ZONE 'Europe/Paris')::date BETWEEN ${du}::date AND ${au}::date AND (${mg}::text IS NULL OR magasin = ${mg}) AND motif NOT LIKE 'Reversement dépôt-vente DV-%' ORDER BY id`) as any[]; // les reversements dépôt-vente ont déjà leur écriture RV-DV
+  for (const m of mv) {
+    const dt = new Date(m.cree_le), piece = "MC-" + String(m.id).padStart(6, "0"), an = ana.get(m.magasin) ?? "";
+    const e = (compte: string, lib: string, deb: number, cre: number) => L.push([ "CA", jjmmaaaa(dt), piece, compte, comptes.get(compte) ?? "", lib, deb ? eur2(deb) : "", cre ? eur2(cre) : "", an, m.par ?? "" ].map(csv).join(";"));
+    const lib = `${m.sens === "entree" ? "Entrée" : "Sortie"} de caisse : ${m.motif || "sans motif"}`;
+    if (m.sens === "entree") { e(def.get("especes") ?? "530", lib, m.montant_cents, 0); e("471", lib, 0, m.montant_cents); }
+    else { e("471", lib, m.montant_cents, 0); e(def.get("especes") ?? "530", lib, 0, m.montant_cents); }
+  }
+  const nom = `journal-${mg ? mg.toLowerCase() : "tous"}-${du}-${au}.csv`;
   return new Response("﻿" + L.join("\r\n") + "\r\n", { headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": `attachment; filename="${nom}"` } });
 });

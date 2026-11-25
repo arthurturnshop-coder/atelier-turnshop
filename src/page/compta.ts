@@ -8,7 +8,7 @@ function cptCard(){
   var d=new Date(),pad=function(n){return(n<10?"0":"")+n},iso=function(x){return x.getFullYear()+"-"+pad(x.getMonth()+1)+"-"+pad(x.getDate())};
   var deb=iso(new Date(d.getFullYear(),d.getMonth(),1)),fin=iso(d);
   var h="<div class='card'><div class='step'>Comptabilité : export pour le comptable</div><div class='muted'>Journal des ventes (une écriture équilibrée par vente ou acompte : encaissement, produits HT, TVA 20 %). Les comptes sont à valider avec ton comptable.</div>"
-    +"<div class='dl' style='margin-top:6px'><span class='muted'>Du</span><input id='cx-d' type='date' value='"+deb+"'><span class='muted'>au</span><input id='cx-f' type='date' value='"+fin+"'><button data-act='cptExport'>Télécharger le journal des ventes (CSV)</button></div>"
+    +"<div class='dl' style='margin-top:6px'><span class='muted'>Du</span><input id='cx-d' type='date' value='"+deb+"'><span class='muted'>au</span><input id='cx-f' type='date' value='"+fin+"'><select id='cx-m'><option value=''>"+esc(MAG||"Tous")+" (ma session)</option><option value='Amiens'>Amiens</option><option value='Rouen'>Rouen</option><option value='tous'>Les deux (mélangés)</option></select><button data-act='cptExport'>Télécharger le journal des ventes (CSV)</button></div>"
     +"<div class='muted'>Le journal des achats viendra quand les prix d'achat seront saisis à la réception des commandes.</div>";
   h+="<div class='step' style='margin-top:14px'>Compte utilisé par défaut</div>";
   CPT.defauts.forEach(function(x){
@@ -22,8 +22,8 @@ function cptCard(){
 ACTS.cptExport=function(){
   var du=v("cx-d"),au=v("cx-f");if(!du||!au){CPTMSG="Choisis la période.";render();return}
   var hd={};if(TOK)hd["x-atelier-token"]=TOK;else hd["x-atelier-password"]=PW;
-  fetch("/api/compta/export?du="+du+"&au="+au,{headers:hd}).then(function(r){if(!r.ok)return r.json().then(function(j){throw new Error(j.error||"Erreur")});return r.blob()}).then(function(b){
-    var a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="journal-ventes-"+du+"-"+au+".csv";document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},500);CPTMSG="Journal téléchargé.";render()}).catch(function(e){CPTMSG=e.message;render()})};
+  fetch("/api/compta/export?du="+du+"&au="+au+"&magasin="+encodeURIComponent(v("cx-m")),{headers:hd}).then(function(r){if(!r.ok)return r.json().then(function(j){throw new Error(j.error||"Erreur")});return r.blob()}).then(function(b){
+    var a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="journal-"+(v("cx-m")||MAG||"tous").toLowerCase()+"-"+du+"-"+au+".csv";document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},500);CPTMSG="Journal téléchargé.";render()}).catch(function(e){CPTMSG=e.message;render()})};
 ACTS.cptAna=function(){Promise.all(CPT.analytiques.map(function(a){return api("/compta/analytique",{magasin:a.magasin,code:v("an-"+a.magasin)})})).then(function(){CPT=null;CPTMSG="Codes analytiques enregistrés.";render()}).catch(function(e){CPTMSG=e.message;render()})};
 ACTS.cptAdd=function(){api("/compta/compte",{code:v("cp-c"),libelle:v("cp-l"),type:v("cp-t")}).then(function(d){CPT=null;CPTMSG=d.message;render()}).catch(function(e){CPTMSG=e.message;render()})};
 document.addEventListener("change",function(e){var t=e.target;if(!t||!t.dataset||!t.dataset.cptdef)return;api("/compta/defaut",{cle:t.dataset.cptdef,code:t.value}).then(function(d){CPTMSG=d.message;CPT=null;render()}).catch(function(er){CPTMSG=er.message;render()})});
