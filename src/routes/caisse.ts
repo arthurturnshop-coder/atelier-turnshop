@@ -161,8 +161,8 @@ app.get("/api/ventes/recherche", async (c) => {
   for (const r of rows) ventes.push(await detailVente(r));
   if (ventes.length) try {
     const ids = ventes.map((v: any) => v.id);
-    const sav = (await sql`SELECT vente_id, type, libelle, quantite, montant_cents, statut, issue, cree_le FROM sav_dossiers WHERE vente_id IN ${sql(ids)} AND statut <> 'annule' ORDER BY id`) as any[];
-    for (const v of ventes as any[]) v.sav = sav.filter((x) => x.vente_id === v.id).map((x) => ({ type: x.type, libelle: x.libelle, quantite: x.quantite, montantCents: x.montant_cents, statut: x.statut, issue: x.issue, le: x.cree_le }));
+    const sav = (await sql`SELECT vente_id, type, libelle, quantite, montant_cents, statut, issue, cree_le, cree_par, close_le, close_par, demande_le, motif FROM sav_dossiers WHERE vente_id IN ${sql(ids)} AND statut <> 'annule' ORDER BY id`) as any[];
+    for (const v of ventes as any[]) v.sav = sav.filter((x) => x.vente_id === v.id).map((x) => ({ type: x.type, libelle: x.libelle, quantite: x.quantite, montantCents: x.montant_cents, statut: x.statut, issue: x.issue, le: x.cree_le, par: x.cree_par, closeLe: x.close_le, closePar: x.close_par, demandeLe: x.demande_le, motif: x.motif }));
   } catch {}
   return c.json({ ventes });
 });

@@ -39,6 +39,18 @@ function serieHtml(l,i){
     return h+"</div>"}
   return""}
 function serieOk(l){if(!l.trott)return true;var q=Math.max(1,l.quantite|0);for(var k=0;k<q;k++){if(String((l.series||[])[k]||"").trim().length<3)return false}return true}
+function savHisto(r){
+  var ev=[];
+  (r.sav||[]).forEach(function(d){
+    var m=d.motif?" ("+esc(d.motif)+")":"";
+    if(d.type==="remboursement")ev.push([d.le,"↩ Remboursement "+eur(d.montantCents)+" en "+esc(({carte:"carte",especes:"espèces",virement:"virement",bon:"bon d'achat"})[d.issue]||d.issue)+m,d.par]);
+    else if(d.type==="echange")ev.push([d.le,"🔁 Échange : "+esc(d.libelle)+" → bon d'achat "+eur(d.montantCents)+m,d.par]);
+    else{ev.push([d.le,"🛠 Garantie ouverte : "+esc(d.libelle)+m,d.par]);
+      if(d.demandeLe)ev.push([d.demandeLe,"🛠 Garantie : demande faite au fournisseur ("+esc(d.libelle)+")",""]);
+      if(d.statut==="termine")ev.push([d.closeLe,"🛠 Garantie terminée ("+esc(d.libelle)+") : "+(d.issue==="piece_recue"?"pièce reçue":d.issue==="rembourse_fournisseur"?"remboursée par le fournisseur":d.issue==="refus"?"refusée":"clôturée"),d.closePar])}});
+  if(!ev.length)return"";
+  ev.sort(function(a,b){return new Date(a[0])-new Date(b[0])});
+  return"<hr><div class='rm'><b>Historique</b></div>"+ev.map(function(e){return"<div style='font-size:12px;margin-top:4px'>"+esc(dateLongue(e[0]))+(e[2]?" · "+esc(e[2]):"")+"<br>"+e[1]+"</div>"}).join("")}
 function recuHtml(r){
   var ttc=r.totalCents,ht=Math.round(ttc/1.2),tva=ttc-ht,t=r.ticket||{};
   var es=entSplit(t.entete),ent=es.haut,ri=RDVI||{};
@@ -57,6 +69,7 @@ function recuHtml(r){
     +"<div class='rl rm'><span>Total HT</span><span>"+eur(ht)+"</span></div><div class='rl rm'><span>TVA 20 %</span><span>"+eur(tva)+"</span></div><hr>";
   if(acd)h+="<div class='rl'><span>Acompte déjà versé</span><span>-"+eur(acd)+"</span></div><div class='rl'><span>Reste payé aujourd'hui</span><span>"+eur(r.totalCents)+"</span></div>";
   r.paiements.forEach(function(p){h+="<div class='rl'><span>Payé en "+esc((MOY[p.moyen]||p.moyen).toLowerCase())+"</span><span>"+eur(p.cents)+"</span></div>"});
+  h+=savHisto(r);
   if(ri.siteQrSvg||ri.avisQrAmiens||ri.avisQrRouen)h+=factureQr(ri);
   else if(t.qrSvg)h+="<hr><div class='rc'><b>Laissez-nous un avis</b><br>et recevez une récompense !</div><div class='qr'>"+t.qrSvg+"</div>";
   return h+entBas(es,"Merci de votre visite !")+"</div>"}
