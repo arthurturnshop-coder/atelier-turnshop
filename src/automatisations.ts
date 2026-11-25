@@ -35,7 +35,7 @@ export async function envoyerCommandeArrivee(repId: number, libelles: string[]) 
   const r = await repInfo(repId);
   if (!r) return;
   const liste = libelles.slice(0, 5).join(", ");
-  await notifier("cmdclient", { clientId: r.client_id, reparationId: repId, sujet: "Votre commande est arrivée - TURN Shop", texte: `Bonjour${prenomDe(r.prenom)}, votre commande (${liste}) est arrivée en boutique. Vous pouvez venir la récupérer quand vous voulez. L'équipe TURN Shop` });
+  await notifier("cmdclient", { clientId: r.client_id, reparationId: repId, sujet: "Votre commande est arrivée - TURN Shop", texte: `Bonjour${prenomDe(r.prenom)}, votre commande (${liste}) est arrivée en boutique et vous est gardée 7 jours. Vous pouvez venir la récupérer dès maintenant. L'équipe TURN Shop` });
 }
 
 export async function envoyerPret(repId: number) {
@@ -109,6 +109,22 @@ async function cycle() {
         const reste = b.etape === 1 ? "6 mois" : b.etape === 2 ? "3 mois" : "1 mois";
         const r = await notifier("bonexp", { clientId: b.client_id, sujet: `Votre bon d'achat TURN Shop expire dans ${reste}`, texte: `Bonjour${prenomDe(b.prenom)}, vous avez un bon d'achat de ${(b.montant_cents / 100).toFixed(2).replace(".", ",")} € chez TURN Shop. Il est valable jusqu'au ${b.expire}, soit dans ${reste}. Passez en boutique pour l'utiliser avant cette date, il sera déduit directement à l'encaissement.\n\nL'équipe TURN Shop` });
         if (r === "envoye") await sql`UPDATE bons_achat SET rappels = ${b.etape} WHERE id = ${b.id}`;
+      }
+    }
+    // Commandes clients arrivées et non récupérées : rappel à 3 jours, dernier rappel 24 h avant l'abandon (7 jours), puis une tâche pour l'équipe.
+    // Rien n'est envoyé dès que la commande est remise au client (remise_le renseigné).
+    const attente = (await sql`SELECT l.id, l.libelle, l.reparation_id, l.boite, extract(epoch FROM (now() - l.recue_le)) / 86400 AS jours, r.client_id, cl.prenom, cl.nom
+      FROM commande_lignes l JOIN devis_lignes dl ON dl.id = l.devis_ligne_id AND dl.remise_client JOIN reparations r ON r.id = l.reparation_id JOIN clients cl ON cl.id = r.client_id
+      WHERE l.statut = 'recue' AND l.remise_le IS NULL AND r.supprime_le IS NULL AND l.recue_le IS NOT NULL LIMIT 100`) as any[];
+    for (const a of attente) {
+      const j = Number(a.jours);
+      if (j >= 7) {
+        const texte = `Commande client non récupérée après 7 jours : ${a.libelle} pour ${`${a.prenom} ${a.nom}`.trim()} (PC-${String(a.reparation_id).padStart(4, "0")}${a.boite ? ", case " + a.boite : ""}) [AB${a.id}]`;
+        const [dej] = await sql`SELECT id FROM taches WHERE texte = ${texte}`;
+        if (!dej) await sql`INSERT INTO taches (texte, priorite, cree_par) VALUES (${texte}, true, 'Automatique')`;
+      } else if (h.h >= 9 && h.h < 19) {
+        if (j >= 6) await notifier("cmdrappel6", { clientId: a.client_id, reparationId: a.reparation_id, sujet: "Dernier jour pour récupérer votre commande - TURN Shop", texte: `Bonjour${prenomDe(a.prenom)}, il ne vous reste plus que 24 heures pour récupérer votre commande (${a.libelle}) en boutique, sinon elle sera remise en vente. L'équipe TURN Shop` });
+        else if (j >= 3) await notifier("cmdrappel3", { clientId: a.client_id, reparationId: a.reparation_id, sujet: "Pensez à récupérer votre commande - TURN Shop", texte: `Bonjour${prenomDe(a.prenom)}, votre commande (${a.libelle}) vous attend en boutique depuis 3 jours. Dépêchez-vous de passer la récupérer : elle vous est gardée jusqu'à 7 jours après son arrivée. L'équipe TURN Shop` });
       }
     }
     // Commandes clients passées chez le fournisseur sans nouvelle depuis 7 jours : une tâche dans la to-do.

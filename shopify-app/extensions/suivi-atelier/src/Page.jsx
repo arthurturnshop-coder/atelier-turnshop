@@ -199,7 +199,17 @@ function Suivi({data, payer, repondre, nouveau}) {
   const finies = data.reparations.filter((r) => r.groupe === 'termine');
   return (
     <s-stack gap="base">
-      {!data.reparations.length && <s-section><s-stack gap="base"><s-text>Tu n'as pas encore de réparation chez nous.</s-text><s-button variant="primary" onClick={nouveau}>Faire une demande</s-button></s-stack></s-section>}
+      {!data.reparations.length && !(data.commandes || []).length && <s-section><s-stack gap="base"><s-text>Tu n'as pas encore de réparation chez nous.</s-text><s-button variant="primary" onClick={nouveau}>Faire une demande</s-button></s-stack></s-section>}
+      {(data.commandes || []).map((c, i) => (
+        <s-section key={'cmd' + i}>
+          <s-stack gap="small-300">
+            <s-heading>{c.libelle + (c.quantite > 1 ? ' × ' + c.quantite : '')}</s-heading>
+            <s-badge tone="success">Arrivée : en attente de récupération</s-badge>
+            <s-text>{'Elle vous attend en boutique' + (c.magasin ? ' ' + c.magasin : '') + (c.emplacement ? ', emplacement ' + c.emplacement : '') + '.'}</s-text>
+            <s-text tone="subdued">{c.joursRestants > 1 ? 'Gardée encore ' + c.joursRestants + ' jours.' : 'Dernier jour pour la récupérer.'}</s-text>
+          </s-stack>
+        </s-section>
+      ))}
       {cours.map((r) => <Carte key={r.id} r={r} payer={payer} repondre={repondre} />)}
       {finies.length > 0 && <s-divider />}
       {finies.length > 0 && <s-heading>Mes réparations passées</s-heading>}

@@ -294,7 +294,11 @@ app.post("/pub/moi", async (c) => {
   }
   const k = await coordonnees(cid, q, {});
   const coordOk = !!(k.prenom && k.nom && k.tel.replace(/\D/g, "").length >= 9 && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(k.email));
-  return c.json({ prenom: q.prenom, profil: { ...k, ok: coordOk }, reparations });
+  const cmds = (await sql`SELECT l.libelle, l.quantite, l.boite, l.recue_le, r.magasin, extract(epoch FROM (now() - l.recue_le)) / 86400 AS jours
+    FROM commande_lignes l JOIN devis_lignes dl ON dl.id = l.devis_ligne_id AND dl.remise_client JOIN reparations r ON r.id = l.reparation_id
+    WHERE r.client_id = ${cid} AND l.statut = 'recue' AND l.remise_le IS NULL AND r.supprime_le IS NULL ORDER BY l.recue_le`.catch(() => [])) as any[];
+  const commandes = cmds.map((x) => ({ libelle: x.libelle, quantite: x.quantite, emplacement: x.boite ?? "", magasin: x.magasin ?? "", recueLe: x.recue_le, joursRestants: Math.max(0, Math.ceil(7 - Number(x.jours))) }));
+  return c.json({ prenom: q.prenom, profil: { ...k, ok: coordOk }, reparations, commandes });
 });
 
 // ---- Demande de rendez-vous ----
