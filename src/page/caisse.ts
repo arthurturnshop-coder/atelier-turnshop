@@ -67,7 +67,7 @@ function recuHtml(r){
   var ttc=r.totalCents,ht=Math.round(ttc/1.2),tva=ttc-ht,t=r.ticket||{};
   var es=entSplit(t.entete),ent=es.haut,ri=RDVI||{};
   var h="<div class='recu' data-recu='"+r.id+"'><div class='rc'>"+ent+(r.magasin?"<br>Boutique "+esc(r.magasin):"")+"</div>"+devisCoord(ri)+"<hr>"
-    +"<div class='rc'><b>FACTURE</b></div>"
+    +"<div class='rc'><b>"+(r.type==="acompte"?"FACTURE D'ACOMPTE":"FACTURE")+"</b></div>"
     +"<div class='rc' style='font-size:18px'><b>"+(r.numero?esc(r.numero):"Ticket n° "+r.id)+"</b></div>"
     +"<div class='rl'><span>Date</span><span>"+esc(dateLongue(r.date))+"</span></div>"
     +"<div class='rm'>Vendeur : "+esc(r.vendeur||"")+"</div><hr>"
@@ -76,6 +76,11 @@ function recuHtml(r){
   h+="<hr><div class='rl'><span>Sous-total</span><span>"+eur(r.brutCents)+"</span></div>";
   r.avantages.forEach(function(a){h+="<div class='rl'><span>"+(a.effet==="cadeau"?"Cadeau : ":"Offre : ")+esc(a.libelle)+"</span><span>"+(a.remiseCents?"-"+eur(a.remiseCents):"offert")+"</span></div>"});
   if(r.fideliteCents)h+="<div class='rl'><span>Fidélité</span><span>-"+eur(r.fideliteCents)+"</span></div>";
+  if(r.type==="acompte"){var tp=r.acompteTotalCents||0,rs=r.acompteResteCents||0,hta=Math.round(r.totalCents/1.2);
+    h+="<div class='rl rt'><span>ACOMPTE TTC</span><span>"+eur(r.totalCents)+"</span></div><div class='rl rm'><span>dont HT</span><span>"+eur(hta)+"</span></div><div class='rl rm'><span>dont TVA 20 %</span><span>"+eur(r.totalCents-hta)+"</span></div><hr>"
+      +(tp?"<div class='rl'><span>Total de la prestation TTC</span><span>"+eur(tp)+"</span></div><div class='rl'><span>Déjà versé (cet acompte inclus)</span><span>"+eur(tp-rs)+"</span></div><div class='rl rt'><span>Solde restant à payer</span><span>"+eur(rs)+"</span></div><hr>":"");
+    r.paiements.forEach(function(p){h+="<div class='rl'><span>Payé en "+esc((MOY[p.moyen]||p.moyen).toLowerCase())+"</span><span>"+eur(p.cents)+"</span></div>"});
+    return h+entBas(es,"Merci de votre confiance !")+"</div>"}
   var acd=r.acompteDeduitCents||0;ttc=r.totalCents+acd;ht=Math.round(ttc/1.2);tva=ttc-ht;
   h+="<div class='rl rt'><span>TOTAL TTC</span><span>"+eur(ttc)+"</span></div>"
     +"<div class='rl rm'><span>Total HT</span><span>"+eur(ht)+"</span></div><div class='rl rm'><span>TVA 20 %</span><span>"+eur(tva)+"</span></div><hr>";

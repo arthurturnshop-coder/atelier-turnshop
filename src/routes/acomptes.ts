@@ -45,6 +45,9 @@ app.post("/api/reparations/acompte", async (c) => {
   const vendeur = await vendeurParMdp(c, b.mdpCaissier);
   const [v] = (await sql`INSERT INTO ventes (client_id, reparation_id, magasin, vendeur, total_cents, points_gagnes, type) VALUES (${r.client_id}, ${repId}, ${u.magasin ?? null}, ${vendeur}, ${total}, 0, 'acompte') RETURNING id`) as any[];
   await sql`INSERT INTO vente_lignes (vente_id, libelle, quantite, prix_unitaire_cents, type) VALUES (${v.id}, ${"Acompte réparation " + pcn(repId)}, 1, ${total}, 'article')`;
+  const dvA = await (await import("./reparations")).devisDe(repId);
+  const [{ n: verseA }] = (await sql`SELECT COALESCE(sum(total_cents), 0)::int AS n FROM ventes WHERE reparation_id = ${repId} AND type = 'acompte'`) as any[];
+  await sql`UPDATE ventes SET numero_facture = 'F-' || to_char(now(), 'YYYY') || '-' || lpad(nextval('facture_seq')::text, 5, '0'), acompte_total_cents = ${dvA.netCents}, acompte_reste_cents = ${Math.max(0, dvA.netCents - verseA)} WHERE id = ${v.id}`;
   for (const p of paiements) await sql`INSERT INTO vente_paiements (vente_id, moyen, montant_cents) VALUES (${v.id}, ${p.moyen}, ${p.cents})`;
   await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${repId}, 'caisse', ${`Acompte encaissé : ${(total / 100).toFixed(2)} €${signature(c)}`})`;
   const [vv] = (await sql`SELECT v.*, trim(cl.prenom || ' ' || cl.nom) AS client_nom FROM ventes v LEFT JOIN clients cl ON cl.id = v.client_id WHERE v.id = ${v.id}`) as any[];

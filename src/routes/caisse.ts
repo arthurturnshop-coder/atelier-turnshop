@@ -96,6 +96,10 @@ app.get("/api/caisse/scan", async (c) => {
 // Numéro de facture continu (F-2026-00001…) donné à chaque vente encaissée.
 await sql`CREATE SEQUENCE IF NOT EXISTS facture_seq`;
 await sql`ALTER TABLE ventes ADD COLUMN IF NOT EXISTS numero_facture TEXT`;
+await sql`ALTER TABLE ventes ADD COLUMN IF NOT EXISTS acompte_total_cents INT`;
+await sql`ALTER TABLE ventes ADD COLUMN IF NOT EXISTS acompte_reste_cents INT`;
+// Les factures d'acompte déjà émises sans numéro en reçoivent un (même suite que les factures, dans l'ordre).
+await sql`UPDATE ventes v SET numero_facture = 'F-' || to_char(v.cree_le, 'YYYY') || '-' || lpad(nextval('facture_seq')::text, 5, '0') FROM (SELECT id FROM ventes WHERE type = 'acompte' AND numero_facture IS NULL ORDER BY id) x WHERE v.id = x.id`;
 // Case de rangement (A1, B12…) d'un produit Shopify : mémorisée ici, ou reprise du stock local si le produit y est.
 await sql`CREATE TABLE IF NOT EXISTS emplacements_produits (variant_id TEXT PRIMARY KEY, emplacement TEXT NOT NULL DEFAULT '', maj_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
 const caseDe = async (variantId: string, codes: string[]): Promise<string> => {
@@ -191,6 +195,16 @@ export async function detailVente(v: any) {
   } catch (e: any) { o.sav = []; console.log(JSON.stringify({ event: "historique-sav", message: String(e?.message ?? e).slice(0, 200) })); }
   return o;
 }
+async function acompteInfos(v: any) {
+  if ((v.type ?? "vente") !== "acompte" || !v.reparation_id) return {};
+  let total = v.acompte_total_cents, reste = v.acompte_reste_cents;
+  if (total == null) {
+    const dv = await (await import("./reparations")).devisDe(v.reparation_id);
+    const [{ n }] = (await sql`SELECT COALESCE(sum(total_cents), 0)::int AS n FROM ventes WHERE reparation_id = ${v.reparation_id} AND type = 'acompte' AND id <= ${v.id}`) as any[];
+    total = dv.netCents; reste = Math.max(0, total - n);
+  }
+  return { acompteTotalCents: total, acompteResteCents: reste };
+}
 async function detailVente0(v: any) {
   const lignes = (await sql`SELECT libelle, quantite, prix_unitaire_cents, series FROM vente_lignes WHERE vente_id = ${v.id} ORDER BY id`) as any[];
   const pays = (await sql`SELECT moyen, montant_cents FROM vente_paiements WHERE vente_id = ${v.id} ORDER BY id`) as any[];
@@ -199,7 +213,7 @@ async function detailVente0(v: any) {
   const [co] = v.client_id ? ((await sql`SELECT prenom, telephone, email FROM clients WHERE id = ${v.client_id}`) as any[]) : [];
   return {
     contact: { prenom: co?.prenom ?? "", tel: co?.telephone ?? "", email: co?.email ?? "" },
-    type: v.type ?? "vente", acompteDeduitCents: v.acompte_deduit_cents ?? 0,
+    type: v.type ?? "vente", acompteDeduitCents: v.acompte_deduit_cents ?? 0, ...(await acompteInfos(v)),
     numero: v.numero_facture ?? null, clientId: v.client_id ?? null,
     id: v.id, date: v.cree_le, magasin: v.magasin, vendeur: v.vendeur, client: v.client_nom || null,
     totalCents: v.total_cents, fideliteCents: v.remise_cents, brutCents: brut,
