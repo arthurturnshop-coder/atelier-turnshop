@@ -41,7 +41,7 @@ function rechHtml(d){
     (p.variantes||[]).forEach(function(x,vi){
       var vt=x.titre&&x.titre!=="Default Title"?" - "+esc(x.titre):"";
       h+="<div class='rp-line'><span class='rp-t'><b>"+esc(p.titre)+vt+"</b> <span class='rp-m'>code-barres "+esc(x.barcode||"—")+" · sku "+esc(x.sku||"—")+" · </span><b>"+esc(x.prix)+" €</b> <span class='rp-m'>· "+stockTxt(x)+"</span></span>"
-        +"<span class='rp-btns'>"+(FICHE?"<button data-act='rAddDevis' data-pi='"+pi+"' data-vi='"+vi+"'>+ Devis</button>":"")+"<button class='sec' data-act='rAddPanier' data-pi='"+pi+"' data-vi='"+vi+"'>+ Panier</button></span></div>"})})}
+        +"<span class='rp-btns'>"+(FICHE?"<button data-act='rAddDevis' data-pi='"+pi+"' data-vi='"+vi+"'>+ Devis</button>":"")+"<button class='sec' data-act='rAddPanier' data-pi='"+pi+"' data-vi='"+vi+"'>+ Caisse</button></span></div>"})})}
   return h}
 function rechOpen(id){
   rechHide();
