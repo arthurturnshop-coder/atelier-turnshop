@@ -163,6 +163,7 @@ export const ACTIONS = `var ACTS={
   avEtat:async function(b){try{await api("/avantages/etat",{id:+b.dataset.id,actif:b.dataset.v==="1"});AVL=null;CAV=null;render()}catch(e){alert(e.message)}},
   avSuppr:async function(b){if(!confirm("Supprimer cet avantage ?"))return;try{await api("/avantages/supprimer",{id:+b.dataset.id});AVL=null;CAV=null;render()}catch(e){alert(e.message)}},
   avType:function(){AVDEC=v("avd");AVF={libelle:v("avl"),seuil:v("avs"),dd:v("avdd"),df:v("avdf"),effet:v("ave"),valeur:v("avv")};render()},
+  saveListes:async function(){try{var d=await api("/parametres/listes",{pannes:v("ls-p"),etats:v("ls-e")});LISTES=null;alert(d.message);render()}catch(e){var m=document.getElementById("lsmsg");if(m)m.textContent=e.message}},
   saveGarP:async function(){try{var d=await api("/parametres/garantie",{jours:v("gj1")});GARP=null;alert(d.message);render()}catch(e){var m=document.getElementById("garmsg");if(m)m.textContent=e.message}},
   saveParam:async function(){try{var d=await api("/parametres",{eurosPourPalier:v("pe1"),remiseEuros:v("pr1")});PARAM=null;alert(d.message);render()}catch(e){var m=document.getElementById("parmsg");if(m)m.textContent=e.message}}
 };

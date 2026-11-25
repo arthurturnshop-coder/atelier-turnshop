@@ -1,7 +1,10 @@
 export const CREATION = `// ---------- Création directe : prise en charge / rendez-vous / devis (dans l'Atelier) ----------
+var LISTES=null;
+function listesCharge(){if(LISTES===null){LISTES=undefined;api("/parametres/listes").then(function(d){LISTES=d;render()}).catch(function(){LISTES={pannes:[],etats:[]};render()})}}
 var CRE={mode:"prise",q:"",res:null,cli:null,msg:"",busy:false};
 function creTitre(){return CRE.mode==="devis"?"Nouveau devis":(CRE.mode==="rdv"?"Nouveau rendez-vous":"Nouvelle prise en charge")}
 function vCreer(){
+  listesCharge();var LP=(LISTES&&LISTES.pannes)||[],LE=(LISTES&&LISTES.etats)||[];
   var m=CRE.mode,h=subHtml()+"<div style='margin-top:12px'><div class='step' style='font-size:20px'>"+creTitre()+"</div>"+(m==="devis"?"<div class='cre-hint'>Un numéro PC est attribué, les lignes se saisissent ensuite.</div>":"")+"</div>";
   if(CRE.msg)h+="<div class='pmsg'>"+esc(CRE.msg)+"</div>";
   h+="<div class='cre'>";
@@ -22,9 +25,9 @@ function vCreer(){
   h+="</div>";
   // 3. Panne
   h+="<div class='cre-sec cre-full'><div class='cre-h'><span class='cre-n'>3</span>"+(m==="devis"?"Objet du devis":"Panne décrite par le client")+"</div>"
-    +(m==="devis"?"":"<div class='cre-chips cre-pn'>"+["Suspicion batterie","Pneu crevé","Ne freine pas","Bruit du contrôleur","Accident","Ne s allume pas","Perte de puissance","Écran / afficheur HS"].map(function(t){return"<button type='button' class='cre-pb' data-act='crePanne' data-t='"+t+"'>+ "+t+"</button>"}).join("")+"</div>")
+    +(m==="devis"?"":"<div class='cre-chips cre-pn'>"+LP.map(function(t){return"<button type='button' class='cre-pb' data-act='crePanne' data-t='"+t+"'>+ "+t+"</button>"}).join("")+"</div>")
     +"<textarea id='cr-p' rows='3' placeholder='"+(m==="devis"?"Ex : devis changement de batterie":"Panne décrite par le client")+"'></textarea>"
-    +"<div class='cre-2'><select id='cr-e'><option value=''>État à l arrivée…</option>"+["Bon état général","Rayures / traces d usure","Choc / bosse","Carénage cassé","Très sale","Déjà démontée","Pièces manquantes","Autre (voir remarques)"].map(function(t){return"<option>"+t+"</option>"}).join("")+"</select><textarea id='cr-r' rows='1' placeholder='Remarques' style='min-height:46px'></textarea></div></div>";
+    +"<div class='cre-2'><select id='cr-e'><option value=''>État à l arrivée…</option>"+LE.map(function(t){return"<option>"+t+"</option>"}).join("")+"</select><textarea id='cr-r' rows='1' placeholder='Remarques' style='min-height:46px'></textarea></div></div>";
   // 4. Rangement et affaires
   h+="<div class='cre-sec'><div class='cre-h'><span class='cre-n'>4</span>Rangement et affaires</div>"+boiteSelect("cr-b")+affairesBox("cr")+"<div class='cre-2' style='margin-top:10px'><input id='cr-k' placeholder='🔑 Code / mot de passe (facultatif)'><input id='cr-d' type='date' value='"+today()+"'></div></div>";
   // 5. Options
