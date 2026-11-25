@@ -17,7 +17,7 @@ function vDevisEd(){
   if(DV.res)h+=DV.res.length?DV.res.map(function(c,i){return"<button class='sec hrow' data-act='dvChoisir' data-i='"+i+"'><b>"+esc(c.name)+"</b> <span class='muted'>"+esc((c.phone||c.telephone||""))+" "+esc(c.email||"")+"</span></button>"}).join(""):"<div class='muted'>Aucun client trouvé.</div>";
   h+="<div class='muted'>Client : choisis un client existant ci-dessus, ou laisse vide (devis sans nom), ou renseigne nom + téléphone ou email (sa fiche client sera créée ou retrouvée).</div><div class='dl'><input id='dn' placeholder='Nom du client' value='"+esc(d.nom)+"'><input id='dt' placeholder='Téléphone' value='"+esc(d.telephone)+"'><input id='de' placeholder='Email' value='"+esc(d.email)+"'></div>"
     +"<div class='dl'><input id='dtr' placeholder='Trottinette (ex : Xiaomi M365)' value='"+esc(d.trottinette)+"'><input id='dob' placeholder='Objet du devis' value='"+esc(d.objet)+"'></div>"
-    +"<div class='step' style='margin-top:10px'>Lignes (prix TTC)</div><div class='muted'>Une pièce du catalogue turnshop.fr ? Cherche-la ou scanne-la ici :</div>"+prodBox("dvs")+(DV.hint?"<div class='pmsg'>"+esc(DV.hint)+"</div>":"");
+    +""+dvPrestaBox()+"<div class='step' style='margin-top:10px'>Lignes (prix TTC)</div><div class='muted'>Une pièce du catalogue turnshop.fr ? Cherche-la ou scanne-la ici :</div>"+prodBox("dvs")+(DV.hint?"<div class='pmsg'>"+esc(DV.hint)+"</div>":"");
   d.lignes.forEach(function(l,i){h+="<div class='dl'><input id='dl"+i+"' class='lb' placeholder='Pièce ou main d oeuvre' value='"+esc(l.libelle)+"'><input id='dq"+i+"' class='q' type='number' min='1' value='"+(l.quantite||1)+"'><input id='dp"+i+"' class='p' placeholder='Prix €' value='"+(l.prixCents?(l.prixCents/100).toFixed(2).replace(".",","):"")+"'><button class='link' data-act='dvDelL' data-i='"+i+"'>Suppr.</button></div>"});
   h+="<div class='actions'><button class='sec' data-act='dvAddL'>+ Ligne</button></div><div style='font-size:20px;margin:8px 0'><b>Total TTC : "+eur(dvTotal(d.lignes))+"</b></div>"
     +"<div class='actions'>"+(rat?"":"<button data-act='dvSave'>Enregistrer</button>")+(d.id?"<button class='sec' data-act='dvPrint'>Imprimer</button>":"")
@@ -32,6 +32,20 @@ function dvPayload(){var d=DV.ed;return{id:d.id,clientId:d.clientId,nom:d.nom,te
 ACTS.dvNouveau=function(){DV.hint="";DV.ed=dvVide();DV.res=null;DV.msg="";FICHE=null;TAB="enc";ATSUB="devis";render()};
 ACTS.dvOuvre=function(b){DV.hint="";var d=DV.list[+b.dataset.i];DV.ed=JSON.parse(JSON.stringify(d));if(!DV.ed.lignes.length)DV.ed.lignes=dvVide().lignes;DV.res=null;DV.msg="";render()};
 ACTS.dvRetour=function(){DV.ed=null;DV.list=null;DV.msg="";render()};
+function dvPrestaBox(){
+  prestaLoad();
+  var l=(PRESTA?PRESTA.prestations:[]).filter(function(x){return x.actif});
+  var h="<div class='step' style='margin-top:10px'>Prestations</div>";
+  if(!l.length)return h+"<div class='muted'>Aucune prestation. Un admin peut en créer dans ⚙ Paramètres.</div>";
+  h+="<div class='presta'>"+l.slice().sort(function(a,b){return (b.usage||0)-(a.usage||0)}).slice(0,8).map(function(x){var F=PRFAM[prFam(x.nom)];return"<button class='sec' style='border-left:5px solid "+F[1]+";background:"+F[2]+"' data-act='dvAddPresta' data-id='"+x.id+"'><b>"+esc(x.nom)+"</b><br><span class='muted'>"+eur(x.prixCents)+"</span></button>"}).join("")+"</div>"+(l.length>8?"<button class='sec' data-act='prPop' style='margin:4px 0'>Voir toutes les prestations ("+l.length+")</button>":"");
+  if(PRPOP)h+=prPopHtml(l);
+  return h}
+function dvPrestaAdd(x){dvLire();var ls=DV.ed.lignes,vide=ls.length&&!ls[ls.length-1].libelle&&!ls[ls.length-1].prixCents;var nl={libelle:x.nom,quantite:1,prixCents:x.prixCents};if(vide)ls[ls.length-1]=nl;else ls.push(nl)}
+ACTS.dvAddPresta=function(b){var x=(PRESTA?PRESTA.prestations:[]).filter(function(p){return p.id===+b.dataset.id})[0];if(!x||!DV.ed)return;dvPrestaAdd(x);DV.hint=x.avecPiece?"Ajoute maintenant : "+(x.pieceAide||"la pièce")+" (cherche-la ci-dessous).":"";render()};
+var _prAj=ACTS.prAjoute;
+ACTS.prAjoute=function(b){
+  if(DV.ed&&!FICHE&&TAB==="enc"&&ATSUB==="devis"){if(!PRPOP)return;var L=PRESTA?PRESTA.prestations:[];Object.keys(PRPOP.sel).forEach(function(id){var x=L.filter(function(p){return p.id===+id})[0];if(x)dvPrestaAdd(x)});PRPOP=null;render();return}
+  return _prAj(b)};
 async function dvAjoutProduit(p){
   dvLire();var r=await api("/maitres/resoudre",{libelle:p.libelle,prix:String(p.prix).replace(".",","),variantId:p.variantId,sku:p.sku,barcode:p.barcode});
   var ls=DV.ed.lignes,vide=ls.length&&!ls[ls.length-1].libelle&&!ls[ls.length-1].prixCents;
