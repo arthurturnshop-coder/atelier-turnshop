@@ -8,11 +8,11 @@ function vDevis(){
   if(DV.list===null){app.innerHTML=subHtml()+"<div class='card'>Chargement…</div>";api("/devis-simples").then(function(d){DV.list=d.devis;render()}).catch(function(e){DV.list=[];DV.msg=e.message;render()});return}
   var h=subHtml()+(DV.msg?"<div class='pmsg'>"+esc(DV.msg)+"</div>":"")+"<div class='card'><div class='step'>Devis</div><div class='muted'>Un devis seul, sans prise en charge. S'il se concrétise : « Facturer » (pièces vendues, passage en caisse) ou « Créer une prise en charge » (réparation).</div>";
   if(!DV.list.length)h+="<div class='muted'>Aucun devis pour l'instant.</div>";
-  DV.list.forEach(function(d,i){h+="<button class='sec hrow' data-act='dvOuvre' data-i='"+i+"'><b>"+dvNum(d.id)+"</b> · "+esc(d.nom||"Sans nom")+" · "+esc(d.trottinette||"")+" · <b>"+eur(d.totalCents)+"</b> · "+esc(day(d.date))+(d.reparationId?" · <span class='tag ok'>Rattaché à "+pcn(d.reparationId)+"</span>":"")+"</button>"});
+  DV.list.forEach(function(d,i){h+="<button class='sec hrow' data-act='dvOuvre' data-i='"+i+"'><b>"+dvNum(d.id)+"</b> · "+esc(d.nom||"Sans nom")+" · "+esc(d.trottinette||"")+" · <b>"+eur(d.totalCents)+"</b> · "+esc(day(d.date))+(d.commandeClient?" · <span class='tag ok'>Commande client</span>":d.reparationId?" · <span class='tag ok'>Rattaché à "+pcn(d.reparationId)+"</span>":"")+"</button>"});
   app.innerHTML=h+"</div>"}
 function vDevisEd(){
   var d=DV.ed,rat=!!d.reparationId;
-  var h=subHtml()+(DV.msg?"<div class='pmsg'>"+esc(DV.msg)+"</div>":"")+"<div class='card'><div class='step'>"+(d.id?"Devis "+dvNum(d.id):"Nouveau devis")+(rat?" · rattaché à "+pcn(d.reparationId):"")+"</div>";
+  var h=subHtml()+(DV.msg?"<div class='pmsg'>"+esc(DV.msg)+"</div>":"")+"<div class='card'><div class='step'>"+(d.id?"Devis "+dvNum(d.id):"Nouveau devis")+(d.commandeClient?" · commande client":rat?" · rattaché à "+pcn(d.reparationId):"")+"</div>";
   h+="<div class='dl'><input id='dq' class='lb' placeholder='Retrouver un client existant (nom, téléphone, email)'><button class='sec' data-act='dvChercher'>Chercher</button></div>";
   if(DV.res)h+=DV.res.length?DV.res.map(function(c,i){return"<button class='sec hrow' data-act='dvChoisir' data-i='"+i+"'><b>"+esc(c.name)+"</b> <span class='muted'>"+esc((c.phone||c.telephone||""))+" "+esc(c.email||"")+"</span></button>"}).join(""):"<div class='muted'>Aucun client trouvé.</div>";
   h+="<div class='muted'>Client : choisis un client existant ci-dessus, ou laisse vide (devis sans nom), ou renseigne nom + téléphone ou email (sa fiche client sera créée ou retrouvée).</div><div class='dl'><input id='dn' placeholder='Nom du client' value='"+esc(d.nom)+"'><input id='dt' placeholder='Téléphone' value='"+esc(d.telephone)+"'><input id='de' placeholder='Email' value='"+esc(d.email)+"'></div>"
@@ -21,7 +21,7 @@ function vDevisEd(){
   d.lignes.forEach(function(l,i){h+="<div class='dl'><input id='dl"+i+"' class='lb' placeholder='Pièce ou main d oeuvre' value='"+esc(l.libelle)+"'><input id='dq"+i+"' class='q' type='number' min='1' value='"+(l.quantite||1)+"'><input id='dp"+i+"' class='p' placeholder='Prix €' value='"+(l.prixCents?(l.prixCents/100).toFixed(2).replace(".",","):"")+"'><button class='link' data-act='dvDelL' data-i='"+i+"'>Suppr.</button></div>"});
   h+="<div class='actions'><button class='sec' data-act='dvAddL'>+ Ligne</button></div><div style='font-size:20px;margin:8px 0'><b>Total TTC : "+eur(dvTotal(d.lignes))+"</b></div>"
     +"<div class='actions'>"+(rat?"":"<button data-act='dvSave'>Enregistrer</button>")+(d.id?"<button class='sec' data-act='dvPrint'>Imprimer</button>":"")
-    +(d.id&&!rat?"<button data-act='dvFact'>Facturer (passer en caisse)</button><button class='sec' data-act='dvRatt'>Créer une prise en charge</button>":"")+(rat?"<button class='sec' data-act='dvVoirPC'>Ouvrir "+pcn(d.reparationId)+"</button>":"")
+    +(d.id&&!rat?"<button data-act='dvFact'>Facturer (passer en caisse)</button><button class='sec' data-act='dvRatt'>Créer une prise en charge</button>":"")+(d.commandeClient?"<button class='sec' data-act='dvConvPC'>Créer une prise en charge</button>":rat?"<button class='sec' data-act='dvVoirPC'>Ouvrir "+pcn(d.reparationId)+"</button>":"")
     +(d.id&&!rat?"<button class='danger' data-act='dvSuppr'>Supprimer</button>":"")+"<button class='sec' data-act='dvRetour'>Retour à la liste</button></div></div>";
   app.innerHTML=h}
 function dvLire(){
@@ -137,7 +137,7 @@ ACTS.cmdGo=async function(){
   ACTS.cmdFerme();
   try{
     if(dom&&livIdx()<0)PAN.push({libelle:"Livraison à domicile",quantite:1,prix:"4,95",type:"article",variantId:"",sku:""});
-    var r=await cartVersDevis();if(!r)return;var p=await api("/devis-simples/rattacher",{id:r.id});await api("/devis-lignes/remise-client",{repairId:p.reparationId,valeur:true});
+    var r=await cartVersDevis();if(!r)return;var p=await api("/devis-simples/rattacher",{id:r.id});await api("/devis-simples/commande-client",{repairId:p.reparationId});await api("/devis-lignes/remise-client",{repairId:p.reparationId,valeur:true});
     if(dom)await api("/reparations/livraison",{repairId:p.reparationId,adresse:CMDLIV.adresse,cp:CMDLIV.cp,ville:CMDLIV.ville});
     var f=await api("/reparation?id="+p.reparationId);var m=await cmdAuto(cmdLignesPieces(f));
     await api("/reparations/acompte",{mdpCaissier:mdpP,repairId:p.reparationId,paiements:pl});
@@ -151,6 +151,7 @@ ACTS.cEnPec=async function(){
   if(!PAN.length){alert("Le panier est vide.");return}
   if(!confirm("Créer une prise en charge (réparation en boutique) avec ce panier ?"))return;
   try{var r=await cartVersDevis();if(!r)return;var p=await api("/devis-simples/rattacher",{id:r.id});cartVide();DV.list=null;await ouvrirFiche(p.reparationId)}catch(e){alert(e.message)}};
+ACTS.dvConvPC=async function(){try{await api("/devis-simples/commande-client",{repairId:DV.ed.reparationId,valeur:false});var id=DV.ed.reparationId;DV.list=null;DV.ed=null;await ouvrirFiche(id)}catch(e){alert(e.message)}};
 ACTS.dvVoirPC=function(){ouvrirFiche(DV.ed.reparationId)};
 ACTS.dvPrint=async function(b){
   btnFlash(b);dvLire();var rv=await rdvInfos();var d=DV.ed,nl=String.fromCharCode(10),t=dvTotal(d.lignes),ht=Math.round(t/1.2),tva=t-ht;

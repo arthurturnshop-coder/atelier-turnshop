@@ -7,9 +7,12 @@ import { AppError, clean } from "../util";
 await sql`CREATE TABLE IF NOT EXISTS devis_simples (id SERIAL PRIMARY KEY, client_id INT, nom TEXT NOT NULL DEFAULT '', telephone TEXT NOT NULL DEFAULT '', email TEXT NOT NULL DEFAULT '', trottinette TEXT NOT NULL DEFAULT '', objet TEXT NOT NULL DEFAULT '', magasin TEXT NOT NULL DEFAULT 'Amiens', cree_par TEXT NOT NULL DEFAULT '', reparation_id INT, supprime_le TIMESTAMPTZ, cree_le TIMESTAMPTZ NOT NULL DEFAULT now(), maj_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
 await sql`CREATE TABLE IF NOT EXISTS devis_simples_lignes (id SERIAL PRIMARY KEY, devis_id INT NOT NULL REFERENCES devis_simples(id), type TEXT NOT NULL DEFAULT 'piece', libelle TEXT NOT NULL, quantite INT NOT NULL DEFAULT 1, prix_unitaire_cents INT NOT NULL DEFAULT 0)`;
 
-const vue = (d: any, lignes: any[]) => ({
+// Commande client : le dossier existe en coulisses (acompte, commande fournisseur) mais n'apparaît pas comme prise en charge tant qu'on ne le demande pas.
+await sql`ALTER TABLE reparations ADD COLUMN IF NOT EXISTS commande_client BOOLEAN NOT NULL DEFAULT false`;
+
+const vue = (d: any, lignes: any[], cc = false) => ({
   id: d.id, clientId: d.client_id, nom: d.nom, telephone: d.telephone, email: d.email, trottinette: d.trottinette, objet: d.objet, magasin: d.magasin, creePar: d.cree_par,
-  reparationId: d.reparation_id, date: d.cree_le,
+  reparationId: d.reparation_id, commandeClient: cc, date: d.cree_le,
   lignes: lignes.map((l) => ({ type: l.type, libelle: l.libelle, quantite: l.quantite, prixCents: l.prix_unitaire_cents })),
   totalCents: lignes.reduce((t, l) => t + l.quantite * l.prix_unitaire_cents, 0),
 });
@@ -18,7 +21,9 @@ app.get("/api/devis-simples", async (c) => {
   const rows = (await sql`SELECT * FROM devis_simples WHERE supprime_le IS NULL ORDER BY id DESC LIMIT 100`) as any[];
   const ids = rows.map((r) => r.id);
   const ls = ids.length ? ((await sql`SELECT * FROM devis_simples_lignes WHERE devis_id = ANY(${ids}) ORDER BY id`) as any[]) : [];
-  return c.json({ devis: rows.map((r) => vue(r, ls.filter((l) => l.devis_id === r.id))) });
+  const rids = rows.map((r) => r.reparation_id).filter(Boolean);
+  const cc = new Set(rids.length ? ((await sql`SELECT id FROM reparations WHERE id = ANY(${rids}) AND commande_client = true`) as any[]).map((r) => r.id) : []);
+  return c.json({ devis: rows.map((r) => vue(r, ls.filter((l) => l.devis_id === r.id), cc.has(r.reparation_id))) });
 });
 
 app.post("/api/devis-simples", async (c) => {
@@ -69,6 +74,12 @@ app.post("/api/devis-simples/supprimer", async (c) => {
 });
 
 // Le devis se concrétise : création de la prise en charge (client et trottinette si besoin) et copie des lignes.
+app.post("/api/devis-simples/commande-client", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  await sql`UPDATE reparations SET commande_client = ${b.valeur !== false} WHERE id = ${Number(b.repairId)}`;
+  return c.json({ ok: true });
+});
+
 app.post("/api/devis-simples/rattacher", async (c) => {
   const b = await c.req.json().catch(() => ({}));
   const [d] = (await sql`SELECT * FROM devis_simples WHERE id = ${Number(b.id)} AND supprime_le IS NULL`) as any[];

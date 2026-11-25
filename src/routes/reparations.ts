@@ -59,7 +59,7 @@ export function ligneListe(r: any, journal: any[]) {
 // Liste des réparations : vue = rdv | afaire | commande | pretes | garantie | tout. Compteurs renvoyés avec.
 app.get("/api/reparations", async (c) => {
   const vue = clean(c.req.query("vue"), 20) || "tout";
-  const rows = (await sql`SELECT r.*, c.prenom, c.nom, c.telephone, c.email, t.marque, t.modele, t.serie FROM reparations r JOIN clients c ON c.id = r.client_id JOIN trottinettes t ON t.id = r.trottinette_id WHERE r.supprime_le IS NULL AND r.statut <> 'récupéré' AND (${magDe(c)}::text IS NULL OR r.magasin IS NULL OR r.magasin = ${magDe(c)}) ORDER BY r.maj_le DESC, r.id DESC LIMIT 300`) as any[];
+  const rows = (await sql`SELECT r.*, c.prenom, c.nom, c.telephone, c.email, t.marque, t.modele, t.serie FROM reparations r JOIN clients c ON c.id = r.client_id JOIN trottinettes t ON t.id = r.trottinette_id WHERE r.supprime_le IS NULL AND r.commande_client = false AND r.statut <> 'récupéré' AND (${magDe(c)}::text IS NULL OR r.magasin IS NULL OR r.magasin = ${magDe(c)}) ORDER BY r.maj_le DESC, r.id DESC LIMIT 300`) as any[];
   const compteurs = {
     rdv: rows.filter((r) => r.en_magasin === false).length,
     afaire: rows.filter((r) => r.en_magasin !== false && ["reçu", "diagnostic", "devis envoyé", "à faire", "en réparation"].includes(r.statut)).length,
