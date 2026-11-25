@@ -284,7 +284,7 @@ document.addEventListener("input",function(e){
 
 // ----- Étiquettes produits : nom, prix, code-barres -----
 var ETQ=[],ETQF=null,ETQSKIP=0;
-var ETQFORMATS={"50x30":{l:"Rouleau 50 × 30 mm",w:50,h:30},"40x25":{l:"Rouleau 40 × 25 mm",w:40,h:25},"62x29":{l:"Ruban Brother 62 × 40 mm",w:62,h:40},"a4":{l:"Planche A4 3 × 8 (70 × 37 mm)",w:70,h:37,page:"A4",cols:3,rows:8},"papier":{l:"Emplacements papier A4 2 × 4 (105 × 74 mm)",w:105,h:74,page:"A4",cols:2,rows:4}};
+var ETQFORMATS={"50x30":{l:"Rouleau 50 × 30 mm",w:50,h:30},"40x25":{l:"Rouleau 40 × 25 mm",w:40,h:25},"62x29":{l:"Ruban Brother 62 × 40 mm",w:62,h:40},"a4":{l:"Planche A4 3 × 8 (70 × 37 mm)",w:70,h:37,page:"A4",cols:3,rows:8},"papier":{l:"Emplacements papier A4 2 × 4 (105 × 70 mm)",w:105,h:70,page:"A4",cols:2,rows:4}};
 function etqSeulEmpl(){return ETQ.length>0&&ETQ.every(function(x){return x.big&&x.style==='papier'})}
 function etqFormat(){
   if(etqSeulEmpl())return"papier";
@@ -338,7 +338,7 @@ function etqEmpl(){
   Promise.all(todo.map(function(it){return api("/stock/scan",{magasin:MAG||"",code:it.barcode||it.sku,local:true}).then(function(r){if(r.produit&&r.produit.emplacement)it.empl=r.produit.emplacement}).catch(function(){})})).then(function(){if(TAB==="etq")render()})}
 function vEtq(){etqEmpl();
   var F=ETQFORMATS[etqFormat()],nb=etqToutes().length;
-  var gen="<div class='card'><div class='step'>Étiquettes d'emplacements et de casiers</div><div class='muted'>Génère une série (ex. A1 à A12, C1 à C20). Choisis le style, elles s'ajoutent à la liste ci-dessous.</div><div class='seg' style='margin:6px 0'><button class='"+(ETQES==="papier"?"on":"")+"' data-act='etqEs' data-s='papier'>📄 Emplacement design (papier A4, vert)</button><button class='"+(ETQES==="simple"?"on":"")+"' data-act='etqEs' data-s='simple'>🏷 Étiquette simple</button></div>"
+  var gen="<div class='card'><div class='step'>Étiquettes d'emplacements et de casiers</div><div class='muted'>Génère une série (ex. A1 à A12, C1 à C20). Choisis le style, elles s'ajoutent à la liste ci-dessous.</div><div class='seg' style='margin:6px 0'><button class='"+(ETQES==="papier"?"on":"")+"' data-act='etqEs' data-s='papier'>📄 Emplacement design (papier A4, vert)</button><button class='"+(ETQES==="simple"?"on":"")+"' data-act='etqEs' data-s='simple'>🏷 Étiquette simple (Brother ou planche)</button></div>"
     +"<div class='dl' style='flex-wrap:wrap'><input id='eg-p' placeholder='Lettre (A)' maxlength='6' style='max-width:110px'><input id='eg-a' type='number' min='0' placeholder='De' style='max-width:90px'><input id='eg-b' type='number' min='0' placeholder='À' style='max-width:90px'><input id='eg-q' type='number' min='1' max='20' value='1' title='Exemplaires' style='max-width:90px'><button data-act='etqGen'>Ajouter la série</button></div>"
     +"<div class='dl' style='flex-wrap:wrap;margin-top:6px'><input id='eg-l' placeholder='Ou une liste : A1, A2, B7, C3' style='flex:1;min-width:200px'><button class='sec' data-act='etqGenListe'>Ajouter</button></div></div>";
   var h=subHtml()+gen+"<div class='card'><div class='step'>Étiquettes produits</div><div class='muted'>Cherche un produit, ajoute-le, choisis le nombre d'étiquettes puis imprime. Chaque étiquette : nom, prix et code-barres.</div>"+prodBox("etq")+"</div>";
