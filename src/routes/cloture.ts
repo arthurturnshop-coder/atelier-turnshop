@@ -1,6 +1,7 @@
 import { app } from "../app";
 import { sql } from "../db";
 import "./auth";
+import { vendeurParMdp } from "./caissier";
 import { AppError, clean, exigeResponsable } from "../util";
 
 // Caisse : ouverture (montant du tiroir) -> ventes -> fermeture (ticket Z stocké, écart compté/attendu).
@@ -19,6 +20,8 @@ const magDe = (c: any) => (c.get("user")?.magasin === "Rouen" ? "Rouen" : "Amien
 const euros = (x: any) => Math.round((Number(String(x ?? "").replace(",", ".")) || 0) * 100);
 const parse = (j: any) => (typeof j === "string" ? JSON.parse(j) : j);
 
+await sql`CREATE TABLE IF NOT EXISTS mouvements_cash (id SERIAL PRIMARY KEY, magasin TEXT NOT NULL, sens TEXT NOT NULL, montant_cents INT NOT NULL, motif TEXT NOT NULL DEFAULT '', par TEXT, cree_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
+
 async function calcul(m: string, de: Date | string, a: Date | string | null) {
   const fin = a ?? new Date();
   const pay = (await sql`SELECT p.moyen, sum(p.montant_cents)::int AS n FROM vente_paiements p JOIN ventes v ON v.id = p.vente_id
@@ -28,6 +31,10 @@ async function calcul(m: string, de: Date | string, a: Date | string | null) {
   const [ac] = (await sql`SELECT count(*)::int AS n FROM ventes WHERE magasin = ${m} AND type = 'acompte' AND cree_le >= ${de} AND cree_le <= ${fin}`) as any[];
   const remb = (await sql`SELECT rb.moyen, sum(rb.montant_cents)::int AS n FROM remboursements rb LEFT JOIN reparations r ON r.id = rb.reparation_id
     WHERE COALESCE(rb.magasin, r.magasin) = ${m} AND rb.cree_le >= ${de} AND rb.cree_le <= ${fin} GROUP BY rb.moyen`) as any[];
+  const mv = (await sql`SELECT sens, montant_cents, motif, par, cree_le FROM mouvements_cash WHERE magasin = ${m} AND cree_le >= ${de} AND cree_le <= ${fin} ORDER BY id`) as any[];
+  const entrees = mv.filter((x) => x.sens === "entree").reduce((a, x) => a + x.montant_cents, 0);
+  const sorties = mv.filter((x) => x.sens === "sortie").reduce((a, x) => a + x.montant_cents, 0);
+  const mouvements = mv.map((x) => ({ sens: x.sens, cents: x.montant_cents, motif: x.motif, par: x.par ?? "", le: x.cree_le }));
   const par: Record<string, number> = { carte: 0, especes: 0, virement: 0, en_ligne: 0, bon_achat: 0 };
   for (const p of pay) par[p.moyen] = p.n;
   const rem: Record<string, number> = {};
@@ -35,7 +42,7 @@ async function calcul(m: string, de: Date | string, a: Date | string | null) {
   const tr = (await sql`SELECT v.numero_facture, vl.libelle, vl.series, trim(cl.prenom || ' ' || cl.nom) AS client FROM vente_lignes vl JOIN ventes v ON v.id = vl.vente_id LEFT JOIN clients cl ON cl.id = v.client_id
     WHERE v.magasin = ${m} AND v.cree_le >= ${de} AND v.cree_le <= ${fin} AND jsonb_array_length(vl.series) > 0 ORDER BY v.id`) as any[];
   const trottinettes = tr.flatMap((r: any) => (r.series as string[]).map((serie) => ({ facture: r.numero_facture ?? "", libelle: r.libelle, serie, client: r.client ?? "" })));
-  return { trottinettes, encaisse: par, rembourse: rem, nbVentes: nb.n, nbAcomptes: ac.n, caCents: nb.total, especesNettes: par.especes - (rem.especes ?? 0) };
+  return { trottinettes, encaisse: par, rembourse: rem, nbVentes: nb.n, nbAcomptes: ac.n, caCents: nb.total, especesNettes: par.especes - (rem.especes ?? 0) + entrees - sorties, entreesCash: entrees, sortiesCash: sorties, mouvements };
 }
 
 const vue = (s: any) => s && ({
@@ -67,6 +74,22 @@ app.post("/api/caisse/ouvrir", async (c) => {
   const u = c.get("user") as any;
   await sql`INSERT INTO caisse_sessions (magasin, jour, fond_cents, ouvert_par) VALUES (${m}, (now() AT TIME ZONE 'Europe/Paris')::date, ${fond}, ${u?.prenom ?? ""})`;
   return c.json({ message: "Caisse ouverte." });
+});
+
+app.post("/api/caisse/mouvement", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const m = magDe(c);
+  const sens = b.sens === "entree" ? "entree" : b.sens === "sortie" ? "sortie" : "";
+  if (!sens) throw new AppError(400, "Choisis entrée ou sortie d'espèces.");
+  const cents = euros(b.montant);
+  if (cents <= 0) throw new AppError(400, "Indique le montant.");
+  const motif = clean(b.motif, 200);
+  if (!motif) throw new AppError(400, "Indique le motif (ex : reversement dépôt-vente, achat fournitures, fond de caisse).");
+  const [ouv] = (await sql`SELECT id FROM caisse_sessions WHERE magasin = ${m} AND fermee_le IS NULL LIMIT 1`) as any[];
+  if (!ouv) throw new AppError(409, "Ouvre d'abord la caisse.");
+  const par = await vendeurParMdp(c, b.mdpCaissier);
+  await sql`INSERT INTO mouvements_cash (magasin, sens, montant_cents, motif, par) VALUES (${m}, ${sens}, ${cents}, ${motif}, ${par})`;
+  return c.json({ message: sens === "entree" ? "Entrée d'espèces enregistrée." : "Sortie d'espèces enregistrée." });
 });
 
 app.post("/api/caisse/fermer", async (c) => {

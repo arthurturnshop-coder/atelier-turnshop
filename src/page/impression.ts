@@ -163,6 +163,7 @@ function cloHeure(x){var t=new Date(x);return t.toLocaleDateString("fr-FR")+" "+
 function cloTotaux(t){
   var e=t.encaisse,r=t.rembourse||{},h="<table class='devis' style='width:100%'>"+cloLigne("Carte",e.carte)+cloLigne("Espèces encaissées",e.especes)+cloLigne("Virement",e.virement)+(e.bon_achat?cloLigne("Bon d achat",e.bon_achat):"")+cloLigne("En ligne (Shopify)",e.en_ligne);
   Object.keys(r).forEach(function(k){h+=cloLigne("Remboursé ("+esc(k)+")",-r[k])});
+  (t.mouvements||[]).forEach(function(x){h+=cloLigne((x.sens==="entree"?"➕ Entrée espèces : ":"➖ Sortie espèces : ")+esc(x.motif)+(x.par?" ("+esc(x.par)+")":""),x.sens==="entree"?x.cents:-x.cents)});
   h+="</table><div class='muted'>"+t.nbVentes+" vente(s) · "+t.nbAcomptes+" acompte(s) · CA ventes "+eur(t.caCents)+"</div>";
   if((t.trottinettes||[]).length){h+="<div class='step' style='margin-top:8px'>🛴 Trottinettes vendues (n° de série)</div>"+t.trottinettes.map(function(x){return"<div class='muted'>"+esc(x.serie)+" · "+esc(x.libelle)+(x.client?" · "+esc(x.client):"")+(x.facture?" · "+esc(x.facture):"")+"</div>"}).join("")}
   return h}
@@ -210,6 +211,7 @@ function cloHtml(){
     var o=d.ouverte,att=o.fondCents+d.live.especesNettes;
     if(o.perimee)h+="<div class='card' style='border:2px solid #b00'><b style='color:#b00'>La caisse du "+esc(o.jour.split("-").reverse().join("/"))+" n est pas fermée.</b><div class='muted'>Compte le tiroir et ferme-la : impossible d ouvrir la caisse du jour ou d encaisser tant que ce n est pas fait.</div></div>";
     h+="<div><span class='tag ok'>Caisse ouverte</span> depuis "+esc(cloHeure(o.ouverteLe))+" par "+esc(o.ouvertPar)+" · tiroir à l ouverture "+eur(o.fondCents)+"</div>"+cloTotaux(d.live)
+      +"<div class='card' style='background:#f7f7f7'><div class='step'>Entrée / sortie d espèces</div><div class='seg' style='margin:6px 0'><button class='"+(CLO.mvs!=="sortie"?"on":"")+"' data-act='cloMvSens' data-m='entree'>➕ Entrée de cash</button><button class='"+(CLO.mvs==="sortie"?"on":"")+"' data-act='cloMvSens' data-m='sortie'>➖ Sortie de cash</button></div><div class='dl'><input id='clo-mm' class='p' placeholder='Montant €'><input id='clo-mo' class='lb' placeholder='Motif (ex : reversement dépôt-vente)'><button data-act='cloMouv'>Enregistrer</button></div></div>"
       +"<div class='muted'>Espèces attendues dans le tiroir : <b id='clo-att'>"+eur(att)+"</b></div>"
       +"<div class='dl'><label class='muted'>Espèces comptées (€)</label><input id='clo-compte' placeholder='Compte le tiroir'></div>"+cntHtml("clo-compte")
       +"<div class='muted'>Écart : <b id='clo-ecart'>-</b></div><div class='dl'><input id='clo-note' placeholder='Note (facultatif)'></div>"
@@ -235,6 +237,11 @@ function vCompta(){
 function cloCharge(){return api("/caisse/session").then(function(d){CLO.d=d;render();if(CLO.scroll){CLO.scroll=false;cloVa()}}).catch(function(e){CLO.msg=e.message;render()})}
 function cloHistCharge(){if(!estResp())return;api("/caisse/cloture-historique?periode="+CLO.per).then(function(h){var y=window.scrollY;CLO.h=h;render();window.scrollTo(0,y)}).catch(function(e){CLO.msg=e.message;render()})}
 function cloVa(){var e=document.getElementById("clo-card");if(e)e.scrollIntoView({block:"start"});var i=document.querySelector("input[data-cnt='clo-compte']");if(i)i.focus({preventScroll:true})}
+ACTS.cloMvSens=function(b){CLO.mvs=b.dataset.m;render()};
+ACTS.cloMouv=async function(){var sens=CLO.mvs==="sortie"?"sortie":"entree";var mt=document.getElementById("clo-mm"),mo=document.getElementById("clo-mo");
+  if(!mt||!mt.value){alert("Indique le montant.");return}
+  try{var code=await demandeCode("Qui fait ce mouvement ?");if(code===null)return;
+    var r=await api("/caisse/mouvement",{sens:sens,montant:mt.value,motif:mo?mo.value:"",mdpCaissier:code});CLO.msg=r.message;await cloCharge()}catch(e){alert(e.message)}};
 ACTS.cloOuvre=function(){CLO={open:true,d:null,h:null,per:CLO.per||"30j",msg:"",aj:null,scroll:true};render();cloVa();cloCharge();cloHistCharge()};
 document.addEventListener("keydown",function(e){
   var t=e.target;if(e.key!=="Enter"||!t||!t.dataset||!t.dataset.cnt)return;
