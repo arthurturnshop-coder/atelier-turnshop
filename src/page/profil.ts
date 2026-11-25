@@ -22,7 +22,22 @@ function fidHtml(){
   if(FID===null)return"Points fidélité : chargement…";
   if(!FID.trouve)return"Points fidélité : non disponible";
   return"Points fidélité : "+esc(FID.points)+" points (réduction disponible : "+esc(FID.euros)+" €)"}
-var CACLI=null,CALOAD=null;
+var CACLI=null,CALOAD=null,PACH=null,PACHLOAD=0,PACHOPEN=0;
+function achatsHtml(){
+  var c=CUR;if(!c)return"";
+  var h="<div class='step' style='margin-top:14px'>Achats en caisse</div>";
+  if(!PACH||PACH.id!==c.id)return h+"<div class='card muted'>Chargement…</div>";
+  if(!PACH.list.length)return h+"<div class='card muted'>Aucun achat en caisse pour ce client.</div>";
+  h+="<div class='card'>";
+  PACH.list.forEach(function(r){
+    var res=r.lignes.slice(0,2).map(function(l){return esc(l.libelle)}).join(", ")+(r.lignes.length>2?"…":"");
+    h+="<button class='sec hrow' data-act='pAchOpen' data-id='"+r.id+"'><b>"+esc(dateLongue(r.date))+"</b> · "+eur(r.totalCents)+"<br><span class='muted'>"+res+"</span></button>";
+    if(PACHOPEN===r.id)h+=recuHtml(r)+"<div class='actions'><button class='sec' data-act='cPrint' data-id='"+r.id+"'>Imprimer le reçu</button><button class='sec' data-act='cEmail' data-id='"+r.id+"'>✉ Envoyer par email</button></div>"});
+  return h+"</div>"}
+async function loadAch(){
+  var c=CUR;if(!c)return;PACHLOAD=c.id;var d;
+  try{d=await api("/caisse/historique?clientId="+c.id)}catch(e){d={ventes:[]}}
+  PACHLOAD=0;PACH={id:c.id,list:d.ventes||[]};if(CUR&&CUR.id===c.id&&TAB==="accueil")render()}
 function caHtml(){
   if(CACLI===null||CACLI.id!==(CUR&&CUR.id))return"Chiffre d'affaires : chargement…";
   var d=CACLI.d,t="Chiffre d'affaires atelier : <b>"+eur(d.atelierCents)+"</b> ("+d.nb+" facture"+(d.nb>1?"s":"")+(d.derniere?", dernière le "+esc(day(d.derniere)):"")+")";
@@ -59,6 +74,7 @@ function vProfil(){
   h+="</div><div id='kpi' style='flex:0 0 auto;margin-left:auto'>"+kpiHtml()+"</div></div></div>";
   if(ADDT)h+="<div class='card'><b>Ajouter une trottinette</b><input id='m' placeholder='Marque'><input id='mo' placeholder='Modèle'><input id='s' placeholder='Numéro de série'><button data-act='addT'>Associer</button><button class='sec' data-act='cancelAddT'>Annuler</button></div>";
   else h+="<button class='sec' data-act='showAddT'>+ Ajouter une trottinette</button>";
+  h+=achatsHtml();
   h+="<div class='step' style='margin-top:14px'>Trottinettes</div>";
   if(!c.trottinettes.length)h+="<div class='card muted'>Aucune trottinette associée. Ajoute-la ci-dessus.</div>";
   c.trottinettes.forEach(function(t){
@@ -77,7 +93,8 @@ function vProfil(){
     h+="</div>"});
   app.innerHTML=h;
   if(FID===null&&FIDLOAD!==c.id)loadFid();
-  if((CACLI===null||CACLI.id!==c.id)&&CALOAD!==c.id)loadCa()}
+  if((CACLI===null||CACLI.id!==c.id)&&CALOAD!==c.id)loadCa();
+  if((!PACH||PACH.id!==c.id)&&PACHLOAD!==c.id)loadAch()}
 async function loadFid(){
   var c=CUR;if(!c)return;FIDLOAD=c.id;var d;
   try{d=await api("/fidelite?id="+c.id)}catch(e){d={trouve:false}}
