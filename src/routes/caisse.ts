@@ -159,12 +159,6 @@ app.get("/api/ventes/recherche", async (c) => {
     ORDER BY v.id DESC LIMIT 40`) as any[];
   const ventes = [];
   for (const r of rows) ventes.push(await detailVente(r));
-  for (const v of ventes as any[]) {
-    try {
-      const sav = (await sql`SELECT type, libelle, quantite, montant_cents, statut, issue, cree_le, cree_par, close_le, close_par, demande_le, motif FROM sav_dossiers WHERE vente_id = ${v.id} AND statut <> 'annule' ORDER BY id`) as any[];
-      v.sav = sav.map((x) => ({ type: x.type, libelle: x.libelle, quantite: x.quantite, montantCents: x.montant_cents, statut: x.statut, issue: x.issue, le: x.cree_le, par: x.cree_par, closeLe: x.close_le, closePar: x.close_par, demandeLe: x.demande_le, motif: x.motif }));
-    } catch (e: any) { v.sav = []; console.log(JSON.stringify({ event: "historique-sav", message: String(e?.message ?? e).slice(0, 200) })); }
-  }
   return c.json({ ventes });
 });
 
@@ -188,7 +182,16 @@ app.post("/api/caisse/series-requises", async (c) => {
 });
 
 // Détail complet d'une vente (pour le reçu).
+// Mouvements SAV (remboursement, échange, garantie) rattachés à la vente : tags et historique du ticket.
 export async function detailVente(v: any) {
+  const o: any = await detailVente0(v);
+  try {
+    const sav = (await sql`SELECT type, libelle, quantite, montant_cents, statut, issue, cree_le, cree_par, close_le, close_par, demande_le, motif FROM sav_dossiers WHERE vente_id = ${v.id} AND statut <> 'annule' ORDER BY id`) as any[];
+    o.sav = sav.map((x) => ({ type: x.type, libelle: x.libelle, quantite: x.quantite, montantCents: x.montant_cents, statut: x.statut, issue: x.issue, le: x.cree_le, par: x.cree_par, closeLe: x.close_le, closePar: x.close_par, demandeLe: x.demande_le, motif: x.motif }));
+  } catch (e: any) { o.sav = []; console.log(JSON.stringify({ event: "historique-sav", message: String(e?.message ?? e).slice(0, 200) })); }
+  return o;
+}
+async function detailVente0(v: any) {
   const lignes = (await sql`SELECT libelle, quantite, prix_unitaire_cents, series FROM vente_lignes WHERE vente_id = ${v.id} ORDER BY id`) as any[];
   const pays = (await sql`SELECT moyen, montant_cents FROM vente_paiements WHERE vente_id = ${v.id} ORDER BY id`) as any[];
   const avs = (await sql`SELECT libelle, effet, remise_cents FROM vente_avantages WHERE vente_id = ${v.id} ORDER BY id`) as any[];
