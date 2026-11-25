@@ -97,53 +97,34 @@ async function cmdAuto(ids){
     ok++;msg=r.message||msg}
   CMDFID=0;return ok?ok+" pièce(s) ajoutée(s) au panier fournisseur.":"Aucune pièce à commander dans le panier (les lignes doivent être des pièces)."}
 function cmdLignesPieces(d){return((d.devis&&d.devis.lignes)||d.lignes||[]).filter(function(l){return l.type==="piece"&&!l.commande&&!/^Livraison à domicile/i.test(l.libelle)}).map(function(l){return l.id})}
-var CMDLIV={mode:"boutique",adresse:"",cp:"",ville:"",pc:"",pe:"",pv:"",pb:""};
-function cmdTotal(){return panierTotal()+(CMDLIV.mode==="domicile"&&livIdx()<0?495:0)}
-function cmdPaye(){return pxCents(CMDLIV.pc)+pxCents(CMDLIV.pe)+pxCents(CMDLIV.pv)+pxCents(CMDLIV.pb)}
-function cmdResteTxt(){var t=cmdTotal(),p=cmdPaye();return"Total commande : <b>"+eur(t)+"</b> · Acompte saisi : <b>"+eur(p)+"</b> · "+(p>t?"<span style='color:#b00020'>trop élevé</span>":"Reste à payer au retrait : <b>"+eur(t-p)+"</b>")}
-function cmdPopHtml(){
-  var dispo=CFID?Math.round(CFID.disponibleEuros*100):0;
-  var champ=function(k,id,lib){return"<div class='dl'><label class='muted' style='min-width:110px'>"+lib+"</label><input id='"+id+"' class='p' inputmode='decimal' placeholder='0,00' value='"+esc(CMDLIV[k]||"")+"'></div>"};
-  return"<div class='cpop' id='cmdpop'><div class='cpbox' style='max-width:520px;padding:18px'><div class='step'>Commande pour "+esc(CCLI?CCLI.name:"")+"</div><div class='muted'>Comment le client récupère sa commande ?</div>"
-    +"<div class='seg' style='margin:10px 0'><button class='"+(CMDLIV.mode==="boutique"?"on":"")+"' data-act='cmdMode' data-m='boutique'>🏬 Retrait en boutique</button><button class='"+(CMDLIV.mode==="domicile"?"on":"")+"' data-act='cmdMode' data-m='domicile'>🚚 Livraison à domicile (+4,95 €)</button></div>"
-    +(CMDLIV.mode==="domicile"?"<div class='muted'>La commande part via le site, comme une commande web, à son adresse.</div><div class='dl'><input id='cmd-a' class='lb' placeholder='Adresse' value='"+esc(CMDLIV.adresse)+"'></div><div class='dl'><input id='cmd-c' placeholder='Code postal' value='"+esc(CMDLIV.cp)+"' style='max-width:140px'><input id='cmd-v' class='lb' placeholder='Ville' value='"+esc(CMDLIV.ville)+"'></div>":"")
-    +"<div class='step' style='margin-top:10px'>Acompte à encaisser</div><div class='muted'>Comme à l'encaissement : tu peux mélanger plusieurs moyens.</div>"
-    +champ("pc","cmp-c","💳 Carte")+champ("pe","cmp-e","💶 Espèces")+champ("pv","cmp-v","🏦 Virement")
-    +(dispo>0?champ("pb","cmp-b","🎁 Bon d'achat")+"<div class='muted'>Bon d'achat disponible : <b>"+eur(dispo)+"</b> <button class='link' data-act='cmdBon'>Utiliser</button></div>":"<div class='muted'>Aucun bon d'achat disponible.</div>")
-    +"<div id='cmd-reste' style='margin:8px 0'>"+cmdResteTxt()+"</div>"
-    +"<div class='actions'><button data-act='cmdGo'>Créer la commande</button><button class='sec' data-act='cmdFerme'>Annuler</button></div></div></div>"}
-function cmdPopShow(){var o=document.getElementById("cmdpop");if(o)o.remove();document.body.insertAdjacentHTML("beforeend",cmdPopHtml())}
-document.addEventListener("input",function(e){var i=e.target&&e.target.id;if(i==="cmd-a")CMDLIV.adresse=e.target.value;else if(i==="cmd-c")CMDLIV.cp=e.target.value;else if(i==="cmd-v")CMDLIV.ville=e.target.value;
-  else if(i==="cmp-c"||i==="cmp-e"||i==="cmp-v"||i==="cmp-b"){CMDLIV[{"cmp-c":"pc","cmp-e":"pe","cmp-v":"pv","cmp-b":"pb"}[i]]=e.target.value;var r=document.getElementById("cmd-reste");if(r)r.innerHTML=cmdResteTxt()}});
-ACTS.cmdMode=function(b){CMDLIV.mode=b.dataset.m;cmdPopShow()};
-ACTS.cmdBon=function(){var dispo=CFID?Math.round(CFID.disponibleEuros*100):0;var reste=Math.max(0,cmdTotal()-pxCents(CMDLIV.pc)-pxCents(CMDLIV.pe)-pxCents(CMDLIV.pv));CMDLIV.pb=String(Math.min(dispo,reste)/100).replace(".",",");cmdPopShow()};
-ACTS.cmdFerme=function(){var o=document.getElementById("cmdpop");if(o)o.remove()};
 ACTS.cCmdClient=async function(){
   if(!PAN.length){alert("Le panier est vide.");return}
   if(!CCLI){alert("Choisis d'abord le client (recherche ou scan de carte).");return}
-  CMDLIV={mode:"boutique",adresse:"",cp:"",ville:"",pc:"",pe:"",pv:"",pb:""};
-  try{var a=await api("/client-adresse?id="+CCLI.id);CMDLIV.adresse=a.adresse;CMDLIV.cp=a.cp;CMDLIV.ville=a.ville}catch(e){}
-  cmdPopShow()};
-ACTS.cmdGo=async function(){
-  var dom=CMDLIV.mode==="domicile";
-  if(dom&&(!CMDLIV.adresse.trim()||!CMDLIV.cp.trim()||!CMDLIV.ville.trim())){alert("Indique l'adresse, le code postal et la ville.");return}
-  var tot=cmdTotal(),pay=cmdPaye();
-  if(pay<=0){alert("Indique l'acompte : au moins un moyen de paiement avec un montant.");return}
-  if(pay>tot){alert("L'acompte ("+eur(pay)+") dépasse le total de la commande ("+eur(tot)+").");return}
-  var dispo=CFID?Math.round(CFID.disponibleEuros*100):0;
-  if(pxCents(CMDLIV.pb)>dispo){alert("Bon d'achat disponible : "+eur(dispo)+" seulement.");return}
+  lirePay();
+  var tot=panierTotal(),dom=livIdx()>=0;
+  var pay={carte:pxCents(CPAY.carte),especes:pxCents(CPAY.especes),virement:pxCents(CPAY.virement),bon_achat:pxCents(CPAY.bon_achat)};
+  var bonFid=remiseCents();if(bonFid>0)pay.bon_achat+=bonFid;
+  var sum=pay.carte+pay.especes+pay.virement+pay.bon_achat;
+  if(sum<=0){alert("Saisis d'abord ce que le client paie (carte, espèces, virement ou bon d'achat), puis clique sur « Commander pour le client ».");return}
+  if(sum>tot){var ex=sum-tot;if(pay.especes>=ex)pay.especes-=ex;else{alert("Le client paie "+eur(sum)+" pour "+eur(tot)+" de commande.");return}sum=tot}
+  var adr={adresse:"",cp:"",ville:""};
+  if(dom){
+    try{var a=await api("/client-adresse?id="+CCLI.id);adr={adresse:a.adresse||"",cp:a.cp||"",ville:a.ville||""}}catch(e){}
+    if(!adr.adresse.trim())adr.adresse=(prompt("Adresse de livraison ?")||"").trim();
+    if(!adr.cp.trim())adr.cp=(prompt("Code postal ?")||"").trim();
+    if(!adr.ville.trim())adr.ville=(prompt("Ville ?")||"").trim();
+    if(!adr.adresse||!adr.cp||!adr.ville){alert("Il faut l'adresse, le code postal et la ville pour livrer à domicile.");return}
+  }
   var mdpP=await demandeCode("Qui encaisse l acompte ?");if(mdpP===null)return;
-  var pl=[["carte",CMDLIV.pc],["especes",CMDLIV.pe],["virement",CMDLIV.pv],["bon_achat",CMDLIV.pb]].filter(function(x){return pxCents(x[1])>0}).map(function(x){return{moyen:x[0],montant:String(pxCents(x[1])/100).replace(".",",")}});
-  ACTS.cmdFerme();
+  var pl=[["carte",pay.carte],["especes",pay.especes],["virement",pay.virement],["bon_achat",pay.bon_achat]].filter(function(x){return x[1]>0}).map(function(x){return{moyen:x[0],montant:String(x[1]/100).replace(".",",")}});
   try{
-    if(dom&&livIdx()<0)PAN.push({libelle:"Livraison à domicile",quantite:1,prix:"4,95",type:"article",variantId:"",sku:""});
     var r=await cartVersDevis();if(!r)return;var p=await api("/devis-simples/rattacher",{id:r.id});await api("/devis-simples/commande-client",{repairId:p.reparationId});await api("/devis-lignes/remise-client",{repairId:p.reparationId,valeur:true});
-    if(dom)await api("/reparations/livraison",{repairId:p.reparationId,adresse:CMDLIV.adresse,cp:CMDLIV.cp,ville:CMDLIV.ville});
+    if(dom)await api("/reparations/livraison",{repairId:p.reparationId,adresse:adr.adresse,cp:adr.cp,ville:adr.ville});
     var f=await api("/reparation?id="+p.reparationId);var m=await cmdAuto(cmdLignesPieces(f));
     await api("/reparations/acompte",{mdpCaissier:mdpP,repairId:p.reparationId,paiements:pl});
-    var du=tot-pay;
+    var du=tot-sum;
     cartVide();CMD=null;CCL=null;FICHE=null;CUR=null;TAB="enc";ATSUB="devis";DV.list=null;DV.ed=null;DV.res=null;DV.hint="";
-    DV.msg="Commande client créée ("+(dom?"livraison à domicile":"retrait en boutique")+") : "+m+" Acompte de "+eur(pay)+" encaissé"+(du>0?", reste à payer "+eur(du):", soldé")+".";
+    DV.msg="Commande client créée ("+(dom?"livraison à domicile":"retrait en boutique")+") : "+m+" Acompte de "+eur(sum)+" encaissé"+(du>0?", reste à payer "+eur(du):", soldé")+".";
     try{var ls=await api("/devis-simples");DV.list=ls.devis;var d=ls.devis.filter(function(x){return x.id===r.id})[0];if(d){DV.ed=JSON.parse(JSON.stringify(d));if(!DV.ed.lignes.length)DV.ed.lignes=dvVide().lignes}}catch(e2){}
     render()}catch(e){alert(e.message)}};
 ACTS.cSepOk=function(){};
