@@ -38,10 +38,41 @@ function cclHtml(){
   CCL.forEach(function(l){var st=CCST[l.statut]||[l.statut,""];
     h+="<div class='hrow' style='padding:6px 0;border-bottom:1px solid #eee'><b>"+esc(l.libelle)+"</b> × "+l.quantite+" <span class='tag "+st[1]+"'>"+st[0]+"</span><div class='muted'>"+esc(l.client)+" · "+esc(l.numero)+(l.fournisseur?" · "+esc(l.fournisseur):"")+(l.commandeeLe&&l.statut==="commandee"?" · commandée le "+esc(dateLongue(l.commandeeLe)):"")+(l.recueLe&&l.statut==="recue"?" · arrivée le "+esc(dateLongue(l.recueLe)):"")+(l.boite?" · 📦 case "+esc(l.boite):"")+(l.remiseLe?" · remise le "+esc(dateLongue(l.remiseLe)):"")+"</div></div>"});
   return h+"</div>"}
+var CMDF=null;
+function francoHtml(f){
+  var d=CMDF&&CMDF.filter(function(x){return x.id===f.id})[0];
+  var h="<div class='dl' style='align-items:center;margin-top:6px;flex-wrap:wrap'><span class='muted'>Franco de port :</span><input id='fr-"+f.id+"' value='"+(f.francoCents!=null?String(f.francoCents/100).replace(".",","):"")+"' placeholder='€ (ex : 300)' style='max-width:130px'><button class='sec' data-act='cmdFranco' data-id='"+f.id+"'>Enregistrer</button></div>";
+  if(f.panier.length){
+    if(!d)h+="<div class='muted'>Calcul du total…</div>";
+    else{var reste=f.francoCents!=null?f.francoCents-d.totalCents:null;
+      h+="<div style='margin-top:6px;padding:8px 12px;border-radius:8px;background:"+(reste==null?"#f2f2f2":reste<=0?"#e1f3e8":"#fdf0d5")+"'><b>Total estimé : "+eur(d.totalCents)+"</b> (au moins cher)"+(d.sansPrix?" <span class='muted'>· "+d.sansPrix+" ligne(s) sans prix</span>":"")+(reste==null?" <span class='muted'>· indique le franco pour voir s'il est atteint</span>":reste<=0?" · <b style='color:#145c35'>✅ franco atteint</b>":" · <b>il manque "+eur(reste)+" pour le franco ("+eur(f.francoCents)+")</b>")+"</div>"}}
+  return h}
+ACTS.cmdFranco=function(b){api("/achats/franco",{id:+b.dataset.id,franco:v("fr-"+b.dataset.id)}).then(function(d){CMD=null;CMDF=null;CMDMSG=d.message;render()}).catch(function(e){alert(e.message)})};
+function feuilleCss(){return"@page{size:A4;margin:12mm}@media print{body>*:not(#impzone){display:none!important}#impzone{position:absolute;left:0;top:0;width:100%}.fcmd{page-break-after:always;break-after:page}.fcmd:last-child{page-break-after:auto;break-after:auto}}"}
+function feuilleLigne(l){
+  var px=function(c,cout){return c==null?"":eur(c)+(cout?" <span style='font-size:8pt'>(achat)</span>":"")};
+  var bc=function(code,h){return code?"<div style='display:inline-block;text-align:center'>"+code128Svg(code,h)+"<div style='font-size:8pt'>"+esc(code)+"</div></div>":"<span style='font-size:9pt;color:#777'>pas de code-barres</span>"};
+  if(l.maitre&&l.options.length){
+    var r="<tr style='background:#e8f5ee'><td><b>"+esc(l.libelle)+"</b><div style='font-size:9pt'>Produit maître : prendre le moins cher en premier"+(l.client?" · client "+esc(l.client):"")+"</div></td><td style='text-align:center;font-size:16pt'><b>"+l.quantite+"</b></td><td></td><td></td></tr>";
+    l.options.forEach(function(o,i){r+="<tr><td style='padding-left:14px'>"+(i+1)+". "+esc(o.libelle||o.sku||"")+(i===0?" <b style='color:#145c35'>← le moins cher</b>":"")+"</td><td></td><td style='text-align:right'>"+px(o.prixCents,o.cout)+"</td><td>"+bc(o.barcode||o.sku,9)+"</td></tr>"});
+    return r}
+  return"<tr><td><b>"+esc(l.libelle)+"</b>"+(l.sku?"<div style='font-size:9pt'>Réf. "+esc(l.sku)+"</div>":"")+(l.client?"<div style='font-size:9pt'>Client : "+esc(l.client)+"</div>":"")+"</td><td style='text-align:center;font-size:16pt'><b>"+l.quantite+"</b></td><td style='text-align:right'>"+px(l.prixCents,l.cout)+"</td><td>"+bc(l.barcode||l.sku,9)+"</td></tr>"}
+function feuilleHtml(F){
+  var d=new Date().toLocaleDateString("fr-FR");
+  return F.map(function(f){return"<div class='fcmd' style='font-family:Arial,Helvetica,sans-serif;color:#000'><div style='display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #1e8449;padding-bottom:4px'><div style='font-size:20pt;font-weight:900;color:#1e8449'>Commande "+esc(f.nom)+"</div><div style='font-size:10pt'>TURN SOCIETY · "+esc(MAG||"")+" · "+d+"</div></div>"
+    +"<table style='width:100%;border-collapse:collapse;margin-top:8px;font-size:11pt'><tr style='text-align:left;border-bottom:2px solid #000'><th>Produit</th><th style='text-align:center'>Qté</th><th style='text-align:right'>Prix</th><th>Code-barres</th></tr>"
+    +f.lignes.map(function(l){return feuilleLigne(l).replace(/<tr/g,"<tr style='border-bottom:1px solid #bbb'").replace(/<tr style='border-bottom:1px solid #bbb' style='/g,"<tr style='border-bottom:1px solid #bbb;")})
+    .join("")+"</table><div style='margin-top:10px;font-size:13pt;text-align:right'><b>Total estimé : "+eur(f.totalCents)+"</b>"+(f.francoCents!=null?(f.francoCents-f.totalCents<=0?" · franco atteint ✅":" · franco "+eur(f.francoCents)+" : il manque "+eur(f.francoCents-f.totalCents)):"")+"</div></div>"}).join("")}
+ACTS.cmdFeuille=function(b){
+  var id=b.dataset.id||"";
+  api("/achats/feuille"+(id?"?fournisseurId="+id:"")).then(function(d){
+    if(!d.fournisseurs.length){alert("Aucune ligne dans le panier à imprimer.");return}
+    impImprimer(feuilleHtml(d.fournisseurs),"",feuilleCss())}).catch(function(e){alert(e.message)})};
 function vCmd(){
   if(!CMD){app.innerHTML="<div class='card'>Chargement…</div>";api("/achats").then(function(d){return api("/stock/reappro?magasin="+encodeURIComponent(MAG||"")).then(function(r){RE=r;return d}).catch(function(){RE=null;return d})}).then(function(d){return api("/achats/reparations-ouvertes").then(function(r){REPS=r;return d}).catch(function(){REPS=[];return d})}).then(function(d){CMD=d;render()}).catch(function(e){app.innerHTML="<div class='card'>"+esc(e.message)+"</div>"});return}
+  if(CMDF===null){CMDF=undefined;api("/achats/feuille").then(function(d){CMDF=d.fournisseurs;render()}).catch(function(){CMDF=[];render()})}
   if(CCL===null){CCL=undefined;api("/commandes-clients").then(function(d){CCL=d.commandes;render()}).catch(function(){CCL=[];render()})}
-  var h="<div class='pmsg'>"+esc(CMDMSG)+"</div>"+cclHtml()+"<div class='card'><div class='step'>Nouveau fournisseur</div><div class='dl'><input id='fn' class='lb' placeholder='Nom (ex : eWheel)'><input id='fe' class='lb' placeholder='Email pour les commandes'><button data-act='fAdd'>Ajouter</button></div></div>";
+  var h="<div class='pmsg'>"+esc(CMDMSG)+"</div>"+cclHtml()+"<div class='actions'><button class='sec' data-act='cmdFeuille' data-id=''>🖨 Imprimer toutes les commandes (A4)</button></div>"+"<div class='card'><div class='step'>Nouveau fournisseur</div><div class='dl'><input id='fn' class='lb' placeholder='Nom (ex : eWheel)'><input id='fe' class='lb' placeholder='Email pour les commandes'><button data-act='fAdd'>Ajouter</button></div></div>";
   if(RE&&RE.produits.length){
     h+="<div class='card'><div class='step'>À recommander : stock minimum atteint ("+RE.produits.length+")</div><div class='muted'>Suggestion pour "+esc(RE.magasin)+". Choisis le fournisseur et ajoute au panier.</div>";
     RE.produits.forEach(function(p){
@@ -53,13 +84,14 @@ function vCmd(){
   if(!CMD.fournisseurs.length)h+="<div class='card'>Ajoute ton premier fournisseur ci-dessus (eWheel, ...). Chaque fournisseur a son panier.</div>";
   CMD.fournisseurs.forEach(function(f){
     h+="<div class='card'><div class='head'><div class='big'>"+esc(f.nom)+"</div><div class='dl'><input id='fe-"+f.id+"' value='"+esc(f.email)+"' placeholder='Email de commande' class='lb'><button class='sec' data-act='fMail' data-id='"+f.id+"'>Enregistrer l'email</button><button class='sec' data-act='fMode' data-id='"+f.id+"' title='Bloc = un seul suivi pour toute la commande ; Unitaire = un suivi par produit'>Mode : "+(f.mode==="unitaire"?"par produit":"bloc")+"</button></div></div>";
+    h+=francoHtml(f);
     if(REC&&REC.fid===f.id)h+=recepHtml(f);
     h+="<div class='actions' style='margin-top:6px'><button class='sec' data-act='histoOpen' data-id='"+f.id+"'>"+(HISTC&&HISTC.fid===f.id?"Masquer l'historique":"Historique des commandes")+"</button></div>"+(HISTC&&HISTC.fid===f.id?histoCmdHtml():"");
     h+="<div class='step' style='margin-top:10px'>Panier ("+f.panier.length+")</div>";
     if(f.panier.length)h+="<table class='devis' style='width:100%'><tr><th>Produit</th><th class='n'>Qté</th><th></th></tr>"+f.panier.map(function(l){return ligneCmd(l,"panier")}).join("")+"</table>";
     else h+="<div class='muted'>Panier vide.</div>";
     h+="<div style='margin-top:8px'>"+prodBox("cmd"+f.id)+"</div><div class='dl' style='margin-top:6px'><input id='cl-"+f.id+"' class='lb' placeholder='Ou saisie libre : produit / référence'><input id='cq-"+f.id+"' class='q' type='number' min='1' value='1'><button class='sec' data-act='cmdLigne' data-id='"+f.id+"'>Ajouter</button></div>";
-    if(f.panier.length)h+="<div class='actions'><button data-act='cmdPasser' data-id='"+f.id+"'>Marquer comme commandé</button><button class='sec' data-act='cmdCopy' data-id='"+f.id+"'>Copier la commande</button><button class='sec' data-act='cmdCsv' data-id='"+f.id+"'>Télécharger (CSV)</button>"
+    if(f.panier.length)h+="<div class='actions'><button data-act='cmdPasser' data-id='"+f.id+"'>Marquer comme commandé</button><button class='sec' data-act='cmdCopy' data-id='"+f.id+"'>Copier la commande</button><button class='sec' data-act='cmdFeuille' data-id='"+f.id+"'>🖨 Imprimer la feuille A4</button><button class='sec' data-act='cmdCsv' data-id='"+f.id+"'>Télécharger (CSV)</button>"
       +(f.email?"<a class='btn' href='mailto:"+esc(f.email)+"?subject="+encodeURIComponent("Commande TURN SOCIETY")+"&body="+encodeURIComponent(texteCommande(f))+"'>Envoyer par email</a>":"")+"</div><div class='muted'>L'envoi direct par l'API du fournisseur s'ajoute fournisseur par fournisseur.</div>";
     if(f.commandees.length){h+="<div class='step' style='margin-top:12px'>Commandé, en attente de réception ("+f.commandees.length+")</div>";
       if(f.mode==="unitaire")h+="<table class='devis' style='width:100%'><tr><th>Produit</th><th class='n'>Qté</th><th></th></tr>"+f.commandees.map(function(l){return ligneCmd(l,"commandee")}).join("")+"</table>";
@@ -70,7 +102,7 @@ function vCmd(){
     if(f.recues.length)h+=ecHtml(f);
     h+="</div>"});
   app.innerHTML=h}
-function cmdRun(p,msg){return p.then(function(d){HISTC=null;CCL=null;CMDMSG=(d&&d.message)||msg||"";CMD=null;render()}).catch(function(e){CMDMSG=e.message;render()})}
+function cmdRun(p,msg){return p.then(function(d){HISTC=null;CCL=null;CMDF=null;CMDMSG=(d&&d.message)||msg||"";CMD=null;render()}).catch(function(e){CMDMSG=e.message;render()})}
 ACTS.cmdReappro=function(b){var id=+b.dataset.id,f=document.getElementById("rf-"+id);if(!f||!f.value){CMDMSG="Ajoute d'abord un fournisseur.";render();return}cmdRun(api("/stock/reappro/ajouter",{id:id,fournisseurId:+f.value,quantite:v("rq-"+id)}))};
 ACTS.fAdd=function(){cmdRun(api("/achats/fournisseur",{nom:v("fn"),email:v("fe")}))};
 ACTS.fMail=function(b){cmdRun(api("/achats/fournisseur/modifier",{id:+b.dataset.id,email:v("fe-"+b.dataset.id)}))};

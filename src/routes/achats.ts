@@ -3,6 +3,7 @@ import { sql } from "../db";
 // Doit passer après la protection /api/* (voir auth.ts).
 import "./auth";
 import { envoyerPieceArrivee } from "../automatisations";
+import { shopifyRead } from "../shopify";
 import { entreeStock, alertesSoeurs, produitParCode } from "./stock";
 import { AppError, clean, signature } from "../util";
 
@@ -12,6 +13,7 @@ await sql`ALTER TABLE devis_lignes ADD COLUMN IF NOT EXISTS remise_client BOOLEA
 await sql`ALTER TABLE commande_lignes ADD COLUMN IF NOT EXISTS remise_le TIMESTAMPTZ`;
 await sql`ALTER TABLE commande_lignes ADD COLUMN IF NOT EXISTS remise_par TEXT`;
 await sql`ALTER TABLE fournisseurs ADD COLUMN IF NOT EXISTS mode TEXT NOT NULL DEFAULT 'groupe'`;
+await sql`ALTER TABLE fournisseurs ADD COLUMN IF NOT EXISTS franco_cents INT`;
 await sql`UPDATE fournisseurs SET mode = 'unitaire' WHERE mode = 'groupe' AND nom ~* 'aliexpress|amazon|ebay|temu|banggood' AND NOT EXISTS (SELECT 1 FROM commandes c WHERE c.fournisseur_id = fournisseurs.id)`;
 await sql`ALTER TABLE commandes ADD COLUMN IF NOT EXISTS suivi TEXT`;
 await sql`ALTER TABLE commande_lignes ADD COLUMN IF NOT EXISTS relance_le TIMESTAMPTZ`;
@@ -21,13 +23,13 @@ const magasinDe = (c: any) => (c.get("user")?.magasin === "Rouen" ? "Rouen" : "A
 
 // Tout l'espace Commandes : par fournisseur, le panier, ce qui est commandé et ce qui est reçu récemment.
 app.get("/api/achats", async (c) => {
-  const fournisseurs = (await sql`SELECT id, nom, email, mode FROM fournisseurs WHERE actif = true ORDER BY nom`) as any[];
+  const fournisseurs = (await sql`SELECT id, nom, email, mode, franco_cents FROM fournisseurs WHERE actif = true ORDER BY nom`) as any[];
   const lignes = (await sql`SELECT l.*, co.suivi AS suivi_bloc, trim(cl.prenom || ' ' || cl.nom) AS client FROM commande_lignes l LEFT JOIN commandes co ON co.id = l.commande_id LEFT JOIN reparations r ON r.id = l.reparation_id LEFT JOIN clients cl ON cl.id = r.client_id
     WHERE l.statut <> 'recue' OR l.recue_le > now() - interval '7 days' ORDER BY l.id`) as any[];
   const vers = (l: any) => ({ commandeId: l.commande_id ?? null, id: l.id, libelle: l.libelle, sku: l.sku ?? "", barcode: l.barcode ?? "", variantId: l.variant_id ?? "", quantite: l.quantite, reparationId: l.reparation_id, client: l.client || "", statut: l.statut, commandeLe: l.commandee_le, recueLe: l.recue_le, suivi: l.suivi ?? l.suivi_bloc ?? "" });
   return c.json({
     fournisseurs: fournisseurs.map((f) => ({
-      id: f.id, nom: f.nom, email: f.email, mode: f.mode,
+      id: f.id, nom: f.nom, email: f.email, mode: f.mode, francoCents: f.franco_cents ?? null,
       panier: lignes.filter((l) => l.fournisseur_id === f.id && l.statut === "panier").map(vers),
       commandees: lignes.filter((l) => l.fournisseur_id === f.id && l.statut === "commandee").map(vers),
       recues: lignes.filter((l) => l.fournisseur_id === f.id && l.statut === "recue").map(vers),
@@ -36,6 +38,48 @@ app.get("/api/achats", async (c) => {
 });
 
 // Historique complet d'un fournisseur : chaque commande passée (regroupée par date) avec ses lignes et leur réception.
+
+// Feuille de commande A4 : pour chaque fournisseur, les lignes du panier avec quantité, prix et codes-barres.
+// Un produit maître est déplié en ses produits liés, le moins cher en premier.
+app.get("/api/achats/feuille", async (c) => {
+  const fid = Number(c.req.query("fournisseurId")) || 0;
+  const fs = (await sql`SELECT id, nom, franco_cents FROM fournisseurs WHERE actif = true AND (${fid} = 0 OR id = ${fid}) ORDER BY nom`) as any[];
+  const lignes = (await sql`SELECT l.id, l.fournisseur_id, l.libelle, l.sku, l.barcode, l.variant_id, l.quantite, d.maitre_id, d.prix_unitaire_cents AS prix_vente, trim(cl.prenom || ' ' || cl.nom) AS client
+    FROM commande_lignes l LEFT JOIN devis_lignes d ON d.id = l.devis_ligne_id LEFT JOIN reparations r ON r.id = l.reparation_id LEFT JOIN clients cl ON cl.id = r.client_id
+    WHERE l.statut = 'panier' AND (${fid} = 0 OR l.fournisseur_id = ${fid}) ORDER BY l.id`) as any[];
+  const liens = new Map<number, any[]>();
+  for (const m of new Set(lignes.map((l) => l.maitre_id).filter(Boolean))) liens.set(m, (await sql`SELECT variant_id, sku, barcode, libelle FROM maitre_liens WHERE maitre_id = ${m} ORDER BY id`) as any[]);
+  const vids = [...new Set([...lignes.map((l) => l.variant_id), ...[...liens.values()].flat().map((x) => x.variant_id)].filter((x) => x && String(x).startsWith("gid://")))];
+  const prix = new Map<string, { cents: number | null; cout: boolean }>();
+  if (vids.length) {
+    const lire = async (avecCout: boolean) => shopifyRead(`query($ids: [ID!]!) { nodes(ids: $ids) { ... on ProductVariant { id price ${avecCout ? "inventoryItem { unitCost { amount } }" : ""} } } }`, { ids: vids });
+    let d: any; try { d = await lire(true); } catch { try { d = await lire(false); } catch { d = null; } }
+    for (const n of d?.nodes ?? []) if (n?.id) {
+      const cout = n.inventoryItem?.unitCost?.amount;
+      prix.set(n.id, cout != null ? { cents: Math.round(Number(cout) * 100), cout: true } : { cents: n.price != null ? Math.round(Number(n.price) * 100) : null, cout: false });
+    }
+  }
+  const pv = (vid: string) => prix.get(vid) ?? { cents: null, cout: false };
+  const out = fs.map((f) => ({
+    id: f.id, nom: f.nom,
+    lignes: lignes.filter((l) => l.fournisseur_id === f.id).map((l) => {
+      const autres = (l.maitre_id ? liens.get(l.maitre_id) ?? [] : []).map((x: any) => ({ libelle: x.libelle, sku: x.sku, barcode: x.barcode, prixCents: pv(x.variant_id).cents, cout: pv(x.variant_id).cout }));
+      autres.sort((a: any, b: any) => (a.prixCents ?? 1e12) - (b.prixCents ?? 1e12));
+      const pl = pv(l.variant_id);
+      return { libelle: l.libelle, quantite: l.quantite, sku: l.sku ?? "", barcode: l.barcode ?? "", prixCents: pl.cents ?? l.prix_vente ?? null, cout: pl.cout, client: l.client || "", maitre: autres.length > 0, options: autres };
+    }),
+  })).filter((f) => f.lignes.length).map((f) => {
+    let total = 0, sansPrix = 0;
+    for (const l of f.lignes) {
+      const p = l.maitre && l.options.length ? l.options[0].prixCents : l.prixCents;
+      if (p == null) sansPrix++; else total += p * l.quantite;
+    }
+    const fr = fs.find((x) => x.id === f.id)?.franco_cents ?? null;
+    return { ...f, totalCents: total, sansPrix, francoCents: fr };
+  });
+  return c.json({ fournisseurs: out });
+});
+
 app.get("/api/achats/historique", async (c) => {
   const id = Number(c.req.query("fournisseurId"));
   const rows = (await sql`SELECT l.id, l.commande_id, l.libelle, l.sku, l.barcode, l.quantite, l.statut, l.commandee_le, l.recue_le, l.reparation_id, trim(cl.prenom || ' ' || cl.nom) AS client
@@ -50,6 +94,13 @@ app.get("/api/achats/historique", async (c) => {
   return c.json(groupes);
 });
 
+app.post("/api/achats/franco", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const v = String(b.franco ?? "").trim();
+  const cents = v === "" ? null : Math.round((Number(v.replace(",", ".")) || 0) * 100);
+  await sql`UPDATE fournisseurs SET franco_cents = ${cents} WHERE id = ${Number(b.id)}`;
+  return c.json({ message: cents === null ? "Franco retiré." : "Franco enregistré." });
+});
 app.post("/api/achats/fournisseur", async (c) => {
   const b = await c.req.json().catch(() => ({}));
   const nom = clean(b.nom, 80);
