@@ -83,7 +83,7 @@ function savForm(r){
   return h+"<div class='actions'><button data-act='svOk' data-id='"+r.id+"'>Valider</button><button class='sec' data-act='svNo'>Annuler</button></div></div>"}
 function vjSync(){
   var o=document.getElementById("vj");
-  if(!VJ){if(o)o.remove();return}
+  if(!VJ){if(o)o.remove();if(PACHOPEN&&CUR)render();return}
   if(!o){o=document.createElement("div");o.id="vj";o.style.cssText="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);z-index:99999;overflow:auto;padding:20px";o.onclick=function(e){if(e.target===o){VJ=null;VJOPEN=0;vjSync()}};document.body.appendChild(o)}
   o.innerHTML=vjHtml()}
 document.addEventListener("keydown",function(e){if(e.key==="Escape"&&VJ){VJ=null;VJOPEN=0;vjSync()}});
