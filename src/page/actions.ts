@@ -1,4 +1,7 @@
 export const ACTIONS = `function prFiltre(q){q=(q||'').toLowerCase();document.querySelectorAll('.prrow').forEach(function(r){r.style.display=r.dataset.n.indexOf(q)>=0?'':'none'});document.querySelectorAll('.prfam').forEach(function(h){var e=h.nextElementSibling,v=false;while(e&&e.classList.contains('prrow')){if(e.style.display!=='none')v=true;e=e.nextElementSibling}h.style.display=v?'':'none'})}
+function bigOk(t,sub){var o=document.createElement("div");o.style.cssText="position:fixed;inset:0;background:rgba(20,30,25,.55);z-index:9500;display:flex;align-items:center;justify-content:center";
+  o.innerHTML="<div style='background:#1e8449;color:#fff;padding:40px 60px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.4)'><div style='font-size:72px'>✅</div><div style='font-size:38px;font-weight:800'>"+esc(t)+"</div>"+(sub?"<div style='font-size:26px;margin-top:12px;font-weight:700'>"+esc(sub)+"</div>":"")+"</div>";
+  document.body.appendChild(o);var ms=sub?3500:1600;function f(){if(o.parentNode)o.remove()}o.addEventListener("click",f);setTimeout(f,ms)}
 var ACTS={
   chooseMag:function(b){loadProfils(b.dataset.mag)},
   choosePrenom:choosePrenom,
@@ -66,7 +69,7 @@ var ACTS={
   rbTrop:function(b){var e=document.getElementById("rb-m");if(e)e.value=b.dataset.v},
   acompte:async function(b){var m=pxCents(v("ac-m"));if(m<=0){alert("Indique le montant.");return}
     try{var mdpA=await demandeCode("Qui encaisse ?");if(mdpA===null)return;var d=await api("/reparations/acompte",{mdpCaissier:mdpA,repairId:+b.dataset.id,paiements:[{moyen:ACM,montant:v("ac-m")}]});
-      var rendu=ACM==="especes"?pxCents(v("ac-r"))-m:0;ACV=null;ACR="";await recharger(+b.dataset.id);CREC=null;alert(d.message+(rendu>0?"\\n💶 Monnaie à rendre au client : "+eur(rendu):""))}catch(e){alert(e.message)}},
+      var rendu=ACM==="especes"?pxCents(v("ac-r"))-m:0;ACV=null;ACR="";CPOP=false;bigOk("Acompte encaissé",rendu>0?"💶 Monnaie à rendre au client : "+eur(rendu):"");await recharger(+b.dataset.id);CREC=null}catch(e){alert(e.message)}},
   acSolder:async function(b){var f=FICHE;if(!f)return;var P=payInfo(f),due=P.due;
     if(due>0){var pm=pxCents(v("ac-m"));if(pm!==due){if(!confirm("Le montant saisi ("+eur(pm)+") ne correspond pas au solde ("+eur(due)+"). Encaisser le solde complet de "+eur(due)+" en "+({carte:"carte",especes:"espèces",virement:"virement"}[ACM])+" ?"))return}}
     var rendu=(ACM==="especes"&&due>0)?pxCents(v("ac-r"))-due:0;
@@ -137,7 +140,7 @@ var ACTS={
       if(!PAN.every(serieOk)){CMSG="Trottinette : saisis le numéro de série (un par trottinette) avant d encaisser.";render();return}
       if(!CCLI){CMSG="Trottinette : choisis le client (sa garantie est liée à son compte).";render();return}}
     var mdpC=await demandeCode("Qui encaisse ?");if(mdpC===null)return;
-    try{var d=await api("/caisse/encaisser",{lignes:PAN,paiements:pay,clientId:CCLI?CCLI.id:null,utiliserFidelite:CUSE,avantageIds:ids,repairId:CREP,mdpCaissier:mdpC});CMDP="";CRAFF=CREP?CAFF:[];CAFF=[];CREP=null;CACO=0;PAN=[];CPAY={carte:"",especes:"",virement:"",bon_achat:""};CUSE=false;CAVOFF=[];CREC=d.vente;CMSG="";CHOPEN=0;CCLI=null;CFID=null;await chargeHisto();if(d.renduCents)alert("💶 Monnaie à rendre au client : "+eur(d.renduCents))}catch(e){CMSG=e.message;render()}},
+    try{var d=await api("/caisse/encaisser",{lignes:PAN,paiements:pay,clientId:CCLI?CCLI.id:null,utiliserFidelite:CUSE,avantageIds:ids,repairId:CREP,mdpCaissier:mdpC});CMDP="";CRAFF=CREP?CAFF:[];CAFF=[];CREP=null;CACO=0;PAN=[];CPAY={carte:"",especes:"",virement:"",bon_achat:""};CUSE=false;CAVOFF=[];CREC=d.vente;CMSG="";CHOPEN=0;CCLI=null;CFID=null;await chargeHisto();if(CPOP){CREC=null;CPOP=false;bigOk("Paiement validé",d.renduCents?"💶 Monnaie à rendre au client : "+eur(d.renduCents):"");if(FICHE)recharger(FICHE.id)}else if(d.renduCents)alert("💶 Monnaie à rendre au client : "+eur(d.renduCents))}catch(e){CMSG=e.message;render()}},
   shopTest:async function(){SHOPRES="<div class='muted'>Test en cours…</div>";render();try{var d=await api("/shopify/diagnostic");SHOPRES=d.etapes.map(function(e){return"<div>"+(e.ok?"✅ ":"❌ ")+"<b>"+esc(e.nom)+"</b><div class='muted'>"+esc(e.detail)+"</div></div>"}).join("")}catch(e){SHOPRES=esc(e.message)}render()},
   prPop:function(){PRPOP={sel:{}};render()},
   prFerme:function(){PRPOP=null;render()},
