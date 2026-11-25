@@ -68,13 +68,15 @@ ACTS.cmdFeuille=function(b){
   api("/achats/feuille"+(id?"?fournisseurId="+id:"")).then(function(d){
     if(!d.fournisseurs.length){alert("Aucune ligne dans le panier à imprimer.");return}
     impImprimer(feuilleHtml(d.fournisseurs),"",feuilleCss())}).catch(function(e){alert(e.message)})};
+var ACCO={};
+document.addEventListener('toggle',function(e){var t=e.target;if(t&&t.dataset&&t.dataset.acc)ACCO[t.dataset.acc]=t.open},true);
 var TINTS=[["#eef6ff","#4a90d9"],["#effaf0","#4caf50"],["#fff6e6","#f5a623"],["#f6f0ff","#9b6fd6"],["#fff0f0","#e57373"]];
 function cmdAjoutRapide(ctx,msg){var y=window.scrollY;return api("/achats").then(function(d){CMD=d;CMDF=null;CMDMSG=msg||"";render();window.scrollTo(0,y);var i=document.querySelector("input[data-ps='"+ctx+"']");if(i)i.focus()})}
 function vCmd(){
   if(!CMD){app.innerHTML="<div class='card'>Chargement…</div>";api("/achats").then(function(d){return api("/stock/reappro?magasin="+encodeURIComponent(MAG||"")).then(function(r){RE=r;return d}).catch(function(){RE=null;return d})}).then(function(d){return api("/achats/reparations-ouvertes").then(function(r){REPS=r;return d}).catch(function(){REPS=[];return d})}).then(function(d){CMD=d;render()}).catch(function(e){app.innerHTML="<div class='card'>"+esc(e.message)+"</div>"});return}
   if(CMDF===null){CMDF=undefined;api("/achats/feuille").then(function(d){CMDF=d.fournisseurs;render()}).catch(function(){CMDF=[];render()})}
   if(CCL===null){CCL=undefined;api("/commandes-clients").then(function(d){CCL=d.commandes;render()}).catch(function(){CCL=[];render()})}
-  var h="<div class='pmsg'>"+esc(CMDMSG)+"</div>"+cclHtml()+"<div class='card'><div class='step'>🛒 Remplir le panier fournisseur</div><div class='sub'>1) Glisse ce bouton dans ta barre de favoris (une seule fois) : <a class='btn' href='"+ewLien()+"' onclick='return false' style='display:inline-block;padding:6px 12px;border-radius:8px;background:var(--vert);color:#fff;text-decoration:none'>🛒 Remplir panier</a><br>2) Ci-dessous, clique sur Copier pour le panier fournisseur. 3) Va sur le site du fournisseur (connecté) et clique sur le favori. Tu valides toi-même.</div></div><div class='actions'><button class='sec' data-act='cmdFeuille' data-id=''>🖨 Imprimer toutes les commandes (A4)</button></div>"+"<div class='card'><div class='step'>Nouveau fournisseur</div><div class='dl'><input id='fn' class='lb' placeholder='Nom (ex : eWheel)'><input id='fe' class='lb' placeholder='Email pour les commandes'><button data-act='fAdd'>Ajouter</button></div></div>";
+  var h="<div class='pmsg'>"+esc(CMDMSG)+"</div>"+cclHtml()+"<div class='card'><div class='step'>🛒 Remplir le panier fournisseur</div><div class='sub'>1) Glisse ce bouton dans ta barre de favoris (une seule fois) : <a class='btn' href='"+ewLien()+"' onclick='return false' style='display:inline-block;padding:6px 12px;border-radius:8px;background:var(--vert);color:#fff;text-decoration:none'>🛒 Remplir panier</a><br>2) Ci-dessous, clique sur Copier pour le panier fournisseur. 3) Va sur le site du fournisseur (connecté) et clique sur le favori. Tu valides toi-même.</div></div><div class='actions'><button class='sec' data-act='cmdFeuille' data-id=''>🖨 Imprimer toutes les commandes (A4)</button></div>";
   if(RE&&RE.produits.length){
     h+="<div class='card'><div class='step'>À recommander : stock minimum atteint ("+RE.produits.length+")</div><div class='muted'>Suggestion pour "+esc(RE.magasin)+". Choisis le fournisseur et ajoute au panier.</div>";
     RE.produits.forEach(function(p){
@@ -89,7 +91,6 @@ function vCmd(){
     h+="<div class='card' style='background:"+tc[0]+";border-left:5px solid "+tc[1]+"'><div class='head'><div class='big'>"+esc(f.nom)+"</div><div class='dl'><input id='fe-"+f.id+"' value='"+esc(f.email)+"' placeholder='Email de commande' class='lb'><button class='sec' data-act='fMail' data-id='"+f.id+"'>Enregistrer l'email</button><button class='sec' data-act='fMode' data-id='"+f.id+"' title='Bloc = un seul suivi pour toute la commande ; Unitaire = un suivi par produit'>Mode : "+(f.mode==="unitaire"?"par produit":"bloc")+"</button></div></div>";
     h+=francoHtml(f);
     if(REC&&REC.fid===f.id)h+=recepHtml(f);
-    h+="<div class='actions' style='margin-top:6px'><button class='sec' data-act='histoOpen' data-id='"+f.id+"'>"+(HISTC&&HISTC.fid===f.id?"Masquer l'historique":"Historique des commandes")+"</button></div>"+(HISTC&&HISTC.fid===f.id?histoCmdHtml():"");
     h+="<div class='step' style='margin-top:10px'>Panier ("+f.panier.length+")</div>";
     if(f.panier.length)h+="<table class='devis' style='width:100%'><tr><th>Produit</th><th class='n'>Qté</th><th></th></tr>"+f.panier.map(function(l){return ligneCmd(l,"panier")}).join("")+"</table>";
     else h+="<div class='muted'>Panier vide.</div>";
@@ -101,13 +102,14 @@ function vCmd(){
       else{var gr={},ord=[];f.commandees.forEach(function(l){var k=l.commandeId||0;if(!gr[k]){gr[k]=[];ord.push(k)}gr[k].push(l)});
         ord.forEach(function(k){var ls=gr[k];h+="<div class='card' style='margin:6px 0'><div><span class='tag'>"+(k?cmdNum(k):"Commande")+"</span> <span class='muted'>"+ls.length+" produit"+(ls.length>1?"s":"")+"</span></div>"+suiviHtml(ls[0])+"<table class='devis' style='width:100%'><tr><th>Produit</th><th class='n'>Qté</th><th></th></tr>"+ls.map(function(l){return ligneCmd(l,"commandee-g")}).join("")+"</table></div>"})}
       h+="<div class='actions'><button data-act='recOpen' data-id='"+f.id+"'>Réceptionner (scan)</button><button class='sec' data-act='cmdRecevoirTout' data-id='"+f.id+"'>Tout réceptionner</button></div>"}
-    if(f.recues.length)h+="<div class='step' style='margin-top:12px'>Reçu cette semaine</div><table class='devis' style='width:100%'>"+f.recues.map(function(l){return ligneCmd(l,"recue")}).join("")+"</table>"
-    if(f.recues.length)h+=ecHtml(f);
+    h+="<details style='margin-top:12px'"+((ACCO[f.id]||(HISTC&&HISTC.fid===f.id))?" open":"")+" data-acc='"+f.id+"'><summary style='cursor:pointer;font-weight:600'>Anciennes commandes</summary>";
+    if(f.recues.length)h+="<div class='step' style='margin-top:8px'>Reçu cette semaine</div><table class='devis' style='width:100%'>"+f.recues.map(function(l){return ligneCmd(l,"recue")}).join("")+"</table>"+ecHtml(f);
+    h+="<div class='actions' style='margin-top:6px'><button class='sec' data-act='histoOpen' data-id='"+f.id+"'>"+(HISTC&&HISTC.fid===f.id?"Masquer l'historique":"Historique des commandes")+"</button></div>"+(HISTC&&HISTC.fid===f.id?histoCmdHtml():"")+"</details>";
     h+="</div>"});
   app.innerHTML=h}
 function cmdRun(p,msg){return p.then(function(d){HISTC=null;CCL=null;CMDF=null;CMDMSG=(d&&d.message)||msg||"";CMD=null;render()}).catch(function(e){CMDMSG=e.message;render()})}
 ACTS.cmdReappro=function(b){var id=+b.dataset.id,f=document.getElementById("rf-"+id);if(!f||!f.value){CMDMSG="Ajoute d'abord un fournisseur.";render();return}cmdRun(api("/stock/reappro/ajouter",{id:id,fournisseurId:+f.value,quantite:v("rq-"+id)}))};
-ACTS.fAdd=function(){cmdRun(api("/achats/fournisseur",{nom:v("fn"),email:v("fe")}))};
+ACTS.fAdd=function(){FOURNP=null;cmdRun(api("/achats/fournisseur",{nom:v("fn"),email:v("fe")}))};
 ACTS.fMail=function(b){cmdRun(api("/achats/fournisseur/modifier",{id:+b.dataset.id,email:v("fe-"+b.dataset.id)}))};
 ACTS.cmdLigne=function(b){var id=+b.dataset.id;cmdRun(api("/achats/ligne",{fournisseurId:id,libelle:v("cl-"+id),quantite:v("cq-"+id)}))};
 ACTS.cmdDel=function(b){cmdRun(api("/achats/ligne/supprimer",{id:+b.dataset.id}))};
