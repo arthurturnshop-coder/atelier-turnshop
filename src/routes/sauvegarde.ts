@@ -82,3 +82,23 @@ setInterval(async () => {
     try { await poser("sauvegarde_derniere", `${new Date().toISOString()}|erreur|${String(e?.message ?? e).slice(0, 150)}`); } catch {}
   }
 }, 10 * 60_000);
+
+// ---------- Mise en production : vider les données de test (clients, prises en charge, ventes, devis, commandes, bons d'achat…) ----------
+// Garde : utilisateurs, réglages, fournisseurs, prestations, produits maîtres, stock, banque et compta. Exige une sauvegarde téléchargée il y a moins de 30 minutes.
+const A_VIDER = ["clients", "trottinettes", "reparations", "journal", "devis_lignes", "devis_simples", "devis_simples_lignes", "devis_envois", "ventes", "vente_lignes", "vente_paiements", "vente_avantages", "vente_acomptes", "remboursements", "bons_achat", "paiements_web", "depots_vente", "commande_lignes", "commandes", "taches", "messages_envoyes", "mouvements_cash", "caisse_sessions", "sav_dossiers", "sav_journal", "sav_pdfs", "reparation_pdfs", "retours", "trott_transferts", "chat_messages", "chat_lus", "ca_reel_mois"];
+app.post("/api/admin/vider-tests", async (c) => {
+  exigeAdmin(c);
+  const b = await c.req.json().catch(() => ({}));
+  if (String(b.confirmation ?? "").trim().toUpperCase() !== "VIDER") throw new AppError(400, "Tape VIDER pour confirmer.");
+  const dl = (await reglage("sauvegarde_derniere_dl")).split("|")[0];
+  if (!dl || Date.now() - new Date(dl).getTime() > 30 * 60_000) throw new AppError(400, "Télécharge d'abord une sauvegarde (moins de 30 minutes avant), au cas où.");
+  const existantes = new Set(((await sql`SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'`) as any[]).map((r) => r.table_name as string));
+  const liste = A_VIDER.filter((t) => existantes.has(t));
+  const noms = liste.map((t) => `"${t}"`).join(", ");
+  await sql.begin(async (tx: any) => {
+    await tx.unsafe(`TRUNCATE ${noms} RESTART IDENTITY`);
+    await tx.unsafe(`DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_class WHERE relname = 'facture_seq') THEN PERFORM setval('facture_seq', 1, false); END IF; END $$`);
+  });
+  console.log(JSON.stringify({ event: "vider-tests", par: (c.get("user") as any)?.prenom ?? "", tables: liste.length }));
+  return c.json({ message: `Données de test supprimées (${liste.length} tables vidées). Les numéros de facture et de dossier repartent à 1.` });
+});
