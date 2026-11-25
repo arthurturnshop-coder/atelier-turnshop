@@ -3,7 +3,7 @@ import { app } from "../app";
 import { sql } from "../db";
 // Doit passer après la protection /api/* (voir auth.ts).
 import "./auth";
-import { detailVente } from "./caisse";
+import { detailVente, soldeFidelite } from "./caisse";
 import { vendeurParMdp } from "./caissier";
 import { AppError, clean, exigeResponsable, signature } from "../util";
 import { rembourserEnLigne } from "./pub";
@@ -39,11 +39,18 @@ app.post("/api/reparations/acompte", async (c) => {
     cents: Math.max(0, Math.round((Number(String(p.montant ?? "0").replace(",", ".")) || 0) * 100)),
   })).filter((p: any) => p.cents > 0);
   if (!paiements.length) throw new AppError(400, "Indique le montant de l'acompte.");
-  if (paiements.some((p: any) => !MOYENS.includes(p.moyen))) throw new AppError(400, "Moyen de paiement inconnu.");
+  if (paiements.some((p: any) => ![...MOYENS, "bon_achat"].includes(p.moyen))) throw new AppError(400, "Moyen de paiement inconnu.");
   const total = paiements.reduce((s: number, p: any) => s + p.cents, 0);
+  // Bon d'achat (cagnotte fidélité du client) : limité à ce qu'il a de disponible, et décompté comme en caisse.
+  const bonCents = paiements.filter((p: any) => p.moyen === "bon_achat").reduce((s: number, p: any) => s + p.cents, 0);
+  if (bonCents > 0) {
+    if (!r.client_id) throw new AppError(400, "Pas de client sur cette réparation : impossible d'utiliser un bon d'achat.");
+    const dispo = Math.round((await soldeFidelite(r.client_id)).disponibleEuros * 100);
+    if (bonCents > dispo) throw new AppError(400, `Bon d'achat disponible : ${(dispo / 100).toFixed(2).replace(".", ",")} € seulement.`);
+  }
   const u = c.get("user");
   const vendeur = await vendeurParMdp(c, b.mdpCaissier);
-  const [v] = (await sql`INSERT INTO ventes (client_id, reparation_id, magasin, vendeur, total_cents, points_gagnes, type) VALUES (${r.client_id}, ${repId}, ${u.magasin ?? null}, ${vendeur}, ${total}, 0, 'acompte') RETURNING id`) as any[];
+  const [v] = (await sql`INSERT INTO ventes (client_id, reparation_id, magasin, vendeur, total_cents, remise_cents, points_gagnes, type) VALUES (${r.client_id}, ${repId}, ${u.magasin ?? null}, ${vendeur}, ${total}, ${bonCents}, 0, 'acompte') RETURNING id`) as any[];
   await sql`INSERT INTO vente_lignes (vente_id, libelle, quantite, prix_unitaire_cents, type) VALUES (${v.id}, ${"Acompte réparation " + pcn(repId)}, 1, ${total}, 'article')`;
   const dvA = await (await import("./reparations")).devisDe(repId);
   const [{ n: verseA }] = (await sql`SELECT COALESCE(sum(total_cents), 0)::int AS n FROM ventes WHERE reparation_id = ${repId} AND type = 'acompte'`) as any[];
