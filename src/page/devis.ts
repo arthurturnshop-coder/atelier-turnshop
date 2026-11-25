@@ -97,14 +97,16 @@ async function cmdAuto(ids){
     ok++;msg=r.message||msg}
   CMDFID=0;return ok?ok+" pièce(s) ajoutée(s) au panier fournisseur.":"Aucune pièce à commander dans le panier (les lignes doivent être des pièces)."}
 function cmdLignesPieces(d){return((d.devis&&d.devis.lignes)||d.lignes||[]).filter(function(l){return l.type==="piece"&&!l.commande&&!/^Livraison à domicile/i.test(l.libelle)}).map(function(l){return l.id})}
-var CMDLIV={mode:"boutique",adresse:"",cp:"",ville:""};
+var CMDLIV={mode:"boutique",adresse:"",cp:"",ville:"",pay:""};
 function cmdPopHtml(){
   return"<div class='cpop' id='cmdpop'><div class='cpbox' style='max-width:520px;padding:18px'><div class='step'>Commande pour "+esc(CCLI?CCLI.name:"")+"</div><div class='muted'>Comment le client récupère sa commande ?</div>"
     +"<div class='seg' style='margin:10px 0'><button class='"+(CMDLIV.mode==="boutique"?"on":"")+"' data-act='cmdMode' data-m='boutique'>🏬 Retrait en boutique</button><button class='"+(CMDLIV.mode==="domicile"?"on":"")+"' data-act='cmdMode' data-m='domicile'>🚚 Livraison à domicile (+4,95 €)</button></div>"
     +(CMDLIV.mode==="domicile"?"<div class='muted'>La commande part via le site, comme une commande web, à son adresse.</div><div class='dl'><input id='cmd-a' class='lb' placeholder='Adresse' value='"+esc(CMDLIV.adresse)+"'></div><div class='dl'><input id='cmd-c' placeholder='Code postal' value='"+esc(CMDLIV.cp)+"' style='max-width:140px'><input id='cmd-v' class='lb' placeholder='Ville' value='"+esc(CMDLIV.ville)+"'></div>":"")
+    +"<div class='muted' style='margin-top:8px'>Le client paie maintenant ? (le paiement est enregistré sur son compte)</div><div class='seg' style='margin:6px 0'>"+[["","Pas encore"],["carte","💳 Carte"],["especes","💶 Espèces"],["virement","🏦 Virement"]].map(function(x){return"<button class='"+(CMDLIV.pay===x[0]?"on":"")+"' data-act='cmdPay' data-m='"+x[0]+"'>"+x[1]+"</button>"}).join("")+"</div>"
     +"<div class='actions'><button data-act='cmdGo'>Créer la commande</button><button class='sec' data-act='cmdFerme'>Annuler</button></div></div></div>"}
 function cmdPopShow(){var o=document.getElementById("cmdpop");if(o)o.remove();document.body.insertAdjacentHTML("beforeend",cmdPopHtml())}
 document.addEventListener("input",function(e){var i=e.target&&e.target.id;if(i==="cmd-a")CMDLIV.adresse=e.target.value;else if(i==="cmd-c")CMDLIV.cp=e.target.value;else if(i==="cmd-v")CMDLIV.ville=e.target.value});
+ACTS.cmdPay=function(b){CMDLIV.pay=b.dataset.m;cmdPopShow()};
 ACTS.cmdMode=function(b){CMDLIV.mode=b.dataset.m;cmdPopShow()};
 ACTS.cmdFerme=function(){var o=document.getElementById("cmdpop");if(o)o.remove()};
 ACTS.cCmdClient=async function(){
@@ -116,13 +118,15 @@ ACTS.cCmdClient=async function(){
 ACTS.cmdGo=async function(){
   var dom=CMDLIV.mode==="domicile";
   if(dom&&(!CMDLIV.adresse.trim()||!CMDLIV.cp.trim()||!CMDLIV.ville.trim())){alert("Indique l'adresse, le code postal et la ville.");return}
+  var mdpP=null;if(CMDLIV.pay){mdpP=await demandeCode("Qui encaisse ?");if(mdpP===null)return}
   ACTS.cmdFerme();
   try{
     if(dom&&livIdx()<0)PAN.push({libelle:"Livraison à domicile",quantite:1,prix:"4,95",type:"article",variantId:"",sku:""});
     var r=await cartVersDevis();if(!r)return;var p=await api("/devis-simples/rattacher",{id:r.id});await api("/devis-lignes/remise-client",{repairId:p.reparationId,valeur:true});
     if(dom)await api("/reparations/livraison",{repairId:p.reparationId,adresse:CMDLIV.adresse,cp:CMDLIV.cp,ville:CMDLIV.ville});
     var f=await api("/reparation?id="+p.reparationId);var m=await cmdAuto(cmdLignesPieces(f));
-    cartVide();DV.list=null;CMD=null;CCL=null;CMDMSG="Commande client créée ("+(dom?"livraison à domicile":"retrait en boutique")+") : "+m+" Devis et dossier : PC-"+("0000"+p.reparationId).slice(-4)+".";FICHE=null;CUR=null;TAB="cmd";render()}catch(e){alert(e.message)}};
+    var payMsg="";if(CMDLIV.pay){var du=payInfo(f).due;if(du>0){await api("/reparations/acompte",{mdpCaissier:mdpP,repairId:p.reparationId,paiements:[{moyen:CMDLIV.pay,montant:String(du/100).replace(".",",")}]});payMsg=" Paiement de "+eur(du)+" enregistré sur son compte."}}
+    cartVide();DV.list=null;CMD=null;CCL=null;CMDMSG="Commande client créée ("+(dom?"livraison à domicile":"retrait en boutique")+") : "+m+" Devis et dossier : PC-"+("0000"+p.reparationId).slice(-4)+"."+payMsg;FICHE=null;CUR=null;TAB="cmd";render()}catch(e){alert(e.message)}};
 ACTS.cSepOk=function(){};
 ACTS.cEnPec=async function(){
   if(!PAN.length){alert("Le panier est vide.");return}
