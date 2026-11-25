@@ -60,7 +60,7 @@ ACTS.stFus=function(b){var p=stProd(+b.dataset.id);if(!p)return;
 // ----- Inventaire -----
 function vInv(){
   var h="<div class='card'><div class='step'>Inventaire partiel</div><div class='muted'>Un rayon (A11) ou tout un panneau (tape juste A : il couvre A11, A12, A22…). Dans un panneau, tape ou scanne d'abord le rayon (A11), puis les produits de ce rayon, puis le rayon suivant. Ce qui était rangé là mais n'est pas scanné sera retiré du stock.</div>";
-  h+="<div class='dl' style='margin-top:6px'><input id='ilieu' class='q' placeholder='A11 ou A' value='"+esc(STINV.lieu)+"'><input id='iscan' class='lb' placeholder='"+(stPanneau()?"Rayon (A11) ou produit":"Scanne un produit")+"'></div></div>";
+  h+="<div class='dl' style='margin-top:6px'><button class='sec' data-act='iClavier' title='Afficher ou cacher le clavier de la tablette'>⌨ "+(STINV.clavier?"Clavier : oui":"Clavier : non")+"</button><input id='ilieu' class='q' inputmode='"+(STINV.clavier?"text":"none")+"' placeholder='A11 ou A' value='"+esc(STINV.lieu)+"'><input id='iscan' class='lb' inputmode='"+(STINV.clavier?"text":"none")+"' autocomplete='off' autocapitalize='off' placeholder='"+(stPanneau()?"Rayon (A11) ou produit":"Scanne un produit")+"'></div></div>";
   if(STINV.alerte){var al=STINV.alerte;h+="<div class='card' style='border:2px solid "+(al.kind==="inconnu"?"#b00":"#e0a200")+";background:#fff8e6'><b>"+esc(al.txt)+"</b>"+(al.kind==="autre"?"<div class='actions'><button data-act='iDeplace'>Déplacer ici</button><button class='sec' data-act='iRemet'>Remettre en "+esc(al.de)+"</button></div>":"")+"</div>"}
   else if(STINV.ok)h+="<div class='card' style='border:2px solid #1e8449;background:#eef8f1'><b>"+esc(STINV.ok)+"</b></div>";
   if(STAP){
@@ -112,10 +112,11 @@ ACTS.iScan=function(){
   STINV.info[c]=null;STINV.noms[c]="";
   api("/stock/scan",{magasin:MAG||"",code:c}).then(function(d){STINV.info[c]=d;STINV.noms[c]=d.produit?d.produit.nom:(d.shopify?d.shopify.nom+" (Shopify)":"");iFeed(c);if(STSUB==="inv"&&!STAP)render()}).catch(function(){});
   render()};
+ACTS.iClavier=function(){STINV.clavier=!STINV.clavier;render()};
 ACTS.iRemet=function(){var a=STINV.alerte;if(!a)return;for(var i=STINV.scans.length-1;i>=0;i--)if(STINV.scans[i].code===a.code){STINV.scans.splice(i,1);break}STINV.alerte=null;STINV.ok="↩ Remets-le en "+(a.de||"son rayon")+" : scan retiré, il ne bouge pas.";render()};
 ACTS.iDeplace=function(){var a=STINV.alerte;STINV.alerte=null;STINV.ok="➡ Déplacé en "+(a?a.vers:"ce rayon")+" à la validation.";render()};
 ACTS.iMoins=function(b){var c=b.dataset.c;for(var i=STINV.scans.length-1;i>=0;i--)if(STINV.scans[i].code===c){STINV.scans.splice(i,1);break}render()};
-ACTS.iReset=function(){STINV={lieu:STINV.lieu,cur:"",scans:[],noms:{},info:{},alerte:null,ok:""};STAP=null;render()};
+ACTS.iReset=function(){STINV={clavier:STINV.clavier,lieu:STINV.lieu,cur:"",scans:[],noms:{},info:{},alerte:null,ok:""};STAP=null;render()};
 ACTS.iBack=function(){STAP=null;render()};
 ACTS.iFin=function(){STINV.lieu=v("ilieu").toUpperCase().replace(/ /g,"")||STINV.lieu;api("/stock/inventaire",{magasin:MAG||"",emplacement:STINV.lieu,scans:STINV.scans}).then(function(d){STAP=d.apercu;render()}).catch(function(e){STMSG=e.message;render()})};
 ACTS.iOk=function(){api("/stock/inventaire",{magasin:MAG||"",emplacement:STINV.lieu,scans:STINV.scans,appliquer:true}).then(function(d){STMSG=d.message;STINV={lieu:"",cur:"",scans:[],noms:{}};STAP=null;STK=null;render()}).catch(function(e){STMSG=e.message;render()})};
