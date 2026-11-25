@@ -34,6 +34,10 @@ await sql`DELETE FROM vente_lignes WHERE vente_id IN (SELECT v.id FROM ventes v 
 await sql`DELETE FROM ventes v WHERE v.vendeur = 'En ligne' AND v.id NOT IN (SELECT vente_id FROM paiements_web WHERE vente_id IS NOT NULL)`;
 } catch { /* première installation : la table paiements_web n'existe pas encore */ }
 await sql`ALTER TABLE ventes ADD COLUMN IF NOT EXISTS shopify_order_id TEXT`;
+await sql`ALTER TABLE ventes ADD COLUMN IF NOT EXISTS livraison JSONB`;
+await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS adresse TEXT NOT NULL DEFAULT ''`;
+await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS code_postal TEXT NOT NULL DEFAULT ''`;
+await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS ville TEXT NOT NULL DEFAULT ''`;
 await sql`ALTER TABLE ventes ADD COLUMN IF NOT EXISTS shopify_order_name TEXT`;
 await sql`ALTER TABLE ventes ADD COLUMN IF NOT EXISTS shopify_erreur TEXT`;
 await sql`ALTER TABLE vente_lignes ADD COLUMN IF NOT EXISTS type TEXT`;

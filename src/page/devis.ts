@@ -32,6 +32,9 @@ function dvPayload(){var d=DV.ed;return{id:d.id,clientId:d.clientId,nom:d.nom,te
 ACTS.dvNouveau=function(){DV.hint="";DV.ed=dvVide();DV.res=null;DV.msg="";FICHE=null;TAB="enc";ATSUB="devis";render()};
 ACTS.dvOuvre=function(b){DV.hint="";var d=DV.list[+b.dataset.i];DV.ed=JSON.parse(JSON.stringify(d));if(!DV.ed.lignes.length)DV.ed.lignes=dvVide().lignes;DV.res=null;DV.msg="";render()};
 ACTS.dvRetour=function(){DV.ed=null;DV.list=null;DV.msg="";render()};
+ACTS.cLivOn=async function(){if(livIdx()<0)PAN.push({libelle:"Livraison à domicile",quantite:1,prix:"4,95",type:"article",variantId:"",sku:""});
+  if(CCLI&&!CLIV.adresse){try{var a=await api("/client-adresse?id="+CCLI.id);CLIV={adresse:a.adresse,cp:a.cp,ville:a.ville}}catch(e){}}render()};
+ACTS.cLivOff=function(){var i=livIdx();if(i>=0)PAN.splice(i,1);render()};
 function dvPrestaBox(){
   prestaLoad();
   var l=(PRESTA?PRESTA.prestations:[]).filter(function(x){return x.actif});

@@ -7,6 +7,13 @@ var CVEH=false;
 var CAV=null,CAVBUSY=false,CAVOFF=[],CREC=null,CHIST=null,CHOPEN=0;
 var PRESTA=null,PRESBUSY=false,DEVHINT="",CACO=0,DEVOPT=0;
 function acoDeduit(reste){return CREP&&CACO>0?Math.max(0,Math.min(CACO,reste)):0}
+var CLIV={adresse:"",cp:"",ville:""};
+function livIdx(){for(var i=0;i<PAN.length;i++)if(/^Livraison à domicile/i.test(PAN[i].libelle))return i;return -1}
+function livHtml(){
+  if(livIdx()<0)return"<div style='margin-top:8px'><button class='sec' data-act='cLivOn'>🚚 Livraison à domicile : 4,95 €</button></div>";
+  return"<div class='card avbox' style='margin-top:8px'><b>🚚 Livraison à domicile (4,95 €)</b><div class='dl'><input id='cliv-a' class='lb' placeholder='Adresse' value='"+esc(CLIV.adresse)+"'></div><div class='dl'><input id='cliv-c' placeholder='Code postal' value='"+esc(CLIV.cp)+"' style='max-width:140px'><input id='cliv-v' class='lb' placeholder='Ville' value='"+esc(CLIV.ville)+"'></div><button class='link' data-act='cLivOff'>Retirer la livraison</button></div>"}
+function livBody(){return livIdx()<0?null:{adresse:CLIV.adresse,cp:CLIV.cp,ville:CLIV.ville}}
+document.addEventListener("input",function(e){var i=e.target&&e.target.id;if(i==="cliv-a")CLIV.adresse=e.target.value;else if(i==="cliv-c")CLIV.cp=e.target.value;else if(i==="cliv-v")CLIV.ville=e.target.value});
 function prestaLoad(){if(PRESTA===null&&!PRESBUSY){PRESBUSY=true;api("/prestations").then(function(d){PRESTA=d;PRESBUSY=false;render()}).catch(function(){PRESTA={prestations:[],multi:{seuil:2,remiseCents:0}};PRESBUSY=false;render()})}}
 function multiRem(brut){
   if(!PRESTA||brut<=0||avChoisis(brut).length)return 0;
@@ -171,6 +178,7 @@ function caisseHtml(){
     if(CVEH)h+="<div class='dl' style='margin-top:6px'><select id='cveh-l'>"+nonT.map(function(x){return"<option value='"+x.i+"'>"+esc(x.l.libelle)+"</option>"}).join("")+"</select><button data-act='cVehOk'>Enregistrer le véhicule</button><button class='link' data-act='cVehNon'>Annuler</button></div>";
     else h+="<div style='margin-top:4px'><button class='link' data-act='cVehOpen' style='font-size:12px;opacity:.7'>🛴 Enregistrer un véhicule</button></div>"}
   h+="<div style='margin-top:8px'>"+prodBox("caisse")+"</div>";
+  h+=livHtml();
   h+="<div class='dl' style='margin-top:8px'><input id='cl' class='lb' placeholder='Article (libellé)'><input id='cq2' class='q' type='number' min='1' value='1'><input id='cp' class='p' placeholder='Prix €'><button data-act='cAdd'>Ajouter</button></div></div>";
   var dispo=(CAV||[]).filter(function(a){return avApplicable(a,brut)});
   if(dispo.length){

@@ -2,7 +2,7 @@ export const ACTIONS = `function prFiltre(q){q=(q||'').toLowerCase();document.qu
 function bigOk(t,sub){var o=document.createElement("div");o.style.cssText="position:fixed;inset:0;background:rgba(20,30,25,.55);z-index:9500;display:flex;align-items:center;justify-content:center";
   o.innerHTML="<div style='background:#1e8449;color:#fff;padding:40px 60px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.4)'><div style='font-size:72px'>✅</div><div style='font-size:38px;font-weight:800'>"+esc(t)+"</div>"+(sub?"<div style='font-size:26px;margin-top:12px;font-weight:700'>"+esc(sub)+"</div>":"")+"</div>";
   document.body.appendChild(o);var ms=sub?3500:1600;function f(){if(o.parentNode)o.remove()}o.addEventListener("click",f);setTimeout(f,ms)}
-function cReset(){CREP=null;CAFF=[];CRAFF=[];CACO=0;PAN=[];CPAY={carte:"",especes:"",virement:"",bon_achat:""};CCLI=null;CFID=null;CUSE=false;CAVOFF=[];CMSG=""}
+function cReset(){CLIV={adresse:"",cp:"",ville:""};CREP=null;CAFF=[];CRAFF=[];CACO=0;PAN=[];CPAY={carte:"",especes:"",virement:"",bon_achat:""};CCLI=null;CFID=null;CUSE=false;CAVOFF=[];CMSG=""}
 var ACTS={
   chooseMag:function(b){loadProfils(b.dataset.mag)},
   choosePrenom:choosePrenom,
@@ -87,7 +87,7 @@ var ACTS={
       if(f.garde&&f.garde.fraisCents>0)lignes.push({libelle:"Gardiennage ("+f.garde.joursFrais+" jours x "+(f.garde.prixCents/100)+" EUR)",quantite:f.garde.joursFrais,prix:String(f.garde.prixCents/100).replace(".",","),type:"article",variantId:"",sku:""});
       var c=await api("/caisse/client?id="+f.customerId);
       var pay=due>0?[{moyen:ACM,montant:String(due/100).replace(".",",")}]:[];
-      var d=await api("/caisse/encaisser",{lignes:lignes,paiements:pay,clientId:f.customerId,utiliserFidelite:false,avantageIds:[],repairId:f.id,mdpCaissier:mdpC});
+      var d=await api("/caisse/encaisser",{livraison:livBody(),lignes:lignes,paiements:pay,clientId:f.customerId,utiliserFidelite:false,avantageIds:[],repairId:f.id,mdpCaissier:mdpC});
       ACV=null;ACR="";await recharger(f.id);alert("✅ Facture créée"+(d.vente&&d.vente.numeroFacture?" : "+d.vente.numeroFacture:"")+"."+(rendu>0?"\\n💶 Monnaie à rendre au client : "+eur(rendu):""))}catch(e){alert(e.message)}},
   rbFait:async function(b){if(!RBM){alert("Choisis comment rembourser.");return}
     var P=payInfo(FICHE),mt=v("rb-m"),cents=mt?pxCents(mt):P.a.resteCents;
@@ -149,7 +149,7 @@ var ACTS={
       if(!PAN.every(serieOk)){CMSG="Trottinette : saisis le numéro de série (un par trottinette) avant d encaisser.";render();return}
       if(!CCLI){CMSG="Trottinette : choisis le client (sa garantie est liée à son compte).";render();return}}
     var mdpC=await demandeCode("Qui encaisse ?");if(mdpC===null)return;
-    try{var d=await api("/caisse/encaisser",{lignes:PAN,paiements:pay,clientId:CCLI?CCLI.id:null,utiliserFidelite:CUSE,avantageIds:ids,repairId:CREP,mdpCaissier:mdpC});CMDP="";CRAFF=CREP?CAFF:[];CAFF=[];CREP=null;CACO=0;PAN=[];CPAY={carte:"",especes:"",virement:"",bon_achat:""};CUSE=false;CAVOFF=[];CREC=d.vente;CMSG="";CHOPEN=0;CCLI=null;CFID=null;await chargeHisto();if(CPOP){CREC=null;CPOP=false;bigOk("Paiement validé",d.renduCents?"💶 Monnaie à rendre au client : "+eur(d.renduCents):"");if(FICHE)recharger(FICHE.id)}else if(d.renduCents)alert("💶 Monnaie à rendre au client : "+eur(d.renduCents))}catch(e){CMSG=e.message;render()}},
+    try{var d=await api("/caisse/encaisser",{livraison:livBody(),lignes:PAN,paiements:pay,clientId:CCLI?CCLI.id:null,utiliserFidelite:CUSE,avantageIds:ids,repairId:CREP,mdpCaissier:mdpC});CMDP="";CRAFF=CREP?CAFF:[];CAFF=[];CREP=null;CACO=0;PAN=[];CPAY={carte:"",especes:"",virement:"",bon_achat:""};CUSE=false;CAVOFF=[];CREC=d.vente;CMSG="";CHOPEN=0;CCLI=null;CFID=null;await chargeHisto();if(CPOP){CREC=null;CPOP=false;bigOk("Paiement validé",d.renduCents?"💶 Monnaie à rendre au client : "+eur(d.renduCents):"");if(FICHE)recharger(FICHE.id)}else if(d.renduCents)alert("💶 Monnaie à rendre au client : "+eur(d.renduCents))}catch(e){CMSG=e.message;render()}},
   shopTest:async function(){SHOPRES="<div class='muted'>Test en cours…</div>";render();try{var d=await api("/shopify/diagnostic");SHOPRES=d.etapes.map(function(e){return"<div>"+(e.ok?"✅ ":"❌ ")+"<b>"+esc(e.nom)+"</b><div class='muted'>"+esc(e.detail)+"</div></div>"}).join("")}catch(e){SHOPRES=esc(e.message)}render()},
   prPop:function(){PRPOP={sel:{}};render()},
   prFerme:function(){PRPOP=null;render()},

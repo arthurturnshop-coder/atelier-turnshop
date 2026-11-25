@@ -227,6 +227,10 @@ app.get("/api/caisse/historique", async (c) => {
 });
 
 // Encaisser : lignes + paiements (carte / espèces / virement, plusieurs possibles) + remise fidélité éventuelle.
+app.get("/api/client-adresse", async (c) => {
+  const [r] = (await sql`SELECT adresse, code_postal, ville FROM clients WHERE id = ${Number(c.req.query("id"))}`) as any[];
+  return c.json({ adresse: r?.adresse ?? "", cp: r?.code_postal ?? "", ville: r?.ville ?? "" });
+});
 app.post("/api/caisse/encaisser", async (c) => {
   const b = await c.req.json().catch(() => ({}));
   const lignes = Array.isArray(b.lignes) ? b.lignes : [];
@@ -248,6 +252,9 @@ app.post("/api/caisse/encaisser", async (c) => {
     series: (Array.isArray(l.series) ? l.series : []).map((x: any) => clean(x, 60).replace(/\s+/g, " ")),
   }));
   if (nettoyees.some((l: any) => !l.libelle)) throw new AppError(400, "Chaque ligne doit avoir un libellé.");
+  const livLigne = nettoyees.some((l: any) => /^Livraison à domicile/i.test(String(l.libelle)));
+  const liv = { adresse: clean(b.livraison?.adresse, 200), cp: clean(b.livraison?.cp, 10), ville: clean(b.livraison?.ville, 80) };
+  if (livLigne && (!liv.adresse || !liv.cp || !liv.ville)) throw new AppError(400, "Livraison : indique l'adresse, le code postal et la ville.");
   const brut = nettoyees.reduce((s: number, l: any) => s + l.quantite * l.prixCents, 0);
 
   // Trottinettes : un numéro de série par unité, et un client (la garantie est liée à son compte).
@@ -333,6 +340,10 @@ app.post("/api/caisse/encaisser", async (c) => {
   const p = await lireParametres();
   const pointsGagnes = Math.floor((totalCents + acompteDeduit) / 100 / p.eurosPourPalier);
   const [v] = (await sql`INSERT INTO ventes (client_id, reparation_id, magasin, vendeur, total_cents, remise_cents, points_gagnes, points_utilises, acompte_deduit_cents) VALUES (${clientId}, ${reparationId}, ${u.magasin ?? null}, ${vendeur}, ${totalCents}, ${remiseCents}, ${pointsGagnes}, ${remiseCents > 0 ? 1 : 0}, ${acompteDeduit}) RETURNING id`) as any[];
+  if (livLigne) {
+    await sql`UPDATE ventes SET livraison = ${JSON.stringify(liv)}::jsonb WHERE id = ${v.id}`;
+    if (clientId) await sql`UPDATE clients SET adresse = ${liv.adresse}, code_postal = ${liv.cp}, ville = ${liv.ville} WHERE id = ${clientId}`;
+  }
   await sql`UPDATE ventes SET numero_facture = 'F-' || to_char(now(), 'YYYY') || '-' || lpad(nextval('facture_seq')::text, 5, '0') WHERE id = ${v.id}`;
   for (const l of nettoyees) { const m = /DV#(\d+)/.exec(String(l.libelle)); if (m) await (await import("./depot")).depotVendu(Number(m[1]), v.id, l.prixCents * l.quantite); }
   for (const l of nettoyees) {

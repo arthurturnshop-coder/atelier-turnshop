@@ -29,10 +29,12 @@ export function construireCommande(v: any, client: any, rep: any, lignes: any[],
   const remise = Math.max(0, brut - net);
   const tva = Math.round(net - net / 1.2);
   const nom = client ? `${client.prenom} ${client.nom}`.trim() : "";
+  const liv = v.livraison && v.livraison.adresse ? v.livraison : null;
+  const livCents = liv ? lignes.filter((l) => /^Livraison à domicile/i.test(String(l.libelle))).reduce((s2, l) => s2 + l.quantite * l.prix_unitaire_cents, 0) : 0;
   const order: any = {
     currency: "EUR",
     financialStatus: "PAID",
-    fulfillmentStatus: "FULFILLED",
+    ...(liv ? {} : { fulfillmentStatus: "FULFILLED" }),
     taxesIncluded: true,
     taxLines: [{ title: "TVA 20 %", rate: 0.2, priceSet: montant(tva) }],
     sourceName: "atelier-turn",
@@ -41,14 +43,19 @@ export function construireCommande(v: any, client: any, rep: any, lignes: any[],
     note: (rep ? `Réparation n°${rep.id} · ${rep.marque} ${rep.modele} (N° ${rep.serie}) · ${rep.panne}` : `Vente boutique${v.magasin ? " " + v.magasin : ""}`).slice(0, 500) + (v.numero_facture ? ` · Facture ${v.numero_facture}` : ""),
     customAttributes: [{ key: "Ticket atelier", value: String(v.id) }, ...(v.numero_facture ? [{ key: "Facture atelier", value: String(v.numero_facture) }] : []), ...(rep ? [{ key: "Réparation", value: String(rep.id) }] : [])],
     processedAt: new Date(v.cree_le).toISOString(),
-    lineItems: lignes.map((l) => {
-      const base: any = { quantity: l.quantite, priceSet: montant(l.prix_unitaire_cents), requiresShipping: false, taxable: true };
+    lineItems: lignes.filter((l) => !(liv && /^Livraison à domicile/i.test(String(l.libelle)))).map((l) => {
+      const base: any = { quantity: l.quantite, priceSet: montant(l.prix_unitaire_cents), requiresShipping: !!liv, taxable: true };
       if (l.shopify_variant_id) base.variantId = l.shopify_variant_id;
       else { base.title = l.libelle; if (l.sku) base.sku = l.sku; }
       return base;
     }),
     transactions: paiements.map((p) => ({ kind: "SALE", status: "SUCCESS", gateway: PASSERELLE[p.moyen] ?? p.moyen, amountSet: montant(p.montant_cents) })),
   };
+  if (liv) {
+    order.shippingAddress = { address1: liv.adresse, zip: liv.cp, city: liv.ville, countryCode: "FR", firstName: client?.prenom || undefined, lastName: client?.nom || undefined, phone: client?.telephone || undefined };
+    order.shippingLines = [{ title: "Livraison à domicile", priceSet: montant(livCents), code: "atelier-livraison" }];
+    order.tags.push("livraison");
+  }
   if (remise > 0) order.discountCode = { itemFixedDiscountCode: { code: "REMISE ATELIER", amountSet: montant(remise) } };
   if (!client) { /* vente au comptoir sans client : commande sans compte */ }
   else if (client.shopify_id) order.customer = { toAssociate: { id: client.shopify_id } };
