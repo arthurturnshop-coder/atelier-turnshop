@@ -239,7 +239,7 @@ app.get("/api/commandes-clients", async (c) => {
 
 app.post("/api/devis-lignes/remise-client", async (c) => {
   const b = await c.req.json().catch(() => ({}));
-  if (b.repairId) await sql`UPDATE devis_lignes SET remise_client = ${!!b.valeur} WHERE reparation_id = ${Number(b.repairId)} AND type = 'piece'`;
+  if (b.repairId) await sql`UPDATE devis_lignes SET remise_client = ${!!b.valeur} WHERE reparation_id = ${Number(b.repairId)} AND type = 'piece' AND libelle NOT ILIKE 'Livraison à domicile%'`;
   else await sql`UPDATE devis_lignes SET remise_client = ${!!b.valeur} WHERE id = ${Number(b.id)}`;
   return c.json({ message: b.valeur ? "Cette pièce apparaîtra dans le bloc Client à son arrivée." : "Cette pièce reste côté atelier." });
 });
