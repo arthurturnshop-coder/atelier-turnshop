@@ -16,7 +16,8 @@ export async function acomptesDe(repId: number) {
   const rows = (await sql`SELECT id, total_cents, utilise_cents, cree_le FROM ventes WHERE reparation_id = ${repId} AND type = 'acompte' ORDER BY id`) as any[];
   const verse = rows.reduce((s, r) => s + r.total_cents, 0);
   const reste = rows.reduce((s, r) => s + (r.total_cents - r.utilise_cents), 0);
-  return { verseCents: verse, resteCents: reste, liste: rows.map((r) => ({ id: r.id, cents: r.total_cents, date: r.cree_le })) };
+  const [rb] = (await sql`SELECT COALESCE(sum(montant_cents), 0)::int AS n FROM remboursements WHERE reparation_id = ${repId} AND motif LIKE 'Acompte%'`) as any[];
+  return { verseCents: verse, rembourseCents: Math.min(verse, rb?.n ?? 0), resteCents: reste, liste: rows.map((r) => ({ id: r.id, cents: r.total_cents, date: r.cree_le })) };
 }
 
 // Encaisser un acompte (ou un paiement avant réparation) : pas de commande Shopify, pas d'avis, pas de points.
