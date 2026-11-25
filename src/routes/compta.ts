@@ -112,15 +112,29 @@ app.get("/api/compta/export", async (c) => {
     const Rh = Math.round(R / 1.2);
     if (A) { ecr(dt, piece, def.get("acompte") ?? "4191", "Acompte déduit", A, 0, an, cl); totalD += A; }
     if (Rh) { ecr(dt, piece, def.get("remise") ?? "709", "Remises accordées", Rh, 0, an, cl); totalD += Rh; }
-    let H = 0;
+    let H = 0, dette = 0;
     for (const l of lignes) {
+      const dv = /DV#(\d+)/.exec(String(l.libelle));
+      if (dv) {
+        // Dépôt-vente : on ne déclare que la commission + la remise en état ; le reste est dû au déposant (compte de tiers, hors CA et TVA)
+        const tot = l.quantite * l.prix_unitaire_cents;
+        const [d] = (await sql`SELECT * FROM depots_vente WHERE id = ${Number(dv[1])}`) as any[];
+        const pris = d ? (await (await import("./depot")).vueDepot(d)) : null;
+        const part = pris ? Math.min(tot, pris.commissionCents + pris.fraisCents) : tot;
+        const due = tot - part;
+        if (due > 0) { dette += due; ecr(dt, piece, "467", "Dépôt-vente à reverser au déposant", 0, due, an, cl); }
+        const ht = Math.round(part / 1.2);
+        H += ht;
+        if (ht) ecr(dt, piece, "706", `Commission et remise en état dépôt-vente DV#${dv[1]}`, 0, ht, an, cl);
+        continue;
+      }
       const ht = Math.round((l.quantite * l.prix_unitaire_cents) / 1.2);
       H += ht;
       ecr(dt, piece, l.compte || def.get(l.type ?? "article") || def.get("article") || "707", l.libelle, 0, ht, an, cl);
     }
-    const tva = pays.reduce((s, p) => s + p.montant_cents, 0) + A + Rh - H; // TVA = ce qui équilibre l'écriture
+    const tva = pays.reduce((s, p) => s + p.montant_cents, 0) + A + Rh - H - dette; // TVA = ce qui équilibre l'écriture
     if (tva) ecr(dt, piece, def.get("tva_collectee") ?? "44571", "TVA collectée 20 %", 0, tva, an, cl);
-    totalC += H + tva;
+    totalC += H + tva + dette;
   }
   const nom = `journal-ventes-${du}-${au}.csv`;
   return new Response("﻿" + L.join("\r\n") + "\r\n", { headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": `attachment; filename="${nom}"` } });

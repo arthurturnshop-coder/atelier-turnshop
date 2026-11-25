@@ -27,6 +27,7 @@ await sql`CREATE TABLE IF NOT EXISTS depots_vente (
 const pcn = (id: number) => "PC-" + String(id).padStart(4, "0");
 const cents = (x: any) => Math.round((Number(String(x ?? "").replace(",", ".")) || 0) * 100);
 
+export async function vueDepot(r: any) { return vue(r); }
 async function vue(r: any) {
   let frais = r.frais_remise_cents as number | null;
   let fraisAuto = false;

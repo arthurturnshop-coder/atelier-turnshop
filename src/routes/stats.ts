@@ -31,6 +31,11 @@ app.get("/api/stats", async (c) => {
     WHERE (v.cree_le AT TIME ZONE 'Europe/Paris')::date BETWEEN ${du}::date AND ${au}::date AND (${m} = '' OR v.magasin = ${m}) GROUP BY 1 ORDER BY 1`) as any[];
   const [vt] = (await sql`SELECT count(*)::int AS nb, COALESCE(sum(total_cents + acompte_deduit_cents), 0)::int AS total FROM ventes v
     WHERE v.type = 'vente' AND (v.cree_le AT TIME ZONE 'Europe/Paris')::date BETWEEN ${du}::date AND ${au}::date AND (${m} = '' OR v.magasin = ${m})`) as any[];
+  // dépôt-vente : la part due au déposant n'est pas du chiffre d'affaires
+  const dvs = (await sql`SELECT d.* FROM depots_vente d JOIN ventes v ON v.id = d.vente_id WHERE v.type = 'vente' AND (v.cree_le AT TIME ZONE 'Europe/Paris')::date BETWEEN ${du}::date AND ${au}::date AND (${m} = '' OR v.magasin = ${m})`) as any[];
+  let dueDep = 0;
+  for (const d of dvs) dueDep += (await (await import("./depot")).vueDepot(d)).reverserCents;
+  vt.total = Math.max(0, vt.total - dueDep);
   const parType = (await sql`SELECT COALESCE(l.type, 'article') AS t, sum(l.quantite * l.prix_unitaire_cents)::int AS n FROM vente_lignes l JOIN ventes v ON v.id = l.vente_id
     WHERE v.type = 'vente' AND (v.cree_le AT TIME ZONE 'Europe/Paris')::date BETWEEN ${du}::date AND ${au}::date AND (${m} = '' OR v.magasin = ${m}) GROUP BY 1 ORDER BY 2 DESC`) as any[];
   const topArticles = (await sql`SELECT l.libelle, sum(l.quantite)::int AS qte, sum(l.quantite * l.prix_unitaire_cents)::int AS n FROM vente_lignes l JOIN ventes v ON v.id = l.vente_id
