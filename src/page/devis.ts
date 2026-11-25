@@ -95,8 +95,8 @@ async function cmdAuto(ids){
       var f=fs[(parseInt(rep,10)||1)-1];if(!f)return"fournisseur inconnu";CMDFID=f.id;
       r=await api("/achats/depuis-devis",{devisLigneId:ids[k],fournisseurId:f.id})}
     ok++;msg=r.message||msg}
-  CMDFID=0;return ok+" pièce(s) ajoutée(s) au panier fournisseur."}
-function cmdLignesPieces(d){return(d.lignes||[]).filter(function(l){return l.type==="piece"&&!l.commande&&!/^Livraison à domicile/i.test(l.libelle)}).map(function(l){return l.id})}
+  CMDFID=0;return ok?ok+" pièce(s) ajoutée(s) au panier fournisseur.":"Aucune pièce à commander dans le panier (les lignes doivent être des pièces)."}
+function cmdLignesPieces(d){return((d.devis&&d.devis.lignes)||d.lignes||[]).filter(function(l){return l.type==="piece"&&!l.commande&&!/^Livraison à domicile/i.test(l.libelle)}).map(function(l){return l.id})}
 var CMDLIV={mode:"boutique",adresse:"",cp:"",ville:""};
 function cmdPopHtml(){
   return"<div class='cpop' id='cmdpop'><div class='cpbox' style='max-width:520px;padding:18px'><div class='step'>Commande pour "+esc(CCLI?CCLI.name:"")+"</div><div class='muted'>Comment le client récupère sa commande ?</div>"

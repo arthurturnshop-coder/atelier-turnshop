@@ -54,8 +54,9 @@ function pcrLoad(){if(PCR===null&&!PCRB){PCRB=true;api("/pieces-a-remettre").the
 function blocPieces(){pcrLoad();return""}
 function pcrListe(){
   if(!PCR)return"<div class='card'><b>📦 Pièces à remettre aux clients</b><div class='muted'>Chargement…</div></div>";
-  if(!PCR.pieces.length)return"<div class='card'><b>📦 Pièces à remettre aux clients</b><div class='muted'>Aucune pièce en attente.</div></div>";
-  var h="<div class='card pcr'><b>📦 Pièces à remettre aux clients ("+PCR.pieces.length+")</b><div class='muted'>Commandées exprès, arrivées, rangées en boutique.</div>";
+  var enc=(PCR.enCours||[]).length?"<div class='card'><b>🕒 En commande ("+PCR.enCours.length+")</b>"+PCR.enCours.map(function(l){return"<div class='muted' style='padding:3px 0'><b>"+esc(l.libelle)+"</b> · "+esc(l.client)+" · "+esc(l.numero)+" · "+(l.statut==="panier"?"dans le panier fournisseur":"commandée"+(l.commandeeLe?" le "+esc(dateLongue(l.commandeeLe)):""))+"</div>"}).join("")+"</div>":"";
+  if(!PCR.pieces.length)return enc+"<div class='card'><b>📦 Pièces à remettre aux clients</b><div class='muted'>Aucune pièce arrivée en attente.</div></div>";
+  var h=enc+"<div class='card pcr'><b>📦 Pièces à remettre aux clients ("+PCR.pieces.length+")</b><div class='muted'>Commandées exprès, arrivées, rangées en boutique.</div>";
   PCR.pieces.forEach(function(p){
     var reste=p.totalCents-p.versetCents,open=PCRO&&PCRO.id===p.id;
     h+="<div class='pcrrow'><div><b>"+esc(p.quantite>1?p.quantite+" × ":"")+esc(p.libelle)+"</b> · "+esc(p.client)+(p.telephone?" <span class='muted'>"+esc(p.telephone)+"</span>":"")+"</div>"

@@ -261,7 +261,8 @@ app.get("/api/pieces-a-remettre", async (c) => {
   }
   const occ = (await sql`SELECT boite, id AS rid FROM reparations WHERE boite IS NOT NULL AND boite <> '' AND supprime_le IS NULL AND statut <> 'récupéré'`) as any[];
   const occL = (await sql`SELECT boite, reparation_id AS rid FROM commande_lignes WHERE boite IS NOT NULL AND boite <> '' AND remise_le IS NULL`) as any[];
-  return c.json({ pieces: out, cases: BOITES_P.map((n) => ({ nom: n, rid: (occ.find((o) => o.boite === n) ?? occL.find((o) => o.boite === n))?.rid ?? null })) });
+  const enCours = (await sql`SELECT l.id, l.libelle, l.statut, l.commandee_le, l.reparation_id, cl.prenom, cl.nom FROM commande_lignes l JOIN devis_lignes dl ON dl.id = l.devis_ligne_id AND dl.remise_client JOIN reparations r ON r.id = l.reparation_id JOIN clients cl ON cl.id = r.client_id WHERE l.statut IN ('panier','commandee') AND r.supprime_le IS NULL ORDER BY l.id DESC`) as any[];
+  return c.json({ enCours: enCours.map((l) => ({ id: l.id, libelle: l.libelle, statut: l.statut, commandeeLe: l.commandee_le, numero: pcnP(l.reparation_id), client: `${l.prenom} ${l.nom}`.trim() })), pieces: out, cases: BOITES_P.map((n) => ({ nom: n, rid: (occ.find((o) => o.boite === n) ?? occL.find((o) => o.boite === n))?.rid ?? null })) });
 });
 
 app.post("/api/pieces/boite", async (c) => {
