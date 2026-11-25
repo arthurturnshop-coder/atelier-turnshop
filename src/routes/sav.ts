@@ -28,6 +28,12 @@ async function venteEtLigne(venteId: number, ligne?: number) {
   }
   return { v, l };
 }
+// Déjà rendu sur une vente : remboursements + échanges (bons d'achat). Empêche de rendre plusieurs fois la même chose.
+async function dejaRendu(venteId: number) {
+  const [r] = (await sql`SELECT COALESCE(sum(montant_cents), 0)::int AS n FROM remboursements WHERE vente_id = ${venteId}`) as any[];
+  const [e] = (await sql`SELECT COALESCE(sum(montant_cents), 0)::int AS n FROM sav_dossiers WHERE vente_id = ${venteId} AND type = 'echange' AND statut <> 'annule'`) as any[];
+  return { remb: r.n, ech: e.n, total: r.n + e.n };
+}
 const nomFacture = (v: any) => v.numero_facture ?? `Ticket n° ${v.id}`;
 
 app.post("/api/sav/rembourser", async (c) => {
@@ -38,8 +44,8 @@ app.post("/api/sav/rembourser", async (c) => {
   const moyen = String(b.moyen ?? "");
   if (!["carte", "especes", "virement", "bon"].includes(moyen)) throw new AppError(400, "Choisis comment rembourser.");
   if (montant <= 0) throw new AppError(400, "Indique le montant à rembourser.");
-  const [dj] = (await sql`SELECT COALESCE(sum(montant_cents), 0)::int AS n FROM remboursements WHERE vente_id = ${v.id}`) as any[];
-  if (montant + dj.n > v.total_cents) throw new AppError(400, `Maximum remboursable : ${eur(v.total_cents - dj.n)} (déjà remboursé : ${eur(dj.n)}).`);
+  const dj = await dejaRendu(v.id);
+  if (montant + dj.total > v.total_cents) throw new AppError(400, `Maximum encore remboursable : ${eur(Math.max(0, v.total_cents - dj.total))} (déjà rendu sur cette vente : ${eur(dj.total)}).`);
   if (moyen === "bon" && !v.client_id) throw new AppError(400, "Un bon d'achat demande un client sur la vente.");
   const u = c.get("user") as any;
   const motif = clean(b.motif, 200);
@@ -55,6 +61,10 @@ app.post("/api/sav/echange", async (c) => {
   if (!v.client_id) throw new AppError(400, "Un échange demande un client sur la vente (le bon d'achat est mis sur son compte).");
   const qte = Math.max(1, Math.min(l.quantite, Math.round(Number(b.quantite) || l.quantite)));
   const montant = qte * l.prix_unitaire_cents;
+  const dj = await dejaRendu(v.id);
+  if (montant + dj.total > v.total_cents) throw new AppError(400, `Déjà rendu sur cette vente : ${eur(dj.total)} (sur ${eur(v.total_cents)}). Rien de plus à échanger.`);
+  const [deja] = (await sql`SELECT COALESCE(sum(quantite), 0)::int AS n FROM sav_dossiers WHERE vente_id = ${v.id} AND type = 'echange' AND libelle = ${l.libelle} AND statut <> 'annule'`) as any[];
+  if (deja.n + qte > l.quantite) throw new AppError(400, `Cet article a déjà été échangé (${deja.n} sur ${l.quantite}).`);
   const u = c.get("user") as any;
   await sql`INSERT INTO bons_achat (client_id, montant_cents, motif) VALUES (${v.client_id}, ${montant}, ${`Échange ${l.libelle} (${nomFacture(v)})`})`;
   await sql`INSERT INTO sav_dossiers (vente_id, client_id, magasin, type, libelle, quantite, montant_cents, motif, statut, cree_par, close_le, close_par) VALUES (${v.id}, ${v.client_id}, ${v.magasin ?? null}, 'echange', ${l.libelle}, ${qte}, ${montant}, ${clean(b.motif, 200)}, 'termine', ${u?.prenom ?? ""}, now(), ${u?.prenom ?? ""})`;
@@ -64,6 +74,8 @@ app.post("/api/sav/echange", async (c) => {
 app.post("/api/sav/garantie", async (c) => {
   const b = await c.req.json().catch(() => ({}));
   const { v, l } = await venteEtLigne(Number(b.venteId), Number(b.ligne));
+  const [gd] = (await sql`SELECT count(*)::int AS n FROM sav_dossiers WHERE vente_id = ${v.id} AND type = 'garantie' AND libelle = ${l.libelle} AND statut IN ('a_traiter', 'demande_faite')`) as any[];
+  if (gd.n) throw new AppError(400, "Un dossier garantie est déjà ouvert pour cet article.");
   const u = c.get("user") as any;
   const jours = 3;
   await sql`INSERT INTO sav_dossiers (vente_id, client_id, magasin, type, libelle, quantite, montant_cents, motif, fournisseur, statut, relance_le, cree_par) VALUES (${v.id}, ${v.client_id ?? null}, ${v.magasin ?? null}, 'garantie', ${l.libelle}, 1, ${l.prix_unitaire_cents}, ${clean(b.motif, 300)}, ${clean(b.fournisseur, 80)}, 'a_traiter', ${(await sql`SELECT ((now() AT TIME ZONE 'Europe/Paris')::date + ${jours}::int)::text AS d`)[0].d}, ${u?.prenom ?? ""})`;

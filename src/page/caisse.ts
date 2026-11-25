@@ -76,9 +76,9 @@ var VJ=null,VJOPEN=0,SAVF=null;
 function recuBloc(r){
   var bt="style='margin:0;width:100%;white-space:nowrap'";
   return"<div style='display:flex;gap:16px;justify-content:center;align-items:flex-start;flex-wrap:wrap'>"+recuHtml(r)
-    +"<div style='display:flex;flex-direction:column;gap:8px;min-width:210px'><button class='sec' "+bt+" data-act='cPrint' data-id='"+r.id+"'>Imprimer le reçu</button><button class='sec' "+bt+" data-act='cEmail' data-id='"+r.id+"'>✉ Envoyer par email</button>"
+    +"<div style='display:flex;flex-direction:column;gap:8px;min-width:210px;flex:0 1 380px'><button class='sec' "+bt+" data-act='cPrint' data-id='"+r.id+"'>Imprimer le reçu</button><button class='sec' "+bt+" data-act='cEmail' data-id='"+r.id+"'>✉ Envoyer par email</button>"
     +(estResp()?"<button class='sec' "+bt+" data-act='svOpen' data-m='remb' data-id='"+r.id+"'>↩ Rembourser</button>":"")
-    +"<button class='sec' "+bt+" data-act='svOpen' data-m='ech' data-id='"+r.id+"'>🔁 Échanger / bon d achat</button><button class='sec' "+bt+" data-act='svOpen' data-m='gar' data-id='"+r.id+"'>🛠 Garantie pièce</button></div></div>"+savForm(r)}
+    +"<button class='sec' "+bt+" data-act='svOpen' data-m='ech' data-id='"+r.id+"'>🔁 Échanger / bon d achat</button><button class='sec' "+bt+" data-act='svOpen' data-m='gar' data-id='"+r.id+"'>🛠 Garantie pièce</button>"+savForm(r)+"</div></div>"}
 function savTags(r){
   var a=r.sav||[];if(!a.length)return"";
   var remb=0,ech=0,gar=[];a.forEach(function(d){if(d.type==="remboursement")remb+=d.montantCents;else if(d.type==="echange")ech+=d.montantCents;else gar.push(d)});
