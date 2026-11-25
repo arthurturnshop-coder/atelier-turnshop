@@ -10,6 +10,7 @@ await sql`ALTER TABLE reparations ADD COLUMN IF NOT EXISTS garantie_relance_le D
 await sql`ALTER TABLE reparations ADD COLUMN IF NOT EXISTS garantie_close BOOLEAN NOT NULL DEFAULT false`;
 await sql`CREATE TABLE IF NOT EXISTS reparation_pdfs (
   id SERIAL PRIMARY KEY, reparation_id INT NOT NULL, nom TEXT NOT NULL, taille INT NOT NULL, data BYTEA NOT NULL, par TEXT NOT NULL DEFAULT '', cree_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
+await sql`ALTER TABLE reparation_pdfs ADD COLUMN IF NOT EXISTS type TEXT NOT NULL DEFAULT 'autre'`;
 await sql`CREATE INDEX IF NOT EXISTS reparation_pdfs_rep ON reparation_pdfs (reparation_id)`;
 
 export async function delaiRelance(): Promise<number> {
@@ -39,11 +40,11 @@ app.get("/api/garantie/:id", async (c) => {
   const id = Number(c.req.param("id"));
   const r = await rep(id);
   const [rl] = (await sql`SELECT to_char(garantie_relance_le, 'YYYY-MM-DD') AS d FROM reparations WHERE id = ${id}`) as any[];
-  const pdfs = (await sql`SELECT id, nom, taille, par, cree_le FROM reparation_pdfs WHERE reparation_id = ${id} ORDER BY id`) as any[];
+  const pdfs = (await sql`SELECT id, nom, taille, par, cree_le, type FROM reparation_pdfs WHERE reparation_id = ${id} ORDER BY id`) as any[];
   return c.json({
     rma: r.garantie_rma ?? "", demandeLe: jour(r.garantie_demande_le), close: r.garantie_close === true,
     relanceLe: rl?.d ?? null, delai: await delaiRelance(),
-    pdfs: pdfs.map((p) => ({ id: p.id, nom: p.nom, taille: p.taille, par: p.par, le: p.cree_le })),
+    pdfs: pdfs.map((p) => ({ id: p.id, nom: p.nom, taille: p.taille, par: p.par, le: p.cree_le, type: p.type })),
   });
 });
 
@@ -91,8 +92,10 @@ app.post("/api/garantie/pdf", async (c) => {
   if (n.n >= 10) throw new AppError(400, "10 PDF maximum par prise en charge.");
   const u = c.get("user") as any;
   const nom = clean(String(b.nom ?? "garantie.pdf"), 120) || "garantie.pdf";
-  await sql`INSERT INTO reparation_pdfs (reparation_id, nom, taille, data, par) VALUES (${id}, ${nom}, ${buf.length}, ${buf}, ${u?.prenom ?? ""})`;
-  await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${id}, 'note', ${`PDF ajouté : ${nom}` + signature(c)})`;
+  const type = ["facture_client", "facture_fournisseur"].includes(String(b.type)) ? String(b.type) : "autre";
+  const lib = type === "facture_client" ? "Facture d'achat client" : type === "facture_fournisseur" ? "Facture d'achat fournisseur" : "PDF";
+  await sql`INSERT INTO reparation_pdfs (reparation_id, nom, taille, data, par, type) VALUES (${id}, ${nom}, ${buf.length}, ${buf}, ${u?.prenom ?? ""}, ${type})`;
+  await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${id}, 'note', ${`${lib} ajouté(e) : ${nom}` + signature(c)})`;
   return c.json({ message: "PDF ajouté." });
 });
 
