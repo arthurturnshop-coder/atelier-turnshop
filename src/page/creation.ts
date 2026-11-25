@@ -22,6 +22,7 @@ function vCreer(){
   h+="</div>";
   // 3. Panne
   h+="<div class='cre-sec cre-full'><div class='cre-h'><span class='cre-n'>3</span>"+(m==="devis"?"Objet du devis":"Panne décrite par le client")+"</div>"
+    +(m==="devis"?"":"<div class='cre-chips cre-pn'>"+["Suspicion batterie","Pneu crevé","Ne freine pas","Bruit du contrôleur","Accident","Ne s allume pas","Perte de puissance","Écran / afficheur HS"].map(function(t){return"<button type='button' class='cre-pb' data-act='crePanne' data-t='"+t+"'>+ "+t+"</button>"}).join("")+"</div>")
     +"<textarea id='cr-p' rows='3' placeholder='"+(m==="devis"?"Ex : devis changement de batterie":"Panne décrite par le client")+"'></textarea>"
     +"<div class='cre-2'><input id='cr-e' placeholder='État à l arrivée'><textarea id='cr-r' rows='1' placeholder='Remarques' style='min-height:46px'></textarea></div></div>";
   // 4. Rangement et affaires
@@ -36,6 +37,7 @@ function vCreer(){
   h+="<div class='cre-bar'><button data-act='creOk'"+(CRE.busy?" disabled":"")+" style='min-width:260px'>"+(m==="devis"?"Créer le devis":(m==="rdv"?"Créer le rendez-vous":"Créer la prise en charge"))+"</button><button class='sec' data-act='creAnnule'>Annuler</button></div>";
   app.innerHTML=h}
 ACTS.creer=function(b){CRE={mode:b.dataset.k,q:"",res:null,cli:null,msg:"",busy:false};FICHE=null;TAB="enc";ATSUB="creer";render();setTimeout(function(){var e=document.getElementById("cre-q");if(e)e.focus()},50)};
+ACTS.crePanne=function(b){var e=document.getElementById("cr-p");if(!e)return;var t=b.dataset.t,x=e.value.trim();if((", "+x+", ").toLowerCase().indexOf(", "+t.toLowerCase()+", ")>=0||x.toLowerCase()===t.toLowerCase())return;e.value=x?x+", "+t:t;e.focus()};
 ACTS.creAnnule=function(){ATSUB="liste";render()};
 ACTS.creAutreCli=function(){CRE.cli=null;CRE.res=null;render()};
 ACTS.creChercher=function(){CRE.q=v("cre-q");if(!CRE.q)return;api("/search?q="+encodeURIComponent(CRE.q)).then(function(r){CRE.res=r;render()}).catch(function(e){CRE.msg=e.message;render()})};
