@@ -143,12 +143,12 @@ function caisseHtml(){
   if(!CLO.d&&!CLOBUSY){CLOBUSY=true;api("/caisse/session").then(function(d){CLO.d=d;CLOBUSY=false;render()}).catch(function(){CLOBUSY=false})}
   if(!CLO.d)return"<div class='caisse'><h3>Caisse</h3><div class='muted'>Chargement...</div></div>";
   if(caisseBloquee()){
-    var hb="<div class='caisse'><h3>Caisse"+(CPOP?"":" <button class='sec' data-act='cVjOuvre' style='float:right'>📋 Ventes du jour</button>")+"</h3>";
+    var hb="<div class='caisse'><h3>Caisse"+(CPOP?"":" <button class='sec' data-act='cVjOuvre' style='float:right'>📋 Ventes du jour</button>"+((PAN.length||CCLI||CREP)?" <button class='sec' data-act='cNouv' style='float:right;margin-right:8px'>🔄 Nouvelle vente</button>":""))+"</h3>";
     if(CREC)hb+="<div class='card'><b>Vente enregistrée</b>"+recuHtml(CREC)+"<div class='actions'><button data-act='cPrint' data-id='"+CREC.id+"'>Imprimer le reçu</button><button class='sec' data-act='cFermeRecu'>Fermer</button></div></div>";
     hb+="<div class='card' style='text-align:center'><div style='font-size:28px;font-weight:700;color:#b00'>🔒 CAISSE FERMÉE</div><div class='muted'>"+(CLO.d.ouverte?"Ferme la caisse de la veille pour continuer.":"Ouvre la caisse pour accéder aux ventes.")+"</div></div>";
     return hb+(CPOP?"":histoHtml()+cloHtml())+"</div>"}
   var brut=panierTotal(),av=avRemTotal(brut),rem=remiseCents(),aco=acoDeduit(brut-av-rem),net=brut-av-rem-aco;
-  var h="<div class='caisse'><h3>Caisse"+(CPOP?"":" <button class='sec' data-act='cVjOuvre' style='float:right'>📋 Ventes du jour</button>")+"</h3>";
+  var h="<div class='caisse'><h3>Caisse"+(CPOP?"":" <button class='sec' data-act='cVjOuvre' style='float:right'>📋 Ventes du jour</button>"+((PAN.length||CCLI||CREP)?" <button class='sec' data-act='cNouv' style='float:right;margin-right:8px'>🔄 Nouvelle vente</button>":""))+"</h3>";
   if(CREC)h+="<div class='card'><b>Vente enregistrée</b>"+affBanner(CRAFF)+recuHtml(CREC)+shopHtml(CREC)+avisBtns(CREC)+"<div class='actions'><button data-act='cPrint' data-id='"+CREC.id+"'>Imprimer le reçu</button><button class='sec' data-act='cEmail' data-id='"+CREC.id+"'>✉ Envoyer par email</button><button class='sec' data-act='cFermeRecu'>Fermer</button></div></div>";
   if(CREP)h+=affBanner(CAFF)+"<div class='card avbox'><b>Facturation de la réparation n°"+CREP+"</b><div class='muted'>Les lignes du devis sont dans le panier. À l'encaissement, la commande est créée dans Shopify.</div><button class='link' data-act='cpFerme'>↩ Retour à la prise en charge</button></div>";
   h+="<div class='card'><div class='step'>Client (scan carte, email ou téléphone)</div><div class='search'><input id='cq' placeholder='Scan carte, email ou téléphone'><button data-act='cScan'>Chercher</button></div>";

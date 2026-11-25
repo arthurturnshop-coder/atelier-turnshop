@@ -70,6 +70,7 @@ var ACTS={
   pcrCase:async function(b){try{await api("/pieces/boite",{id:+b.dataset.id,boite:b.dataset.b});PCR=null;PCRO=null;render()}catch(e){alert(e.message)}},
   pcrRatt:async function(b){if(!confirm("Rattacher cette pièce à "+b.textContent.split(" ")[0]+" ? Elle passera dans son devis."))return;try{var d=await api("/pieces/rattacher",{id:+b.dataset.id,repairId:+b.dataset.r});PCR=null;PCRO=null;alert(d.message);render()}catch(e){alert(e.message)}},
   pcrRemis:async function(b){var p=(PCR?PCR.pieces:[]).filter(function(x){return x.id===+b.dataset.id})[0];if(p&&!p.facture&&p.totalCents-p.versetCents>0&&!confirm("Il reste "+eur(p.totalCents-p.versetCents)+" à payer sur "+p.numero+". Remettre quand même la pièce ?"))return;try{await api("/pieces/remettre",{id:+b.dataset.id});PCR=null;PCRO=null;render()}catch(e){alert(e.message)}},
+  cNouv:function(){cReset();CHIST=null;CHOPEN=0;CVEH=false;lirePay();render()},
   cMode:function(b){CMODE=b.dataset.m;render()},
   acMoy:function(b){ACM=b.dataset.m;render()},
   acSolde:function(b){ACV=b.dataset.v;render()},
