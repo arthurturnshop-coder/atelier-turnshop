@@ -10,7 +10,11 @@ function repHtml(r){
   var abs=r.en_magasin===false;
   return"<div class='rep'><div class='st'><b>"+esc(day(r.date_depot))+"</b><span class='tag'>"+esc(r.statut)+"</span>"+(abs?"<span class='tag warn'>Trottinette pas en magasin</span>":"")+(r.sous_garantie?"<span class='tag ok'>Sous garantie</span>":"")+"</div><div>"+esc(r.panne)+"</div>"+hist
     +(abs?"<button data-act='arrivee' data-id='"+r.id+"'>Trottinette arrivée</button>":"")
-    +"<button class='sec' data-act='ouvrirFiche' data-id='"+r.id+"'>Ouvrir la fiche</button>"+blocAvisRep(r)+"</div>"}
+    +"<button class='sec' data-act='ouvrirFiche' data-id='"+r.id+"'>Ouvrir la fiche</button>"+factRep(r)+blocAvisRep(r)+"</div>"}
+function factRep(r){
+  if(!PACH||!CUR||PACH.id!==CUR.id)return"";
+  var f=PACH.list.filter(function(x){return x.reparationId===r.id});
+  return f.map(function(x){return"<button class='sec' data-act='pFact' data-id='"+x.id+"'>🧾 Facture "+esc(x.numero||"n° "+x.id)+" · "+eur(x.totalCents)+"</button>"}).join("")}
 function recepForm(t){
   return"<div class='rep'><div class='step'>Nouvelle prise en charge pour "+esc(t.marque+" "+t.modele)+"</div>"
     +"<textarea id='p' rows='3' placeholder='Panne décrite par le client'></textarea><input id='e' placeholder='État à l arrivée'><textarea id='r' rows='2' placeholder='Remarques'></textarea>"+boiteSelect("b")+affairesBox("a")+"<input id='k' placeholder='🔑 Code / mot de passe de la trottinette (facultatif)'><input id='d' type='date' value='"+today()+"'>"

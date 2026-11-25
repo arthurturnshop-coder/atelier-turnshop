@@ -103,6 +103,7 @@ export const ACTIONS = `var ACTS={
     if(q[a]&&!confirm(q[a]))return;try{await api("/sav/maj",{id:+b.dataset.id,action:a});await savReload()}catch(e){toastKo(e.message)}},
   cVjFerme:function(){VJ=null;VJOPEN=0;vjSync()},
   cVjRecu:function(b){var id=+b.dataset.id;VJOPEN=VJOPEN===id?0:id;vjSync()},
+  pFact:function(b){PTAB="ach";PACHOPEN=+b.dataset.id;render()},
   pTab:function(b){PTAB=b.dataset.t;render()},
   pAchOpen:function(b){var id=+b.dataset.id;PACHOPEN=PACHOPEN===id?0:id;render()},
   cRecu:function(b){var id=+b.dataset.id;CHOPEN=CHOPEN===id?0:id;lirePay();render()},
