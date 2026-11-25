@@ -137,7 +137,8 @@ ACTS.cmdCopy=function(b){var f=trouveF(+b.dataset.id);if(!f)return;var t=texteCo
 
 function EWB(){
   var run=function(txt){
-    if(!txt){return}
+    if(!txt||!txt.trim()){alert("FS : aucune commande reçue. Retourne dans FS, clique sur Copier pour le panier fournisseur, puis re-clique sur ce favori.");return}
+    alert("FS : "+txt.trim().split("\\n").length+" ligne(s) lues, ajout au panier en cours... (clique OK et patiente)");
     var L=txt.split("\\n"),ok=[],ko=[],i=0;
     var next=function(){
       if(i>=L.length){alert("Panier rempli : "+ok.length+" ligne(s) ajoutée(s)."+(ko.length?"\\nNON ajoutées (à faire à la main) :\\n"+ko.join("\\n"):"")+"\\nVérifie le panier puis valide toi-même.");location.href="/cart";return}
