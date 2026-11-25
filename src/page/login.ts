@@ -38,14 +38,14 @@ async function connect(){
     var r=await fetch("/auth/connexion",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prenom:l.prenom,magasin:l.magasin,motdepasse:pw})});
     var d=await r.json().catch(function(){return{}});
     if(!r.ok)throw new Error(d.error||"Connexion impossible.");
-    TOK=d.token;PRENOM=d.prenom;ROLE=d.role;MAG=d.magasin;PW="";LG={step:"mag"};saveSession();render()
+    TOK=d.token;PRENOM=d.prenom;ROLE=d.role;MAG=d.magasin;PW="";LG={step:"mag"};saveSession();setActeur({code:"",prenom:d.prenom,role:d.role});render()
   }catch(e){MSG=e.message;render()}}
 async function secoursConnect(){
   var p=document.getElementById("ps").value;MSG="";
   try{
     var r=await fetch("/api/consignes",{headers:{"x-atelier-password":p}});
     if(!r.ok)throw new Error(r.status===401?"Mot de passe incorrect.":"Erreur, réessayer.");
-    TOK="";PW=p;PRENOM="Secours";ROLE="admin";MAG="";LG={step:"mag"};saveSession();render()
+    TOK="";PW=p;PRENOM="Secours";ROLE="admin";MAG="";LG={step:"mag"};saveSession();setActeur({code:"",prenom:"Secours",role:"admin"});render()
   }catch(e){MSG=e.message;render()}}
 async function logout(){
   if(TOK){try{await fetch("/auth/deconnexion",{method:"POST",headers:{"x-atelier-token":TOK}})}catch(e){}}
