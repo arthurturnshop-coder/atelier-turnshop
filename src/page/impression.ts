@@ -337,7 +337,7 @@ function etqEmpl(){
 function vEtq(){etqEmpl();
   var F=ETQFORMATS[etqFormat()],nb=etqToutes().length;
   if(ETQTAB==="empl")return vEmpl();
-  var h=subHtml()+etqTabs()+"<div class='card'><div class='step'>Étiquettes produits</div><div class='muted'>Cherche un produit, ajoute-le, choisis le nombre d'étiquettes puis imprime. Chaque étiquette : nom, prix et code-barres.</div>"+prodBox("etq")+"</div>";
+  var h=etqTabs()+"<div class='card'><div class='step'>Étiquettes produits</div><div class='muted'>Cherche un produit, ajoute-le, choisis le nombre d'étiquettes puis imprime. Chaque étiquette : nom, prix et code-barres.</div>"+prodBox("etq")+"</div>";
   h+="<div class='card'><div class='step'>Imprimer sur</div><div class='actions'><button class='"+(F.page?"":"sec")+"' data-act='etqMode' data-f='a4'>🖨 Imprimante A4 (feuille à découper)</button><button class='"+(F.page?"sec":"")+"' data-act='etqMode' data-f='62x29'>🏷 Brother (rouleau)</button></div><div class='muted' style='margin-top:6px'>Autres formats :</div><select id='etqf' data-act='etqFormat'>"+Object.keys(ETQFORMATS).map(function(k){return"<option value='"+k+"'"+(k===etqFormat()?" selected":"")+">"+esc(ETQFORMATS[k].l)+"</option>"}).join("")+"</select>"
     +(F.page?"<div class='muted' style='margin-top:6px'>Étiquettes déjà utilisées sur la planche (à sauter)</div><input id='etqskip' type='number' min='0' max='"+(F.cols*F.rows-1)+"' value='"+ETQSKIP+"' data-act='etqSkip'>":"")
     +"<div class='muted' style='margin-top:6px'>Dans la fenêtre d'impression : choisis ton imprimante d'étiquettes, mets les marges sur « Aucune » et l'échelle à 100 %.</div></div>";
@@ -354,7 +354,7 @@ function etqTabs(){return"<div class='seg' style='margin-bottom:10px'><button cl
 ACTS.etqTab=function(b){ETQTAB=b.dataset.t;render()};
 function vEmpl(){
   var nb=0;EMP.forEach(function(x){nb+=x.qte});
-  var h=subHtml()+etqTabs()+"<div class='card'><div class='step'>Emplacements et casiers</div><div class='muted'>Génère une série (ex. A1 à A12, C1 à C20) ou une liste, puis choisis où imprimer.</div>"
+  var h=etqTabs()+"<div class='card'><div class='step'>Emplacements et casiers</div><div class='muted'>Génère une série (ex. A1 à A12, C1 à C20) ou une liste, puis choisis où imprimer.</div>"
     +"<div class='dl' style='flex-wrap:wrap'><input id='eg-p' placeholder='Lettre (A)' maxlength='6' style='max-width:110px'><input id='eg-a' type='number' min='0' placeholder='De' style='max-width:90px'><input id='eg-b' type='number' min='0' placeholder='À' style='max-width:90px'><input id='eg-q' type='number' min='1' max='20' value='1' title='Exemplaires' style='max-width:90px'><button data-act='etqGen'>Ajouter la série</button></div>"
     +"<div class='dl' style='flex-wrap:wrap;margin-top:6px'><input id='eg-l' placeholder='Ou une liste : A1, A2, B7, C3' style='flex:1;min-width:200px'><button class='sec' data-act='etqGenListe'>Ajouter</button></div></div>";
   h+="<div class='card'><div class='step'>Imprimer sur</div><div class='seg'><button class='"+(EMPOUT==="a4"?"on":"")+"' data-act='empOut' data-o='a4'>📄 Papier A4 : design vert, 8 par feuille</button><button class='"+(EMPOUT==="brother"?"on":"")+"' data-act='empOut' data-o='brother'>🏷 Brother : étiquette simple (rouleau)</button></div></div>";
