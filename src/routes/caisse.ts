@@ -317,6 +317,14 @@ app.post("/api/caisse/encaisser", async (c) => {
     cents: Math.max(0, Math.round((Number(String(p.montant ?? "0").replace(",", ".")) || 0) * 100)),
   })).filter((p: any) => p.cents > 0);
   if (paiements.some((p: any) => !["carte", "especes", "virement", "bon_achat"].includes(p.moyen))) throw new AppError(400, "Moyen de paiement inconnu.");
+  let renduCents = 0;
+  {
+    const brutPaye = paiements.reduce((s: number, p: any) => s + p.cents, 0);
+    const esp = paiements.find((p: any) => p.moyen === "especes");
+    if (brutPaye > totalCents && esp && esp.cents >= brutPaye - totalCents) { renduCents = brutPaye - totalCents; esp.cents -= renduCents; }
+  }
+  const paiementsOk = paiements.filter((p: any) => p.cents > 0);
+  paiements.length = 0; paiements.push(...paiementsOk);
   const payeTotal = paiements.reduce((s: number, p: any) => s + p.cents, 0);
   if (payeTotal !== totalCents) throw new AppError(400, `Les paiements (${(payeTotal / 100).toFixed(2)} €) ne correspondent pas au total (${(totalCents / 100).toFixed(2)} €).`);
 
@@ -349,7 +357,7 @@ app.post("/api/caisse/encaisser", async (c) => {
   if (await commandesActives()) await creerCommandeShopify(v.id);
   if (clientId) void envoyerAvis(v.id);
   const [vv] = (await sql`SELECT v.*, trim(cl.prenom || ' ' || cl.nom) AS client_nom FROM ventes v LEFT JOIN clients cl ON cl.id = v.client_id WHERE v.id = ${v.id}`) as any[];
-  return c.json({ id: v.id, message: "Vente enregistrée.", totalCents, remiseCents, vente: await detailVente(vv) });
+  return c.json({ id: v.id, message: "Vente enregistrée." + (renduCents ? " Monnaie à rendre au client : " + (renduCents / 100).toFixed(2).replace(".", ",") + " €." : ""), renduCents, totalCents, remiseCents, vente: await detailVente(vv) });
 });
 
 // Envoi du reçu / de la facture par email (texte du ticket fourni par l'écran, adresse = client de la vente ou saisie).

@@ -31,6 +31,9 @@ function avCondition(a){
   if(a.declencheur==="achat")return"dès "+(a.seuilCents/100)+" € d'achat";
   return"du "+day(a.dateDebut)+" au "+day(a.dateFin)+(a.seuilCents>0?" dès "+(a.seuilCents/100)+" € d'achat":"")}
 function remiseCents(){var brut=panierTotal();return CUSE&&CFID?Math.min(Math.round(CFID.disponibleEuros*100),brut-avRemTotal(brut)):0}
+var CNET=0;
+function renduTxt(){var t=0;["pc","pe","pv","pb"].forEach(function(i){var e=document.getElementById(i);t+=pxCents(e?e.value:"")||0});var x=t-CNET;return x>0&&CPAY&&(document.getElementById("pe")?pxCents(document.getElementById("pe").value)>=x:true)?"💶 À rendre au client : "+eur(x):""}
+document.addEventListener("input",function(e){if(e.target&&/^p[cevb]$/.test(e.target.id)){var r=document.getElementById("pay-rendu");if(r)r.textContent=renduTxt()}});
 function lirePay(){CPAY={carte:v("pc"),especes:v("pe"),virement:v("pv"),bon_achat:v("pb")}}
 function dateLongue(d){try{return new Date(d).toLocaleString("fr-FR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit",timeZone:"Europe/Paris"})}catch(e){return d||""}}
 function serieHtml(l,i){
@@ -177,7 +180,7 @@ function caisseHtml(){
   if(multiRem(brut))h+="<div>Remise plusieurs prestations : -"+eur(multiRem(brut))+"</div>";
   if(rem)h+="<div>Remise fidélité : -"+eur(rem)+"</div>";
   if(aco)h+="<div>Acompte déjà versé : -"+eur(aco)+"</div>";
-  h+="<div class='big'>À payer : "+eur(net)+"</div>"
+  CNET=net;h+="<div class='big'>À payer : "+eur(net)+"</div><div id='pay-rendu' class='big' style='color:#b00'>"+renduTxt()+"</div>"
     +"<div class='pay'><span>Carte</span><input id='pc' placeholder='0,00' value='"+esc(CPAY.carte)+"'></div><div class='pay'><span>Espèces</span><input id='pe' placeholder='0,00' value='"+esc(CPAY.especes)+"'></div><div class='pay'><span>Virement</span><input id='pv' placeholder='0,00' value='"+esc(CPAY.virement)+"'></div>"+((CCLI&&CFID&&CFID.disponibleEuros>0)?"<div class='pay'><span>Cagnotte</span><button class='"+(CUSE?"":"sec")+"' data-act='cUse' data-v='"+(CUSE?0:1)+"'>"+(CUSE?"✓ "+eur(remiseCents())+" utilisés (annuler)":"Utiliser les "+CFID.disponibleEuros.toFixed(2).replace(".",",")+" € de la cagnotte")+"</button></div>":"")
     +"<div class='actions'><button class='sec' data-act='cTout' data-m='carte'>Tout en carte</button><button class='sec' data-act='cTout' data-m='especes'>Tout en espèces</button><button class='sec' data-act='cTout' data-m='virement'>Tout en virement</button></div>"
     +"<button data-act='cEncaisser' style='width:100%;margin-top:6px;padding:14px;font-size:17px'>Encaisser</button><div class='muted'>"+esc(CMSG)+"</div>"

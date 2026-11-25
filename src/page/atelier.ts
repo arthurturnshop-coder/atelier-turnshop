@@ -74,6 +74,7 @@ function prFam(n){n=(n||"").toLowerCase();var i=4;
   else if(/batterie|data|moteur|contr|gâchette|gachette|éclairage|eclairage|led/.test(n))i=2;
   else if(/colonne|garde-boue|boue/.test(n))i=3;
   return i}
+document.addEventListener('input',function(e){if(e.target&&(e.target.id==='ac-r'||e.target.id==='ac-m')){var m=pxCents(v('ac-m')),r=pxCents(v('ac-r')),o=document.getElementById('ac-rendu');if(o)o.textContent=r>m&&m>0?'💶 À rendre au client : '+eur(r-m):''}});
 var PRPOP=null;
 document.addEventListener('input',function(e){if(e.target&&e.target.id==='pr-q')prFiltre(e.target.value)});
 function prPopHtml(l){
@@ -162,7 +163,7 @@ function acompteHtml(f){
   var h="<div class='card'><div class='step'>Acompte / paiement d'avance</div>";
   if(a.verseCents>0)h+="<div>Versé : <b>"+eur(a.verseCents)+"</b> · À déduire de la facture : <b>"+eur(a.resteCents)+"</b></div>";
   else h+="<div class='muted'>Aucun acompte versé.</div>";
-  h+="<div class='dl'><input id='ac-m' class='p' placeholder='Montant €'><select id='ac-t' class='t'><option value='carte'>Carte</option><option value='especes'>Espèces</option><option value='virement'>Virement</option></select><button data-act='acompte' data-id='"+f.id+"'>Encaisser l'acompte</button></div>";
+  h+="<div class='dl'><input id='ac-m' class='p' placeholder='Montant €'><select id='ac-t' class='t'><option value='carte'>Carte</option><option value='especes'>Espèces</option><option value='virement'>Virement</option></select><button data-act='acompte' data-id='"+f.id+"'>Encaisser l'acompte</button></div><div class='dl'><input id='ac-r' class='p' placeholder='Donné par le client €'><div id='ac-rendu' class='big' style='color:#b00;margin:0'></div></div>";
   if(a.resteCents>0&&estResp())h+="<div class='step' style='margin-top:10px'>Rembourser l'acompte ("+eur(a.resteCents)+")</div><div class='dl'><select id='rb-t' class='t'><option value=''>Comment ?</option><option value='carte'>Par carte</option><option value='especes'>En espèces</option><option value='virement'>Par virement</option><option value='carte_cadeau'>Carte cadeau Shopify (bon d'achat, en ligne + boutique)</option><option value='bon'>Bon d'achat atelier (caisse du logiciel)</option></select><button class='danger' data-act='rembourse' data-id='"+f.id+"' data-c='"+a.resteCents+"'>Rembourser</button></div>";
   return h+"</div>"}
 async function recharger(id){try{FICHE=await api("/reparation?id="+id);render()}catch(e){FICHE=null;render()}}
