@@ -51,9 +51,7 @@ function pPopRender(){
   o.innerHTML="<div class='cpbox'><button class='cpx' data-act='pcrFerme' title='Fermer'>✕</button>"+pcrListe()+"</div>";
   if(st&&o.firstChild)o.firstChild.scrollTop=st}
 function pcrLoad(){if(PCR===null&&!PCRB){PCRB=true;api("/pieces-a-remettre").then(function(d){PCR=d;PCRB=false;render()}).catch(function(){PCR={pieces:[],cases:[]};PCRB=false})}}
-function blocPieces(){
-  pcrLoad();var n=PCR?PCR.pieces.length:0;
-  return"<button class='"+(n?"":"sec")+"' data-act='pcrPop' style='width:100%;min-height:52px;margin:6px 0'>📦 Pièces à remettre aux clients"+(PCR?" ("+n+")":"")+"</button>"}
+function blocPieces(){pcrLoad();return""}
 function pcrListe(){
   if(!PCR)return"<div class='card'><b>📦 Pièces à remettre aux clients</b><div class='muted'>Chargement…</div></div>";
   if(!PCR.pieces.length)return"<div class='card'><b>📦 Pièces à remettre aux clients</b><div class='muted'>Aucune pièce en attente.</div></div>";
