@@ -4,6 +4,7 @@ import { verifierPaiementsWeb } from "./routes/pub";
 import { lireAuto, notifier } from "./brevo";
 import { relancesDevis } from "./routes/devisenvoi";
 import { infosTicket } from "./routes/ticket";
+import { ANNIV_PRIX_CENTS } from "./config";
 
 // Textes des messages envoyés aux clients.
 const prenomDe = (p: string) => (p && p.trim() ? ` ${p.trim()}` : "");
@@ -76,6 +77,14 @@ async function cycle() {
           await notifier("garde4", { clientId: r.client_id, reparationId: r.id, sujet: "Dernier jour pour récupérer votre trottinette - TURN Shop", texte: `Bonjour${prenomDe(r.prenom)}, votre ${trott} est prête depuis ${g.jours} jours. Il vous reste 1 jour pour venir la récupérer : ensuite, des frais de gardiennage de ${(GARDE.prixCents / 100).toFixed(0)} € par jour s'appliqueront. L'équipe TURN Shop` });
         }
       }
+    }
+    // Anniversaire du compte : email avec l'offre révision, le jour J (une fois par an et par client).
+    if (auto.anniv !== "off" && h.h >= 9 && h.h < 19) {
+      const prix = (ANNIV_PRIX_CENTS / 100).toFixed(2).replace(".", ",");
+      const rows = (await sql`SELECT id, prenom FROM clients WHERE email <> '' AND cree_le <= now() - interval '360 days'
+        AND to_char(cree_le AT TIME ZONE 'Europe/Paris', 'MM-DD') = to_char(now() AT TIME ZONE 'Europe/Paris', 'MM-DD')
+        AND NOT EXISTS (SELECT 1 FROM messages_envoyes m WHERE m.type = 'anniv' AND m.client_id = clients.id AND m.cree_le > now() - interval '300 days') LIMIT 40`) as any[];
+      for (const r of rows) await notifier("anniv", { clientId: r.id, sujet: "C'est l'anniversaire de votre carte TURN Shop : une offre pour vous", texte: `Bonjour${prenomDe(r.prenom)}, cela fait un an que vous êtes client TURN Shop, merci pour votre confiance ! Pour fêter ça, nous vous offrons la révision de votre trottinette à ${prix} € (au lieu du tarif habituel).\n\nPrésentez-vous en boutique ou prenez rendez-vous, et dites simplement que c'est l'anniversaire de votre carte. L'équipe TURN Shop` });
     }
     if (auto.avis !== "off") {
       const rows = (await sql`SELECT r.id, r.client_id, r.magasin, c.prenom FROM reparations r JOIN clients c ON c.id = r.client_id WHERE r.avis_statut = 'programme' AND r.avis_envoi_le <= now() AND r.supprime_le IS NULL LIMIT 20`) as any[];

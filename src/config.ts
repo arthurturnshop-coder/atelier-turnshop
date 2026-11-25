@@ -6,3 +6,6 @@ export const ESSAIS_MAX = 5;
 export const BLOCAGE_MS = 5 * 60_000;
 export const CONSIGNES = ["upsell", "offre", "fidelite", "autre"];
 export const AVIS_DELAI_HEURES = 24;
+
+// Offre anniversaire du compte (révision) : prix en centimes.
+export const ANNIV_PRIX_CENTS = 3990;

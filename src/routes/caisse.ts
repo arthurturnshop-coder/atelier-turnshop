@@ -1,3 +1,4 @@
+import { ANNIV_PRIX_CENTS } from "../config";
 import { app } from "../app";
 import { sql } from "../db";
 import { lireParametres } from "./parametres";
@@ -30,10 +31,10 @@ export async function soldeFidelite(clientId: number) {
 app.get("/api/caisse/client", async (c) => {
   const id = Number(c.req.query("id"));
   if (!(id > 0)) throw new AppError(404, "Client introuvable.");
-  const [cl] = (await sql`SELECT id, prenom, nom, telephone, email FROM clients WHERE id = ${id}`) as any[];
+  const [cl] = (await sql`SELECT id, prenom, nom, telephone, email, cree_le, (to_char(cree_le AT TIME ZONE 'Europe/Paris', 'MM-DD') = to_char(now() AT TIME ZONE 'Europe/Paris', 'MM-DD')) AS meme_jour, (extract(year FROM now() AT TIME ZONE 'Europe/Paris') - extract(year FROM cree_le AT TIME ZONE 'Europe/Paris'))::int AS annees FROM clients WHERE id = ${id}`) as any[];
   if (!cl) throw new AppError(404, "Client introuvable.");
   const ctx = await contexteClient(id);
-  return c.json({ client: { id: cl.id, name: `${cl.prenom} ${cl.nom}`.trim(), phone: cl.telephone, email: cl.email }, fidelite: { ...(await soldeFidelite(id)), depenseCents: ctx.depenseCents, recus: ctx.recus } });
+  return c.json({ client: { id: cl.id, name: `${cl.prenom} ${cl.nom}`.trim(), phone: cl.telephone, email: cl.email, anniversaire: cl.meme_jour && cl.annees >= 1 ? { annees: cl.annees, prixCents: ANNIV_PRIX_CENTS } : null }, fidelite: { ...(await soldeFidelite(id)), depenseCents: ctx.depenseCents, recus: ctx.recus } });
 });
 
 // Trouver un client à partir d'un scan (douchette = clavier) : email, téléphone, numéro de client,

@@ -64,7 +64,7 @@ function vParam(){
   h+=avForm()+"</div>";
   S.fid=h;h="";
   if(BRV===null&&!BRVBUSY){BRVBUSY=true;api("/brevo").then(function(d){BRV=d;BRVBUSY=false;render()}).catch(function(){BRV={configure:false,auto:{},messages:[]};BRVBUSY=false;render()})}
-  if(BRV){var BL=[["avis","Demande d'avis après encaissement"],["rdv","Rappel de rendez-vous (la veille, entre 9 h et 19 h)"],["piece","Pièce arrivée (réparation reprend)"],["pret","Trottinette prête à récupérer"],["garde","Gardiennage : dernier jour (J4), rappel chaque semaine, abandon à 30 jours"]],BO=[["off","Désactivé"],["email","Activé (email)"]];
+  if(BRV){var BL=[["avis","Demande d'avis après encaissement"],["rdv","Rappel de rendez-vous (la veille, entre 9 h et 19 h)"],["piece","Pièce arrivée (réparation reprend)"],["pret","Trottinette prête à récupérer"],["garde","Gardiennage : dernier jour (J4), rappel chaque semaine, abandon à 30 jours"],["anniv","Anniversaire du compte (1 an) : email avec offre révision à 39,90 €"]],BO=[["off","Désactivé"],["email","Activé (email)"]];
     h+="<div class='card'><div class='step'>Envois automatiques aux clients (Brevo)</div>"
       +(BRV.configure?"<div class='muted'>Brevo est connecté."+(BRV.expediteurEmail?"":" Il manque BREVO_EMAIL_EXPEDITEUR dans Railway pour les emails.")+"</div>":"<div class='muted'><b>Brevo n'est pas connecté.</b> Dans Railway, ajoute les variables BREVO_API_KEY (clé API Brevo) et BREVO_EMAIL_EXPEDITEUR (adresse d'envoi validée dans Brevo).</div>");
     BL.forEach(function(x){h+="<label class='muted'>"+esc(x[1])+"</label><select id='bv-"+x[0]+"'>"+BO.map(function(o){return"<option value='"+o[0]+"'"+((BRV.auto[x[0]]||"off")===o[0]?" selected":"")+">"+o[1]+"</option>"}).join("")+"</select>"});

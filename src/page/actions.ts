@@ -71,6 +71,8 @@ export const ACTIONS = `var ACTS={
   raccFin:function(){RACC="";render()},
   racc:function(b){RACC=b.dataset.k;CUR=null;RES=[];SEARCHED=false;NEWCLI=false;FICHE=null;TAB="accueil";render()},
   cScan:function(){return scanCode(v("cq"),"caisse")},
+  cProfil:function(){if(!CCLI)return;api("/customer?id="+CCLI.id).then(function(c){CUR=c;TAB="accueil";FICHE=null;ADDT=false;RECEP=null;EDITCLI=false;FID=null;render()}).catch(function(e){alert(e.message)})},
+  cProfilMod:function(){if(!CCLI)return;api("/customer?id="+CCLI.id).then(function(c){CUR=c;TAB="accueil";FICHE=null;ADDT=false;RECEP=null;EDITCLI=true;FID=null;render()}).catch(function(e){alert(e.message)})},
   cClient0:function(){CREP=null;CACO=0;CCLI=null;CFID=null;CUSE=false;CHIST=null;CHOPEN=0;CAVOFF=[];lirePay();render()},
   cUse:function(b){CUSE=b.dataset.v==="1";lirePay();var sy=window.scrollY;render();window.scrollTo(0,sy)},
   cAdd:function(){var l=v("cl");if(!l){alert("Donne un libellé.");return}PAN.push({libelle:l,quantite:Math.max(1,Number(v("cq2"))||1),prix:v("cp")||"0"});lirePay();render()},

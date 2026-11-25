@@ -7,8 +7,8 @@ export const brevoConfigure = () => !!Bun.env.BREVO_API_KEY;
 
 await sql`CREATE TABLE IF NOT EXISTS messages_envoyes (id SERIAL PRIMARY KEY, type TEXT NOT NULL, canal TEXT NOT NULL, client_id INT, reparation_id INT, vente_id INT, destinataire TEXT NOT NULL DEFAULT '', statut TEXT NOT NULL, erreur TEXT, cree_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
 
-export type Quand = "avis" | "rdv" | "piece" | "pret" | "garde";
-export const QUAND: Quand[] = ["avis", "rdv", "piece", "pret", "garde"];
+export type Quand = "avis" | "rdv" | "piece" | "pret" | "garde" | "anniv";
+export const QUAND: Quand[] = ["avis", "rdv", "piece", "pret", "garde", "anniv"];
 // Types de messages : les trois emails de gardiennage dépendent du même réglage « garde ».
 export type MsgType = Quand | "garde4" | "garde_hebdo" | "abandon";
 const REGLAGE = (t: MsgType): Quand => (t === "garde4" || t === "garde_hebdo" || t === "abandon" ? "garde" : t);
@@ -87,6 +87,9 @@ export async function notifier(quand: MsgType, c: Ctx): Promise<string> {
     // Jamais deux fois le même message pour la même réparation ou vente (et un avis par client au maximum tous les 30 jours).
     if (quand === "avis") {
       const [d] = (await sql`SELECT id FROM messages_envoyes WHERE type = 'avis' AND client_id = ${c.clientId} AND statut = 'envoye' AND cree_le > now() - interval '30 days' LIMIT 1`) as any[];
+      if (d) return "";
+    } else if (quand === "anniv") {
+      const [d] = (await sql`SELECT id FROM messages_envoyes WHERE type = 'anniv' AND client_id = ${c.clientId} AND statut = 'envoye' AND cree_le > now() - interval '300 days' LIMIT 1`) as any[];
       if (d) return "";
     } else if (quand === "garde_hebdo" && c.reparationId) {
       const [d] = (await sql`SELECT id FROM messages_envoyes WHERE type = 'garde_hebdo' AND reparation_id = ${c.reparationId} AND statut = 'envoye' AND cree_le > now() - interval '6 days' LIMIT 1`) as any[];
