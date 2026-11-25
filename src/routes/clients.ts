@@ -69,7 +69,16 @@ app.get("/api/recherche", async (c) => {
   const mailCarte = q.match(/[^\s:<>"'?&=\/]+@[^\s<>"'?&]+\.[a-z]{2,}/i);
   const likeMail = mailCarte ? mailCarte[0] : "@@aucun@@";
   const rows = await sql`SELECT id, prenom, nom, email, telephone FROM clients WHERE prenom ILIKE ${like} OR nom ILIKE ${like} OR email ILIKE ${like} OR telephone ILIKE ${like} OR regexp_replace(coalesce(telephone,''), '\\D', '', 'g') LIKE ${likeTel} OR lower(email) = lower(${likeMail}) ORDER BY nom LIMIT 5`;
-  const clients = (rows as any[]).map((r) => ({ id: r.id, name: `${r.prenom} ${r.nom}`.trim(), phone: r.telephone, email: r.email }));
+  // Plusieurs mots (« arthur top », dans n'importe quel ordre ou casse) : chaque mot doit se retrouver dans le prénom, le nom, l'email ou le téléphone.
+  const motsQ = q.toLowerCase().split(/\s+/).filter(Boolean).slice(0, 5);
+  let rowsAll: any[] = rows as any[];
+  if (motsQ.length > 1) {
+    const pool = (await sql`SELECT id, prenom, nom, email, telephone FROM clients ORDER BY nom LIMIT 5000`) as any[];
+    const ok = pool.filter((r) => motsQ.every((m) => `${r.prenom} ${r.nom} ${r.email}`.toLowerCase().includes(m) || (m.replace(/\D/g, "").length >= 3 && String(r.telephone ?? "").replace(/\D/g, "").includes(m.replace(/\D/g, ""))))).slice(0, 8);
+    const vus = new Set(rowsAll.map((r) => r.id));
+    rowsAll = [...rowsAll, ...ok.filter((r) => !vus.has(r.id))].slice(0, 8);
+  }
+  const clients = rowsAll.map((r) => ({ id: r.id, name: `${r.prenom} ${r.nom}`.trim(), phone: r.telephone, email: r.email }));
   const repRows = (await sql`SELECT r.id, r.statut, r.panne, c.prenom, c.nom, t.marque, t.modele FROM reparations r JOIN clients c ON c.id = r.client_id JOIN trottinettes t ON t.id = r.trottinette_id WHERE r.supprime_le IS NULL AND (${numPC ? Number(numPC[1]) : 0} = r.id OR c.prenom ILIKE ${like} OR c.nom ILIKE ${like} OR t.marque ILIKE ${like} OR t.modele ILIKE ${like} OR t.serie ILIKE ${like} OR r.panne ILIKE ${like}) ORDER BY (r.id = ${numPC ? Number(numPC[1]) : 0}) DESC, r.id DESC LIMIT 6`) as any[];
   const reparations = repRows.map((r) => ({ id: r.id, client: `${r.prenom} ${r.nom}`.trim(), trottinette: `${r.marque} ${r.modele}`.trim(), statut: r.statut, panne: r.panne }));
   let produits: any[] = [];
