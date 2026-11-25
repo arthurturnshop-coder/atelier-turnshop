@@ -285,9 +285,7 @@ document.addEventListener("input",function(e){
 // ----- Étiquettes produits : nom, prix, code-barres -----
 var ETQ=[],ETQF=null,ETQSKIP=0;
 var ETQFORMATS={"50x30":{l:"Rouleau 50 × 30 mm",w:50,h:30},"40x25":{l:"Rouleau 40 × 25 mm",w:40,h:25},"62x29":{l:"Ruban Brother 62 × 40 mm",w:62,h:40},"a4":{l:"Planche A4 3 × 8 (70 × 37 mm)",w:70,h:37,page:"A4",cols:3,rows:8},"papier":{l:"Emplacements papier A4 2 × 4 (105 × 70 mm)",w:105,h:70,page:"A4",cols:2,rows:4}};
-function etqSeulEmpl(){return ETQ.length>0&&ETQ.every(function(x){return x.big&&x.style==='papier'})}
 function etqFormat(){
-  if(etqSeulEmpl())return"papier";
   if(!ETQF){try{ETQF=localStorage.getItem("etqf")||""}catch(e){ETQF=""}}
   if(!ETQFORMATS[ETQF])ETQF="62x29";return ETQF}
 var ETQES="papier";
@@ -318,13 +316,13 @@ function etqToutes(){var out=[];ETQ.forEach(function(it){for(var i=0;i<(it.qte||
 function etqCss(F){
   if(F.page)return"@page{size:A4;margin:0}@media print{body>*:not(#impzone){display:none!important}#impzone{position:absolute;left:0;top:0;width:210mm}.etqgrid{display:grid;grid-template-columns:repeat("+F.cols+","+F.w+"mm);grid-auto-rows:"+F.h+"mm;margin-left:0;margin-top:5mm}.etqempty{width:"+F.w+"mm;height:"+F.h+"mm}}";
   return"@page{size:"+F.w+"mm "+F.h+"mm;margin:0}@media print{body>*:not(#impzone){display:none!important}#impzone{position:absolute;left:0;top:0;width:"+F.w+"mm}.etq{break-after:page;page-break-after:always}.etq:last-child{break-after:auto;page-break-after:auto}}"}
-function etqImprimer(){
-  var F=ETQFORMATS[etqFormat()],L=etqToutes();
+function etqImprimer(items,fkey){
+  var key=fkey||etqFormat(),F=ETQFORMATS[key],L=items||etqToutes();
   if(!L.length){alert("Ajoute au moins un produit.");return}
   var h="";
   if(F.page){h="<div class='etqgrid'>";for(var s=0;s<ETQSKIP;s++)h+="<div class='etqempty'></div>";L.forEach(function(it){h+=etqLabel(it,F)});h+="</div>"}
   else L.forEach(function(it){h+=etqLabel(it,F)});
-  if(!F.page&&etqFormat()==="62x29"){
+  if(!F.page&&key==="62x29"){
     var hs=L.map(function(it){return etqLabel(it,F)}).join("<!--etq-->");
     agentPing().then(function(ok){
       if(!ok){impImprimer(h,"",etqCss(F));return}
@@ -338,10 +336,8 @@ function etqEmpl(){
   Promise.all(todo.map(function(it){return api("/stock/scan",{magasin:MAG||"",code:it.barcode||it.sku,local:true}).then(function(r){if(r.produit&&r.produit.emplacement)it.empl=r.produit.emplacement}).catch(function(){})})).then(function(){if(TAB==="etq")render()})}
 function vEtq(){etqEmpl();
   var F=ETQFORMATS[etqFormat()],nb=etqToutes().length;
-  var gen="<div class='card'><div class='step'>Étiquettes d'emplacements et de casiers</div><div class='muted'>Génère une série (ex. A1 à A12, C1 à C20). Choisis le style, elles s'ajoutent à la liste ci-dessous.</div><div class='seg' style='margin:6px 0'><button class='"+(ETQES==="papier"?"on":"")+"' data-act='etqEs' data-s='papier'>📄 Emplacement design (papier A4, vert)</button><button class='"+(ETQES==="simple"?"on":"")+"' data-act='etqEs' data-s='simple'>🏷 Étiquette simple (Brother ou planche)</button></div>"
-    +"<div class='dl' style='flex-wrap:wrap'><input id='eg-p' placeholder='Lettre (A)' maxlength='6' style='max-width:110px'><input id='eg-a' type='number' min='0' placeholder='De' style='max-width:90px'><input id='eg-b' type='number' min='0' placeholder='À' style='max-width:90px'><input id='eg-q' type='number' min='1' max='20' value='1' title='Exemplaires' style='max-width:90px'><button data-act='etqGen'>Ajouter la série</button></div>"
-    +"<div class='dl' style='flex-wrap:wrap;margin-top:6px'><input id='eg-l' placeholder='Ou une liste : A1, A2, B7, C3' style='flex:1;min-width:200px'><button class='sec' data-act='etqGenListe'>Ajouter</button></div></div>";
-  var h=subHtml()+gen+"<div class='card'><div class='step'>Étiquettes produits</div><div class='muted'>Cherche un produit, ajoute-le, choisis le nombre d'étiquettes puis imprime. Chaque étiquette : nom, prix et code-barres.</div>"+prodBox("etq")+"</div>";
+  if(ETQTAB==="empl")return vEmpl();
+  var h=subHtml()+etqTabs()+"<div class='card'><div class='step'>Étiquettes produits</div><div class='muted'>Cherche un produit, ajoute-le, choisis le nombre d'étiquettes puis imprime. Chaque étiquette : nom, prix et code-barres.</div>"+prodBox("etq")+"</div>";
   h+="<div class='card'><div class='step'>Imprimer sur</div><div class='actions'><button class='"+(F.page?"":"sec")+"' data-act='etqMode' data-f='a4'>🖨 Imprimante A4 (feuille à découper)</button><button class='"+(F.page?"sec":"")+"' data-act='etqMode' data-f='62x29'>🏷 Brother (rouleau)</button></div><div class='muted' style='margin-top:6px'>Autres formats :</div><select id='etqf' data-act='etqFormat'>"+Object.keys(ETQFORMATS).map(function(k){return"<option value='"+k+"'"+(k===etqFormat()?" selected":"")+">"+esc(ETQFORMATS[k].l)+"</option>"}).join("")+"</select>"
     +(F.page?"<div class='muted' style='margin-top:6px'>Étiquettes déjà utilisées sur la planche (à sauter)</div><input id='etqskip' type='number' min='0' max='"+(F.cols*F.rows-1)+"' value='"+ETQSKIP+"' data-act='etqSkip'>":"")
     +"<div class='muted' style='margin-top:6px'>Dans la fenêtre d'impression : choisis ton imprimante d'étiquettes, mets les marges sur « Aucune » et l'échelle à 100 %.</div></div>";
@@ -353,8 +349,27 @@ function vEtq(){etqEmpl();
   if(ETQ.length)h+="<div class='actions'><button data-act='etqPrint'>Imprimer</button><button class='sec' data-act='etqVider'>Tout vider</button></div>"
     +"<div class='step' style='margin-top:10px'>Aperçu</div><div style='overflow:auto;background:#eee;padding:8px'>"+etqLabel(ETQ[0],F)+"</div>";
   app.innerHTML=h+"</div>"}
-ACTS.etqEs=function(b){ETQES=b.dataset.s;render()};
-function etqAjout(codes,q){codes.forEach(function(c){c=String(c).trim().toUpperCase();if(c)ETQ.push({big:c,style:ETQES,empl:"",titre:c,prix:"",barcode:"",sku:"",qte:q})});render()}
+var ETQTAB="prod",EMP=[],EMPOUT="a4";
+function etqTabs(){return"<div class='seg' style='margin-bottom:10px'><button class='"+(ETQTAB==="prod"?"on":"")+"' data-act='etqTab' data-t='prod'>🏷 Étiquettes produits</button><button class='"+(ETQTAB==="empl"?"on":"")+"' data-act='etqTab' data-t='empl'>📍 Emplacements et casiers</button></div>"}
+ACTS.etqTab=function(b){ETQTAB=b.dataset.t;render()};
+function vEmpl(){
+  var nb=0;EMP.forEach(function(x){nb+=x.qte});
+  var h=subHtml()+etqTabs()+"<div class='card'><div class='step'>Emplacements et casiers</div><div class='muted'>Génère une série (ex. A1 à A12, C1 à C20) ou une liste, puis choisis où imprimer.</div>"
+    +"<div class='dl' style='flex-wrap:wrap'><input id='eg-p' placeholder='Lettre (A)' maxlength='6' style='max-width:110px'><input id='eg-a' type='number' min='0' placeholder='De' style='max-width:90px'><input id='eg-b' type='number' min='0' placeholder='À' style='max-width:90px'><input id='eg-q' type='number' min='1' max='20' value='1' title='Exemplaires' style='max-width:90px'><button data-act='etqGen'>Ajouter la série</button></div>"
+    +"<div class='dl' style='flex-wrap:wrap;margin-top:6px'><input id='eg-l' placeholder='Ou une liste : A1, A2, B7, C3' style='flex:1;min-width:200px'><button class='sec' data-act='etqGenListe'>Ajouter</button></div></div>";
+  h+="<div class='card'><div class='step'>Imprimer sur</div><div class='seg'><button class='"+(EMPOUT==="a4"?"on":"")+"' data-act='empOut' data-o='a4'>📄 Papier A4 : design vert, 8 par feuille</button><button class='"+(EMPOUT==="brother"?"on":"")+"' data-act='empOut' data-o='brother'>🏷 Brother : étiquette simple (rouleau)</button></div></div>";
+  h+="<div class='card'><div class='step'>À imprimer ("+nb+")</div>";
+  if(!EMP.length)h+="<div class='muted'>Aucun emplacement pour l'instant.</div>";
+  EMP.forEach(function(it,i){h+="<div class='hrow' style='display:flex;gap:8px;align-items:center;justify-content:space-between;margin:6px 0'><b style='font-size:18px'>"+esc(it.big)+"</b><div style='display:flex;gap:6px;align-items:center'><input type='number' min='1' max='200' value='"+it.qte+"' style='width:70px' data-act='empQte' data-i='"+i+"'><button class='danger' data-act='empSuppr' data-i='"+i+"'>×</button></div></div>"});
+  if(EMP.length){var F=ETQFORMATS[EMPOUT==="a4"?"papier":"62x29"];
+    h+="<div class='actions'><button data-act='empPrint'>Imprimer</button><button class='sec' data-act='empVider'>Tout vider</button></div><div class='step' style='margin-top:10px'>Aperçu</div><div style='overflow:auto;background:#eee;padding:8px'>"+etqBig({big:EMP[0].big,style:EMPOUT==="a4"?"papier":"simple"},F)+"</div>"}
+  app.innerHTML=h+"</div>"}
+function etqAjout(codes,q){codes.forEach(function(c){c=String(c).trim().toUpperCase();if(c)EMP.push({big:c,qte:q})});render()}
+ACTS.empOut=function(b){EMPOUT=b.dataset.o;render()};
+ACTS.empQte=function(b){var it=EMP[+b.dataset.i];if(it)it.qte=Math.max(1,Math.min(200,Number(b.value)||1))};
+ACTS.empSuppr=function(b){EMP.splice(+b.dataset.i,1);render()};
+ACTS.empVider=function(){EMP=[];render()};
+ACTS.empPrint=function(){if(!EMP.length)return;var a=EMPOUT==="a4",L=[];EMP.forEach(function(x){for(var i=0;i<x.qte;i++)L.push({big:x.big,style:a?"papier":"simple"})});ETQSKIP=0;etqImprimer(L,a?"papier":"62x29")};
 ACTS.etqGen=function(){var p=(v("eg-p")||"").trim(),a=parseInt(v("eg-a"),10),b=parseInt(v("eg-b"),10),q=Math.max(1,parseInt(v("eg-q"),10)||1);
   if(isNaN(a))return alert("Indique le numéro de départ.");if(isNaN(b))b=a;if(b<a){var t=a;a=b;b=t}if(b-a>299)return alert("300 étiquettes maximum à la fois.");
   var L=[];for(var i=a;i<=b;i++)L.push(p+i);etqAjout(L,q)};
