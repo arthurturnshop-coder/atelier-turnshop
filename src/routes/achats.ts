@@ -101,6 +101,35 @@ app.post("/api/achats/franco", async (c) => {
   await sql`UPDATE fournisseurs SET franco_cents = ${cents} WHERE id = ${Number(b.id)}`;
   return c.json({ message: cents === null ? "Franco retiré." : "Franco enregistré." });
 });
+
+// Lien de panier eWheel (Shopify : /cart/ID:QTE,ID:QTE) : on retrouve la variante de chaque SKU sur le site public.
+const EW_CACHE = new Map<string, { id: number; available: boolean } | null>();
+async function ewVariante(sku: string) {
+  const k = sku.toLowerCase();
+  if (EW_CACHE.has(k) && EW_CACHE.get(k)) return EW_CACHE.get(k)!;
+  const sr: any = await fetch("https://ewheel.es/search/suggest.json?q=" + encodeURIComponent(sku) + "&resources[type]=product&resources[limit]=5").then((r) => r.json()).catch(() => null);
+  const ps: any[] = sr?.resources?.results?.products ?? [];
+  for (const p of ps) {
+    const pr: any = await fetch("https://ewheel.es/products/" + p.handle + ".js").then((r) => r.json()).catch(() => null);
+    const v = (pr?.variants ?? []).find((x: any) => { const s = String(x.sku || "").toLowerCase(); return s === k || s === k + "-iu"; });
+    if (v) { const r = { id: v.id as number, available: !!v.available }; EW_CACHE.set(k, r); return r; }
+  }
+  return null;
+}
+app.post("/api/achats/lien-panier", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const lignes = (await sql`SELECT sku, libelle, quantite FROM commande_lignes WHERE fournisseur_id = ${Number(b.fournisseurId)} AND statut = 'panier' ORDER BY id`) as any[];
+  const parts: string[] = [], ko: string[] = [];
+  const total = new Map<string, number>();
+  for (const l of lignes) { if (!l.sku) { ko.push(l.libelle + " (sans référence)"); continue; } total.set(l.sku, (total.get(l.sku) ?? 0) + Number(l.quantite)); }
+  for (const [sku, q] of total) {
+    const v = await ewVariante(sku);
+    if (!v) ko.push(sku + " (introuvable)");
+    else if (!v.available) ko.push(sku + " (rupture)");
+    else parts.push(v.id + ":" + q);
+  }
+  return c.json({ url: parts.length ? "https://ewheel.es/cart/" + parts.join(",") : "", ajoutes: parts.length, ko });
+});
 app.post("/api/achats/fournisseur", async (c) => {
   const b = await c.req.json().catch(() => ({}));
   const nom = clean(b.nom, 80);

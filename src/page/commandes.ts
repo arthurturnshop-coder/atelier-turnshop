@@ -88,7 +88,7 @@ function vCmd(){
   if(!CMD){app.innerHTML="<div class='card'>Chargement…</div>";api("/achats").then(function(d){return api("/stock/reappro?magasin="+encodeURIComponent(MAG||"")).then(function(r){RE=r;return d}).catch(function(){RE=null;return d})}).then(function(d){return api("/achats/reparations-ouvertes").then(function(r){REPS=r;return d}).catch(function(){REPS=[];return d})}).then(function(d){CMD=d;render()}).catch(function(e){app.innerHTML="<div class='card'>"+esc(e.message)+"</div>"});return}
   if(CMDF===null){CMDF=undefined;api("/achats/feuille").then(function(d){CMDF=d.fournisseurs;render()}).catch(function(){CMDF=[];render()})}
   if(CCL===null){CCL=undefined;api("/commandes-clients").then(function(d){CCL=d.commandes;render()}).catch(function(){CCL=[];render()})}
-  var h="<div class='pmsg'>"+esc(CMDMSG)+"</div>"+cclHtml()+"<div class='card'><div class='step'>🛒 Remplir le panier fournisseur</div><div class='sub'>1) Une seule fois : <a class='btn' href='/favori' target='_blank'>ouvre la page d'installation du favori</a><br>2) Ci-dessous, clique sur Copier pour le panier fournisseur. 3) Va sur le site du fournisseur (connecté) et clique sur le favori. Tu valides toi-même.</div></div><div class='actions'><button class='sec' data-act='cmdFeuille' data-id=''>🖨 Imprimer toutes les commandes (A4)</button></div>";
+  var h="<div class='pmsg'>"+esc(CMDMSG)+"</div>"+cclHtml()+"<div class='actions'><button class='sec' data-act='cmdFeuille' data-id=''>🖨 Imprimer toutes les commandes (A4)</button></div>";
   if(RE&&RE.produits.length){
     h+="<div class='card'><div class='step'>À recommander : stock minimum atteint ("+RE.produits.length+")</div><div class='muted'>Suggestion pour "+esc(RE.magasin)+". Choisis le fournisseur et ajoute au panier.</div>";
     RE.produits.forEach(function(p){
@@ -107,7 +107,7 @@ function vCmd(){
     if(f.panier.length)h+="<table class='devis' style='width:100%'><tr><th>Produit</th><th class='n'>Qté</th><th></th></tr>"+f.panier.map(function(l){return ligneCmd(l,"panier")}).join("")+"</table>";
     else h+="<div class='muted'>Panier vide.</div>";
     h+="<div style='margin-top:8px'>"+prodBox("cmd"+f.id)+"</div><div class='dl' style='margin-top:6px'><input id='cl-"+f.id+"' class='lb' placeholder='Ou saisie libre : produit / référence'><input id='cq-"+f.id+"' class='q' type='number' min='1' value='1'><button class='sec' data-act='cmdLigne' data-id='"+f.id+"'>Ajouter</button></div>";
-    if(f.panier.length)h+="<div class='actions'><button data-act='cmdPasser' data-id='"+f.id+"'>Marquer comme commandé</button><button class='sec' data-act='cmdCopy' data-id='"+f.id+"'>Copier la commande</button><button class='sec' data-act='cmdEwCopy' data-id='"+f.id+"'>🛒 Copier pour le panier fournisseur</button><button class='sec' data-act='cmdFeuille' data-id='"+f.id+"'>🖨 Imprimer la feuille A4</button><button class='sec' data-act='cmdCsv' data-id='"+f.id+"'>Télécharger (CSV)</button>"
+    if(f.panier.length)h+="<div class='actions'><button data-act='cmdPasser' data-id='"+f.id+"'>Marquer comme commandé</button><button class='sec' data-act='cmdCopy' data-id='"+f.id+"'>Copier la commande</button><button class='sec' data-act='cmdEwCopy' data-id='"+f.id+"'>🛒 Remplir le panier eWheel</button><button class='sec' data-act='cmdFeuille' data-id='"+f.id+"'>🖨 Imprimer la feuille A4</button><button class='sec' data-act='cmdCsv' data-id='"+f.id+"'>Télécharger (CSV)</button>"
       +(f.email?"<a class='btn' href='mailto:"+esc(f.email)+"?subject="+encodeURIComponent("Commande TURN SOCIETY")+"&body="+encodeURIComponent(texteCommande(f))+"'>Envoyer par email</a>":"")+"</div><div class='muted'>L'envoi direct par l'API du fournisseur s'ajoute fournisseur par fournisseur.</div>";
     if(f.commandees.length){h+="<div class='step' style='margin-top:12px'>Commandé, en attente de réception ("+f.commandees.length+")</div>";
       if(f.mode==="unitaire")h+="<table class='devis' style='width:100%'><tr><th>Produit</th><th class='n'>Qté</th><th></th></tr>"+f.commandees.map(function(l){return ligneCmd(l,"commandee")}).join("")+"</table>";
@@ -165,10 +165,11 @@ function EWB(){
 }
 function ewLien(){return "javascript:("+encodeURIComponent(EWB.toString())+")()"}
 ACTS.cmdEwCopy=function(b){var f=trouveF(+b.dataset.id);if(!f)return;
-  var t=f.panier.filter(function(l){return l.sku}).map(function(l){return l.sku+"\t"+l.quantite}).join("\\n");
-  var sans=f.panier.filter(function(l){return !l.sku}).length;
-  var w=null;if(t&&/ewheel/i.test(f.nom))w=window.open("https://ewheel.es/cart#fs="+encodeURIComponent(t),"_blank");
-  if(navigator.clipboard)navigator.clipboard.writeText(t).then(function(){CMDMSG=(w?"eWheel ouvert. Clique sur le favori Remplir panier dans cet onglet.":"Copié. Sur le site du fournisseur, clique sur le favori Remplir panier.")+" "+(sans?" "+sans+" ligne(s) sans référence à ajouter à la main.":"");render()},function(){alert(t)});else alert(t)};
+  var w=window.open("","_blank");if(w)w.document.write("Préparation du panier eWheel...");
+  api("/achats/lien-panier",{fournisseurId:f.id}).then(function(d){
+    if(!d.url){if(w)w.close();alert("Rien à ajouter."+(d.ko.length?"\\n"+d.ko.join("\\n"):""));return}
+    if(w)w.location.href=d.url;else location.href=d.url;
+    CMDMSG="Panier eWheel ouvert ("+d.ajoutes+" produit(s)). Vérifie-le puis valide."+(d.ko.length?" NON ajoutés : "+d.ko.join(", "):"");render()}).catch(function(e){if(w)w.close();alert(e.message)})};
 ACTS.cmdCsv=function(b){var f=trouveF(+b.dataset.id);if(!f)return;
   var blob=new Blob([csvCommande(f)],{type:"text/csv"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="commande-"+f.nom.replace(/[^a-z0-9]+/gi,"-")+".csv";document.body.appendChild(a);a.click();a.remove()};
 document.addEventListener("change",function(e){var t=e.target;if(!t||!t.dataset||t.dataset.act!=="cmdQte")return;api("/achats/ligne/maj",{id:+t.dataset.id,quantite:t.value}).then(function(){CMD=null;CMDMSG="";}).catch(function(err){CMDMSG=err.message})});
