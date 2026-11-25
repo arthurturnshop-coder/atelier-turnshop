@@ -85,11 +85,7 @@ function vSynthese(){
   if(!SY.d){syCharge();return"<div class='card muted'>Chargement…</div>"}
   var d=SY.d;if(!d.mois)return"<div class='card muted'>"+esc(SY.msg||"Aucune donnée pour l'instant : importe un relevé ou fais des ventes.")+"</div>";
   var h="<div class='card'><div class='step'>Mois</div><div class='actions' style='flex-wrap:wrap'>"+d.liste.slice(0,12).map(function(m){return"<button class='"+(m===d.mois?"":"sec")+"' data-act='syMois' data-m='"+m+"'>"+esc(bqMoisLib(m))+"</button>"}).join("")+"</div>"
-    +"<div class='muted' style='margin-top:6px'>CA retenu pour la marge : "+(d.source==="saisi"?"<b>CA réel saisi</b> (là où il est renseigné, sinon logiciel ou banque)":d.source==="logiciel"?"<b>ventes du logiciel</b> ("+d.nbVentes+" ventes ce mois-ci)":"<b>encaissements de la banque</b> (aucune vente dans le logiciel ce mois-ci)")+"."+(d.releve?"":" ⚠ Relevé bancaire de ce mois pas importé : achats, charges et rapprochement sont à 0.")+"</div></div>";
-  var R=d.caReel,K=d.caRetenu,rv=function(x){return x==null?"":esc(String(x/100).replace(".",","))};
-  h+="<div class='card'><div class='step'>CA réel encaissé du mois (TTC)</div><div class='muted'>Si le logiciel ou le relevé ne contient pas tout (ex : le mois était encore sur Shifter), saisis ici le vrai CA TTC par boutique. Il remplace le calcul pour la marge et la TVA. Vide = calcul automatique.</div>"
-    +"<div class='dl' style='margin-top:8px'><input id='sy-ra' class='p' placeholder='Amiens €' value='"+rv(R.amiens)+"'><input id='sy-rr' class='p' placeholder='Rouen €' value='"+rv(R.rouen)+"'><input id='sy-rc' class='p' placeholder='En ligne / commun €' value='"+rv(R.commun)+"'><button data-act='syReel'>Enregistrer</button></div>"
-    +"<div class='muted'>CA retenu : Amiens "+eur(K.amiens)+" · Rouen "+eur(K.rouen)+" · Commun "+eur(K.commun)+" · <b>total "+eur(K.amiens+K.rouen+K.commun)+"</b></div></div>";
+    +"<div class='muted' style='margin-top:6px'>CA retenu pour la marge : "+(d.source==="logiciel"?"<b>ventes du logiciel</b> ("+d.nbVentes+" ventes ce mois-ci)":"<b>encaissements de la banque</b> (aucune vente dans le logiciel ce mois-ci)")+"."+(d.releve?"":" ⚠ Relevé bancaire de ce mois pas importé : achats, charges et rapprochement sont à 0.")+"</div></div>";
   var L=d.caLogiciel,tot=function(k){return L.amiens[k]+L.rouen[k]+L.commun[k]};
   h+="<div class='card'><div class='step'>1 · CA par magasin d'après le logiciel</div><table class='devis' style='width:100%'><tr><th></th><th class='n'>Amiens</th><th class='n'>Rouen</th><th class='n'>En ligne / sans magasin</th><th class='n'>Total</th></tr>"
     +"<tr><td>CA TTC (ventes)</td>"+syN(L.amiens.ttc)+syN(L.rouen.ttc)+syN(L.commun.ttc)+syN(tot("ttc"),"font-weight:700")+"</tr>"
@@ -126,7 +122,6 @@ function vSynthese(){
   P.filter(function(p){return p.cle!=="pieces"}).forEach(function(p){h+=row("− "+esc(p.nom),{amiens:-p.amiens,rouen:-p.rouen,commun:-p.commun,total:-p.total})});
   h+=row("Marge nette (résultat)",M.net,true,M.net.pct)+"</table><div class='muted'>Les dépenses sont celles du relevé classé par pôle (achats, logiciels, télécom et fournitures passés de TTC en HT). Une dépense « À classer » se range dans « Voir et classer » de l'onglet Banque. Les retraits d'espèces et remboursements ne sont pas comptés.</div></div>";
   return h}
-ACTS.syReel=function(){api("/compta/ca-reel",{mois:SY.mois||SY.d.mois,amiens:v("sy-ra"),rouen:v("sy-rr"),commun:v("sy-rc")}).then(function(r){SY.msg=r.message;SY.d=null;SY.busy=false;render()}).catch(function(e){alert(e.message)})};
 ACTS.syMois=function(b){SY.mois=b.dataset.m;SY.d=null;SY.busy=false;render()};
 ACTS.syTva=function(){api("/compta/tva-deductible",{mois:SY.mois,montant:v("sy-tva")}).then(function(r){SY.msg=r.message;SY.d=null;SY.busy=false;render()}).catch(function(e){alert(e.message)})};
 `;
