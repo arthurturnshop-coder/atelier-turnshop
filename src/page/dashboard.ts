@@ -110,9 +110,9 @@ function vAccueil(){
   if(SEARCHED&&!NEWCLI)h+="<div class='actions'><button class='sec' data-act='showNewPre' data-q='"+esc(v("q"))+"'>+ Créer un client « "+esc(v("q"))+" »</button></div>";
   RES.forEach(function(c,i){
     var enCours=0;c.trottinettes.forEach(function(t){enCours+=t.reparations.filter(function(r){return r.statut!=="récupéré"}).length});
-    h+="<div class='card'><b>"+esc(c.name||"Sans nom")+"</b>"+(enCours?" <span class='tag'>"+enCours+" en cours</span>":"")
+    h+="<div class='card'><button class='sec' data-act='cliCaisse' data-i='"+i+"' title='Mettre en caisse' style='float:right;width:56px;height:56px;padding:0;font-size:26px;margin:0'>🛒</button><b>"+esc(c.name||"Sans nom")+"</b>"+(enCours?" <span class='tag'>"+enCours+" en cours</span>":"")
       +"<div class='muted'>"+esc(c.phone||"")+(c.phone&&c.email?" · ":"")+esc(c.email||"")+"</div>"
-      +"<div class='actions'><button class='sec' data-act='open' data-i='"+i+"'>Voir le profil</button><button class='sec' data-act='cliCaisse' data-i='"+i+"'>🛒 Mettre en caisse</button><button data-act='priseEnCharge' data-i='"+i+"'>Créer une prise en charge</button></div></div>"});
+      +"<div class='actions'><button class='sec' data-act='open' data-i='"+i+"'>Voir le profil</button><button data-act='priseEnCharge' data-i='"+i+"'>Créer une prise en charge</button></div></div>"});
   h+="</div>"+blocConsignes()+"</div>"+blocTaches()+blocPieces()+blocGaranties()+blocChiffres()+blocDefi()+"</div><div class='dright'>"+caisseHtml()+"</div></div>";
   app.innerHTML=h;caisseBind();
   var q=document.getElementById("q");if(q)q.addEventListener("keydown",function(e){if(e.key==="Enter")ACTS.search()});
