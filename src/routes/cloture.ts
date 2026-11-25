@@ -60,7 +60,12 @@ app.get("/api/caisse/session", async (c) => {
   const [{ auj }] = (await sql`SELECT (now() AT TIME ZONE 'Europe/Paris')::date::text AS auj`) as any[];
   const ouvV: any = ouv ? vue(ouv) : null;
   if (ouvV) ouvV.perimee = ouvV.jour < auj;
-  return c.json({ magasin: m, ouverte: ouvV, live, dernier: der ? vue(der) : null, fondConseilleCents: der?.especes_comptees_cents ?? 0 });
+  let fondC = der?.especes_comptees_cents ?? 0, mvFerme: any[] = [];
+  if (!ouv) {
+    mvFerme = (await sql`SELECT sens, montant_cents, motif, par, cree_le FROM mouvements_cash WHERE magasin = ${m} AND cree_le > ${der?.fermee_le ?? "1970-01-01"} ORDER BY id`) as any[];
+    fondC += mvFerme.reduce((a, x) => a + (x.sens === "entree" ? x.montant_cents : -x.montant_cents), 0);
+  }
+  return c.json({ magasin: m, ouverte: ouvV, live, dernier: der ? vue(der) : null, fondConseilleCents: fondC, mouvementsFerme: mvFerme.map((x) => ({ sens: x.sens, cents: x.montant_cents, motif: x.motif, par: x.par ?? "", le: x.cree_le })) });
 });
 
 app.post("/api/caisse/ouvrir", async (c) => {
@@ -85,8 +90,6 @@ app.post("/api/caisse/mouvement", async (c) => {
   if (cents <= 0) throw new AppError(400, "Indique le montant.");
   const motif = clean(b.motif, 200);
   if (!motif) throw new AppError(400, "Indique le motif (ex : reversement dépôt-vente, achat fournitures, fond de caisse).");
-  const [ouv] = (await sql`SELECT id FROM caisse_sessions WHERE magasin = ${m} AND fermee_le IS NULL LIMIT 1`) as any[];
-  if (!ouv) throw new AppError(409, "Ouvre d'abord la caisse.");
   const par = await vendeurParMdp(c, b.mdpCaissier);
   await sql`INSERT INTO mouvements_cash (magasin, sens, montant_cents, motif, par) VALUES (${m}, ${sens}, ${cents}, ${motif}, ${par})`;
   return c.json({ message: sens === "entree" ? "Entrée d'espèces enregistrée." : "Sortie d'espèces enregistrée." });

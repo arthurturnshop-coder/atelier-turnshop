@@ -202,6 +202,7 @@ function cloHist(){
     A.ventes.forEach(function(v){o+="<div class='dl'>"+esc(v.numero)+" · "+eur(v.totalCents)+" <button data-act='cloAjoute' data-s='"+A.id+"' data-v='"+v.id+"'>Ajouter au ticket Z</button></div>"});
     o+="<div class='actions'><button class='sec' data-act='cloAjoutNo'>Fermer</button></div></div>"}
   return o}
+function mvForm(){return"<div class='card' style='background:#f7f7f7'><div class='step'>Entrée / sortie d espèces</div><div class='seg' style='margin:6px 0'><button class='"+(CLO.mvs!=="sortie"?"on":"")+"' data-act='cloMvSens' data-m='entree'>➕ Entrée de cash</button><button class='"+(CLO.mvs==="sortie"?"on":"")+"' data-act='cloMvSens' data-m='sortie'>➖ Sortie de cash</button></div><div class='dl'><input id='clo-mm' class='p' placeholder='Montant €'><input id='clo-mo' class='lb' placeholder='Motif (ex : reversement dépôt-vente)'><button data-act='cloMouv'>Enregistrer</button></div></div>"}
 function cloHtml(){
   var blq=caisseBloquee();
   if(!CLO.open&&!blq)return"<div class='actions' style='margin-top:12px'><button class='sec' data-act='cloOuvre'>Caisse : ouvrir / clôturer</button></div>";
@@ -211,7 +212,7 @@ function cloHtml(){
     var o=d.ouverte,att=o.fondCents+d.live.especesNettes;
     if(o.perimee)h+="<div class='card' style='border:2px solid #b00'><b style='color:#b00'>La caisse du "+esc(o.jour.split("-").reverse().join("/"))+" n est pas fermée.</b><div class='muted'>Compte le tiroir et ferme-la : impossible d ouvrir la caisse du jour ou d encaisser tant que ce n est pas fait.</div></div>";
     h+="<div><span class='tag ok'>Caisse ouverte</span> depuis "+esc(cloHeure(o.ouverteLe))+" par "+esc(o.ouvertPar)+" · tiroir à l ouverture "+eur(o.fondCents)+"</div>"+cloTotaux(d.live)
-      +"<div class='card' style='background:#f7f7f7'><div class='step'>Entrée / sortie d espèces</div><div class='seg' style='margin:6px 0'><button class='"+(CLO.mvs!=="sortie"?"on":"")+"' data-act='cloMvSens' data-m='entree'>➕ Entrée de cash</button><button class='"+(CLO.mvs==="sortie"?"on":"")+"' data-act='cloMvSens' data-m='sortie'>➖ Sortie de cash</button></div><div class='dl'><input id='clo-mm' class='p' placeholder='Montant €'><input id='clo-mo' class='lb' placeholder='Motif (ex : reversement dépôt-vente)'><button data-act='cloMouv'>Enregistrer</button></div></div>"
+      +mvForm()
       +"<div class='muted'>Espèces attendues dans le tiroir : <b id='clo-att'>"+eur(att)+"</b></div>"
       +"<div class='dl'><label class='muted'>Espèces comptées (€)</label><input id='clo-compte' placeholder='Compte le tiroir'></div>"+cntHtml("clo-compte")
       +"<div class='muted'>Écart : <b id='clo-ecart'>-</b></div><div class='dl'><input id='clo-note' placeholder='Note (facultatif)'></div>"
@@ -220,7 +221,8 @@ function cloHtml(){
     h+="<div><span class='tag'>Caisse fermée</span></div>";
     if(d.dernier){var z=d.dernier;h+="<div class='muted' style='margin-top:6px'>Dernier ticket Z : fermée le "+esc(cloHeure(z.fermeeLe))+" par "+esc(z.fermePar||"")+" · compté "+eur(z.compteCents)+" · <b>écart "+cloEcartTxt(z.ecartCents)+"</b></div>"
       +"<div class='actions'><button class='sec' data-act='cloZ' data-id='"+z.id+"'>Imprimer le ticket Z</button></div>"}
-    h+=cloOuvreForm(d)}
+    if((d.mouvementsFerme||[]).length)h+="<div class='muted' style='margin-top:6px'>Mouvements depuis la fermeture :"+d.mouvementsFerme.map(function(x){return" "+(x.sens==="entree"?"+":"-")+eur(x.cents)+" ("+esc(x.motif)+")"}).join(",")+". Pris en compte dans le tiroir conseillé à l ouverture.</div>";
+    h+=mvForm()+cloOuvreForm(d)}
   if(CLO.msg)h+="<div class='muted'>"+esc(CLO.msg)+"</div>";
   if(!blq)h+="<div class='actions'><button class='sec' data-act='cloFerme'>Fermer ce panneau</button></div>";
   return h+"</div>"}
