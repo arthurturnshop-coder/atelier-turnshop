@@ -62,7 +62,9 @@ const versPresta = (r: any) => ({ id: r.id, nom: r.nom, prixCents: r.prix_cents,
 app.get("/api/prestations", async (c) => {
   const rows = (await sql`SELECT * FROM prestations ORDER BY nom`) as any[];
   const opts = (await sql`SELECT id, prestation_id, nom, prix_cents, type FROM prestation_options ORDER BY id`) as any[];
-  return c.json({ prestations: rows.map((r) => ({ ...versPresta(r), options: opts.filter((o) => o.prestation_id === r.id).map((o) => ({ id: o.id, nom: o.nom, prixCents: o.prix_cents, type: o.type })) })), multi: await lireMulti() });
+  const us = (await sql`SELECT libelle, count(*)::int AS n FROM devis_lignes WHERE type = 'main_oeuvre' AND libelle IN (SELECT nom FROM prestations) GROUP BY libelle`) as any[];
+  const usage = new Map(us.map((u) => [u.libelle, u.n]));
+  return c.json({ prestations: rows.map((r) => ({ ...versPresta(r), usage: usage.get(r.nom) ?? 0, options: opts.filter((o) => o.prestation_id === r.id).map((o) => ({ id: o.id, nom: o.nom, prixCents: o.prix_cents, type: o.type })) })), multi: await lireMulti() });
 });
 
 app.post("/api/prestations", async (c) => {
