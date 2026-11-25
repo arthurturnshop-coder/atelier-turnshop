@@ -230,6 +230,13 @@ app.post("/api/reparations/valider-piece", async (c) => {
 const BOITES_P = ["C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8"];
 const pcnP = (id: number) => "PC-" + String(id).padStart(4, "0");
 
+app.get("/api/commandes-clients", async (c) => {
+  const rows = (await sql`SELECT l.id, l.libelle, l.quantite, l.statut, l.commandee_le, l.recue_le, l.remise_le, l.boite, l.reparation_id, f.nom AS fournisseur, cl.prenom, cl.nom
+    FROM commande_lignes l JOIN devis_lignes dl ON dl.id = l.devis_ligne_id AND dl.remise_client JOIN reparations r ON r.id = l.reparation_id JOIN clients cl ON cl.id = r.client_id LEFT JOIN fournisseurs f ON f.id = l.fournisseur_id
+    WHERE r.supprime_le IS NULL AND (l.remise_le IS NULL OR l.remise_le > now() - interval '30 days') ORDER BY (l.remise_le IS NOT NULL), l.id DESC LIMIT 200`) as any[];
+  return c.json({ commandes: rows.map((l) => ({ id: l.id, libelle: l.libelle, quantite: l.quantite, statut: l.remise_le ? "remise" : l.statut, fournisseur: l.fournisseur ?? "", commandeeLe: l.commandee_le, recueLe: l.recue_le, remiseLe: l.remise_le, boite: l.boite ?? "", repairId: l.reparation_id, numero: pcnP(l.reparation_id), client: `${l.prenom} ${l.nom}`.trim() })) });
+});
+
 app.post("/api/devis-lignes/remise-client", async (c) => {
   const b = await c.req.json().catch(() => ({}));
   if (b.repairId) await sql`UPDATE devis_lignes SET remise_client = ${!!b.valeur} WHERE reparation_id = ${Number(b.repairId)} AND type = 'piece'`;

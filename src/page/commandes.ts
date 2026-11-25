@@ -29,9 +29,19 @@ function ligneCmd(l,mode){
   else if(mode==="commandee"||mode==="commandee-g")h+="<td class='n'>"+l.quantite+"</td><td class='n'><button data-act='cmdRecevoir' data-id='"+l.id+"'>Réceptionner</button></td>";
   else h+="<td class='n'>"+l.quantite+"</td><td class='n'><span class='tag ok'>Reçu</span></td>";
   return h+"</tr>"}
+var CCL=null;
+var CCST={panier:["À commander (panier fournisseur)","warn"],commandee:["Commandée","warn"],recue:["Arrivée : à remettre","ok"],remise:["Remise au client",""]};
+function cclHtml(){
+  var h="<div class='card'><div class='step'>Commandes clients"+(CCL&&CCL.length?" ("+CCL.length+")":"")+"</div>";
+  if(!CCL)return h+"<div class='muted'>Chargement…</div></div>";
+  if(!CCL.length)return h+"<div class='muted'>Aucune commande client en cours. Depuis la caisse : « 📦 Commander pour le client ».</div></div>";
+  CCL.forEach(function(l){var st=CCST[l.statut]||[l.statut,""];
+    h+="<div class='hrow' style='padding:6px 0;border-bottom:1px solid #eee'><b>"+esc(l.libelle)+"</b> × "+l.quantite+" <span class='tag "+st[1]+"'>"+st[0]+"</span><div class='muted'>"+esc(l.client)+" · "+esc(l.numero)+(l.fournisseur?" · "+esc(l.fournisseur):"")+(l.commandeeLe&&l.statut==="commandee"?" · commandée le "+esc(dateLongue(l.commandeeLe)):"")+(l.recueLe&&l.statut==="recue"?" · arrivée le "+esc(dateLongue(l.recueLe)):"")+(l.boite?" · 📦 case "+esc(l.boite):"")+(l.remiseLe?" · remise le "+esc(dateLongue(l.remiseLe)):"")+"</div></div>"});
+  return h+"</div>"}
 function vCmd(){
   if(!CMD){app.innerHTML="<div class='card'>Chargement…</div>";api("/achats").then(function(d){return api("/stock/reappro?magasin="+encodeURIComponent(MAG||"")).then(function(r){RE=r;return d}).catch(function(){RE=null;return d})}).then(function(d){return api("/achats/reparations-ouvertes").then(function(r){REPS=r;return d}).catch(function(){REPS=[];return d})}).then(function(d){CMD=d;render()}).catch(function(e){app.innerHTML="<div class='card'>"+esc(e.message)+"</div>"});return}
-  var h="<div class='pmsg'>"+esc(CMDMSG)+"</div><div class='card'><div class='step'>Nouveau fournisseur</div><div class='dl'><input id='fn' class='lb' placeholder='Nom (ex : eWheel)'><input id='fe' class='lb' placeholder='Email pour les commandes'><button data-act='fAdd'>Ajouter</button></div></div>";
+  if(CCL===null){CCL=undefined;api("/commandes-clients").then(function(d){CCL=d.commandes;render()}).catch(function(){CCL=[];render()})}
+  var h="<div class='pmsg'>"+esc(CMDMSG)+"</div>"+cclHtml()+"<div class='card'><div class='step'>Nouveau fournisseur</div><div class='dl'><input id='fn' class='lb' placeholder='Nom (ex : eWheel)'><input id='fe' class='lb' placeholder='Email pour les commandes'><button data-act='fAdd'>Ajouter</button></div></div>";
   if(RE&&RE.produits.length){
     h+="<div class='card'><div class='step'>À recommander : stock minimum atteint ("+RE.produits.length+")</div><div class='muted'>Suggestion pour "+esc(RE.magasin)+". Choisis le fournisseur et ajoute au panier.</div>";
     RE.produits.forEach(function(p){
@@ -60,7 +70,7 @@ function vCmd(){
     if(f.recues.length)h+=ecHtml(f);
     h+="</div>"});
   app.innerHTML=h}
-function cmdRun(p,msg){return p.then(function(d){HISTC=null;CMDMSG=(d&&d.message)||msg||"";CMD=null;render()}).catch(function(e){CMDMSG=e.message;render()})}
+function cmdRun(p,msg){return p.then(function(d){HISTC=null;CCL=null;CMDMSG=(d&&d.message)||msg||"";CMD=null;render()}).catch(function(e){CMDMSG=e.message;render()})}
 ACTS.cmdReappro=function(b){var id=+b.dataset.id,f=document.getElementById("rf-"+id);if(!f||!f.value){CMDMSG="Ajoute d'abord un fournisseur.";render();return}cmdRun(api("/stock/reappro/ajouter",{id:id,fournisseurId:+f.value,quantite:v("rq-"+id)}))};
 ACTS.fAdd=function(){cmdRun(api("/achats/fournisseur",{nom:v("fn"),email:v("fe")}))};
 ACTS.fMail=function(b){cmdRun(api("/achats/fournisseur/modifier",{id:+b.dataset.id,email:v("fe-"+b.dataset.id)}))};

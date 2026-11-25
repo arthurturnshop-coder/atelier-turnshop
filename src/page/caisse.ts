@@ -178,7 +178,6 @@ function caisseHtml(){
     if(CVEH)h+="<div class='dl' style='margin-top:6px'><select id='cveh-l'>"+nonT.map(function(x){return"<option value='"+x.i+"'>"+esc(x.l.libelle)+"</option>"}).join("")+"</select><button data-act='cVehOk'>Enregistrer le véhicule</button><button class='link' data-act='cVehNon'>Annuler</button></div>";
     else h+="<div style='margin-top:4px'><button class='link' data-act='cVehOpen' style='font-size:12px;opacity:.7'>🛴 Enregistrer un véhicule</button></div>"}
   h+="<div style='margin-top:8px'>"+prodBox("caisse")+"</div>";
-  h+=livHtml();
   h+="<div class='dl' style='margin-top:8px'><input id='cl' class='lb' placeholder='Article (libellé)'><input id='cq2' class='q' type='number' min='1' value='1'><input id='cp' class='p' placeholder='Prix €'><button data-act='cAdd'>Ajouter</button></div></div>";
   var dispo=(CAV||[]).filter(function(a){return avApplicable(a,brut)});
   if(dispo.length){
@@ -202,6 +201,10 @@ async function ajouterProduit(p,ctx){
   if(ctx==="etq"){ETQ.push({titre:p.libelle,prix:String(p.prix),barcode:p.barcode||"",sku:p.sku||"",qte:1});render();return}
   if(ctx.indexOf("mait")===0){await maitLier(ctx,p);return}
   if(ctx==="dvs"){await dvAjoutProduit(p);return}
+  if(ctx==="sep"){if(!FICHE)return;try{var rs=await api("/devis/ligne",{repairId:FICHE.id,type:"piece",libelle:p.libelle,quantite:1,prix:String(p.prix).replace(".",","),variantId:p.variantId,sku:p.sku,barcode:p.barcode,marque:p.marque});
+    var nl=rs.devis.lignes.filter(function(l){return l.type==="piece"}).sort(function(a,b){return b.id-a.id})[0];
+    if(nl){await api("/devis-lignes/remise-client",{id:nl.id,valeur:true});var mm=await cmdAuto([nl.id]);DEVHINT="Commande séparée : "+mm}
+    await recharger(FICHE.id)}catch(e){alert(e.message)}return}
   if(ctx==="devis"){if(!FICHE)return;DEVHINT="";var rd=await api("/devis/ligne",{repairId:FICHE.id,type:"piece",libelle:p.libelle,quantite:1,prix:String(p.prix).replace(".",","),variantId:p.variantId,sku:p.sku,barcode:p.barcode,marque:p.marque});if(rd.maitre)DEVHINT="Produit maître mis sur le devis : "+rd.maitre.nom+" (produit choisi : "+rd.maitre.origine+")";await recharger(FICHE.id);return}
   if(ctx.indexOf("cmd")===0){var d=await api("/achats/ligne",{fournisseurId:+ctx.slice(3),libelle:p.libelle,sku:p.sku,barcode:p.barcode,variantId:p.variantId,quantite:1});CMDMSG=d.message;CMD=null;render();return}
   lirePay();CUR=null;FICHE=null;TAB="accueil";CREC=null;

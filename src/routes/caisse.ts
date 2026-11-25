@@ -227,6 +227,14 @@ app.get("/api/caisse/historique", async (c) => {
 });
 
 // Encaisser : lignes + paiements (carte / espèces / virement, plusieurs possibles) + remise fidélité éventuelle.
+app.post("/api/reparations/livraison", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const liv = { adresse: clean(b.adresse, 200), cp: clean(b.cp, 10), ville: clean(b.ville, 80) };
+  if (!liv.adresse || !liv.cp || !liv.ville) throw new AppError(400, "Livraison : indique l'adresse, le code postal et la ville.");
+  const [r] = (await sql`UPDATE reparations SET livraison = ${JSON.stringify(liv)}::jsonb WHERE id = ${Number(b.repairId)} RETURNING client_id`) as any[];
+  if (r?.client_id) await sql`UPDATE clients SET adresse = ${liv.adresse}, code_postal = ${liv.cp}, ville = ${liv.ville} WHERE id = ${r.client_id}`;
+  return c.json({ message: "Livraison à domicile enregistrée." });
+});
 app.get("/api/client-adresse", async (c) => {
   const [r] = (await sql`SELECT adresse, code_postal, ville FROM clients WHERE id = ${Number(c.req.query("id"))}`) as any[];
   return c.json({ adresse: r?.adresse ?? "", cp: r?.code_postal ?? "", ville: r?.ville ?? "" });
@@ -253,7 +261,9 @@ app.post("/api/caisse/encaisser", async (c) => {
   }));
   if (nettoyees.some((l: any) => !l.libelle)) throw new AppError(400, "Chaque ligne doit avoir un libellé.");
   const livLigne = nettoyees.some((l: any) => /^Livraison à domicile/i.test(String(l.libelle)));
-  const liv = { adresse: clean(b.livraison?.adresse, 200), cp: clean(b.livraison?.cp, 10), ville: clean(b.livraison?.ville, 80) };
+  const [repLiv] = Number(b.repairId) > 0 ? ((await sql`SELECT livraison FROM reparations WHERE id = ${Number(b.repairId)}`) as any[]) : [undefined];
+  const src = b.livraison?.adresse ? b.livraison : (repLiv?.livraison ?? {});
+  const liv = { adresse: clean(src.adresse, 200), cp: clean(src.cp, 10), ville: clean(src.ville, 80) };
   if (livLigne && (!liv.adresse || !liv.cp || !liv.ville)) throw new AppError(400, "Livraison : indique l'adresse, le code postal et la ville.");
   const brut = nettoyees.reduce((s: number, l: any) => s + l.quantite * l.prixCents, 0);
 

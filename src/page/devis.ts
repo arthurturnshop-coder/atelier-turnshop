@@ -84,11 +84,46 @@ ACTS.cEnDevis=async function(){
   try{var r=await cartVersDevis();if(!r)return;cartVide();DV.list=null;DV.ed=null;DV.res=null;DV.hint="";DV.msg="Devis "+dvNum(r.id)+" enregistré.";FICHE=null;CUR=null;TAB="enc";ATSUB="devis";
     try{var ls=await api("/devis-simples");DV.list=ls.devis;var d=ls.devis.filter(function(x){return x.id===r.id})[0];if(d){DV.ed=JSON.parse(JSON.stringify(d));if(!DV.ed.lignes.length)DV.ed.lignes=dvVide().lignes}}catch(e2){}
     render()}catch(e){alert(e.message)}};
+var CMDFID=0;
+async function cmdAuto(ids){
+  var ok=0,msg="";
+  for(var k=0;k<ids.length;k++){
+    var r=await api("/achats/depuis-devis",{devisLigneId:ids[k],fournisseurId:CMDFID||undefined});
+    if(r.choix){
+      var fs=r.fournisseurs;if(!fs.length){alert("Crée d'abord un fournisseur dans l'onglet Commandes.");return"aucun fournisseur"}
+      var rep=prompt("Quel fournisseur ? Tape le numéro :"+String.fromCharCode(10)+fs.map(function(x,i){return(i+1)+" = "+x.nom}).join(String.fromCharCode(10)),"1");if(!rep)return"annulé";
+      var f=fs[(parseInt(rep,10)||1)-1];if(!f)return"fournisseur inconnu";CMDFID=f.id;
+      r=await api("/achats/depuis-devis",{devisLigneId:ids[k],fournisseurId:f.id})}
+    ok++;msg=r.message||msg}
+  CMDFID=0;return ok+" pièce(s) ajoutée(s) au panier fournisseur."}
+function cmdLignesPieces(d){return(d.lignes||[]).filter(function(l){return l.type==="piece"&&!l.commande&&!/^Livraison à domicile/i.test(l.libelle)}).map(function(l){return l.id})}
+var CMDLIV={mode:"boutique",adresse:"",cp:"",ville:""};
+function cmdPopHtml(){
+  return"<div class='cpop' id='cmdpop'><div class='cpbox' style='max-width:520px;padding:18px'><div class='step'>Commande pour "+esc(CCLI?CCLI.name:"")+"</div><div class='muted'>Comment le client récupère sa commande ?</div>"
+    +"<div class='seg' style='margin:10px 0'><button class='"+(CMDLIV.mode==="boutique"?"on":"")+"' data-act='cmdMode' data-m='boutique'>🏬 Retrait en boutique</button><button class='"+(CMDLIV.mode==="domicile"?"on":"")+"' data-act='cmdMode' data-m='domicile'>🚚 Livraison à domicile (+4,95 €)</button></div>"
+    +(CMDLIV.mode==="domicile"?"<div class='muted'>La commande part via le site, comme une commande web, à son adresse.</div><div class='dl'><input id='cmd-a' class='lb' placeholder='Adresse' value='"+esc(CMDLIV.adresse)+"'></div><div class='dl'><input id='cmd-c' placeholder='Code postal' value='"+esc(CMDLIV.cp)+"' style='max-width:140px'><input id='cmd-v' class='lb' placeholder='Ville' value='"+esc(CMDLIV.ville)+"'></div>":"")
+    +"<div class='actions'><button data-act='cmdGo'>Créer la commande</button><button class='sec' data-act='cmdFerme'>Annuler</button></div></div></div>"}
+function cmdPopShow(){var o=document.getElementById("cmdpop");if(o)o.remove();document.body.insertAdjacentHTML("beforeend",cmdPopHtml())}
+document.addEventListener("input",function(e){var i=e.target&&e.target.id;if(i==="cmd-a")CMDLIV.adresse=e.target.value;else if(i==="cmd-c")CMDLIV.cp=e.target.value;else if(i==="cmd-v")CMDLIV.ville=e.target.value});
+ACTS.cmdMode=function(b){CMDLIV.mode=b.dataset.m;cmdPopShow()};
+ACTS.cmdFerme=function(){var o=document.getElementById("cmdpop");if(o)o.remove()};
 ACTS.cCmdClient=async function(){
   if(!PAN.length){alert("Le panier est vide.");return}
   if(!CCLI){alert("Choisis d'abord le client (recherche ou scan de carte).");return}
-  if(!confirm("Créer la commande pour "+CCLI.name+" ? Les pièces du panier iront dans le dossier du client, à commander au fournisseur."))return;
-  try{var r=await cartVersDevis();if(!r)return;var p=await api("/devis-simples/rattacher",{id:r.id});await api("/devis-lignes/remise-client",{repairId:p.reparationId,valeur:true});cartVide();DV.list=null;DEVHINT="Commande client : clique sur « À commander » à côté de chaque pièce, puis demande l'acompte ou le paiement. La pièce apparaîtra dans le bloc 📦 Client à son arrivée.";await ouvrirFiche(p.reparationId)}catch(e){alert(e.message)}};
+  CMDLIV={mode:"boutique",adresse:"",cp:"",ville:""};
+  try{var a=await api("/client-adresse?id="+CCLI.id);CMDLIV.adresse=a.adresse;CMDLIV.cp=a.cp;CMDLIV.ville=a.ville}catch(e){}
+  cmdPopShow()};
+ACTS.cmdGo=async function(){
+  var dom=CMDLIV.mode==="domicile";
+  if(dom&&(!CMDLIV.adresse.trim()||!CMDLIV.cp.trim()||!CMDLIV.ville.trim())){alert("Indique l'adresse, le code postal et la ville.");return}
+  ACTS.cmdFerme();
+  try{
+    if(dom&&livIdx()<0)PAN.push({libelle:"Livraison à domicile",quantite:1,prix:"4,95",type:"article",variantId:"",sku:""});
+    var r=await cartVersDevis();if(!r)return;var p=await api("/devis-simples/rattacher",{id:r.id});await api("/devis-lignes/remise-client",{repairId:p.reparationId,valeur:true});
+    if(dom)await api("/reparations/livraison",{repairId:p.reparationId,adresse:CMDLIV.adresse,cp:CMDLIV.cp,ville:CMDLIV.ville});
+    var f=await api("/reparation?id="+p.reparationId);var m=await cmdAuto(cmdLignesPieces(f));
+    cartVide();DV.list=null;CMD=null;CCL=null;CMDMSG="Commande client créée ("+(dom?"livraison à domicile":"retrait en boutique")+") : "+m+" Devis et dossier : PC-"+("0000"+p.reparationId).slice(-4)+".";FICHE=null;CUR=null;TAB="cmd";render()}catch(e){alert(e.message)}};
+ACTS.cSepOk=function(){};
 ACTS.cEnPec=async function(){
   if(!PAN.length){alert("Le panier est vide.");return}
   if(!confirm("Créer une prise en charge (réparation en boutique) avec ce panier ?"))return;

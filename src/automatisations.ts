@@ -104,6 +104,13 @@ async function cycle() {
         if (r === "envoye") await sql`UPDATE bons_achat SET rappels = ${b.etape} WHERE id = ${b.id}`;
       }
     }
+    // Commandes clients passées chez le fournisseur sans nouvelle depuis 7 jours : une tâche dans la to-do.
+    const vieilles = (await sql`SELECT l.id, l.libelle, l.reparation_id, f.nom AS fournisseur, cl.prenom, cl.nom FROM commande_lignes l JOIN devis_lignes dl ON dl.id = l.devis_ligne_id AND dl.remise_client JOIN reparations r ON r.id = l.reparation_id JOIN clients cl ON cl.id = r.client_id LEFT JOIN fournisseurs f ON f.id = l.fournisseur_id WHERE l.statut = 'commandee' AND l.commandee_le < now() - interval '7 days'`) as any[];
+    for (const v of vieilles) {
+      const texte = `Commande client sans nouvelle depuis 7 jours : ${v.libelle} pour ${`${v.prenom} ${v.nom}`.trim()} (PC-${String(v.reparation_id).padStart(4, "0")}${v.fournisseur ? ", " + v.fournisseur : ""}) [CC${v.id}]`;
+      const [dej] = await sql`SELECT id FROM taches WHERE texte = ${texte}`;
+      if (!dej) await sql`INSERT INTO taches (texte, priorite, cree_par) VALUES (${texte}, true, 'Automatique')`;
+    }
     if (auto.avis !== "off") {
       const rows = (await sql`SELECT r.id, r.client_id, r.magasin, c.prenom FROM reparations r JOIN clients c ON c.id = r.client_id WHERE r.avis_statut = 'programme' AND r.avis_envoi_le <= now() AND r.supprime_le IS NULL LIMIT 20`) as any[];
       for (const r of rows) {
