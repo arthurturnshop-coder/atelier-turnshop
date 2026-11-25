@@ -1,4 +1,5 @@
-export const ACTIONS = `var ACTS={
+export const ACTIONS = `function prFiltre(q){q=(q||'').toLowerCase();document.querySelectorAll('.prrow').forEach(function(r){r.style.display=r.dataset.n.indexOf(q)>=0?'':'none'})}
+var ACTS={
   chooseMag:function(b){loadProfils(b.dataset.mag)},
   choosePrenom:choosePrenom,
   loginBack:function(){LG={step:"mag"};MSG="";render()},
@@ -120,6 +121,14 @@ export const ACTIONS = `var ACTS={
     var mdpC=await demandeCode("Qui encaisse ?");if(mdpC===null)return;
     try{var d=await api("/caisse/encaisser",{lignes:PAN,paiements:pay,clientId:CCLI?CCLI.id:null,utiliserFidelite:CUSE,avantageIds:ids,repairId:CREP,mdpCaissier:mdpC});CMDP="";CRAFF=CREP?CAFF:[];CAFF=[];CREP=null;CACO=0;PAN=[];CPAY={carte:"",especes:"",virement:"",bon_achat:""};CUSE=false;CAVOFF=[];CREC=d.vente;CMSG="";CHOPEN=0;CCLI=null;CFID=null;await chargeHisto()}catch(e){CMSG=e.message;render()}},
   shopTest:async function(){SHOPRES="<div class='muted'>Test en cours…</div>";render();try{var d=await api("/shopify/diagnostic");SHOPRES=d.etapes.map(function(e){return"<div>"+(e.ok?"✅ ":"❌ ")+"<b>"+esc(e.nom)+"</b><div class='muted'>"+esc(e.detail)+"</div></div>"}).join("")}catch(e){SHOPRES=esc(e.message)}render()},
+  prPop:function(){PRPOP={sel:{}};render()},
+  prFerme:function(){PRPOP=null;render()},
+  prFond:function(b,e){},
+  prTog:function(b){if(!PRPOP)return;var i=b.dataset.id;if(PRPOP.sel[i])delete PRPOP.sel[i];else PRPOP.sel[i]=1;var q=document.getElementById("pr-q"),qv=q?q.value:"",sc=document.querySelector(".prlist"),st=sc?sc.scrollTop:0;render();q=document.getElementById("pr-q");if(q){q.value=qv;prFiltre(qv)}sc=document.querySelector(".prlist");if(sc)sc.scrollTop=st},
+  prAjoute:async function(){if(!PRPOP||!FICHE)return;var ids=Object.keys(PRPOP.sel),L=PRESTA?PRESTA.prestations:[],last=null;
+    try{for(var k=0;k<ids.length;k++){var x=L.filter(function(p){return p.id===+ids[k]})[0];if(!x)continue;await api("/devis/ligne",{repairId:FICHE.id,type:"main_oeuvre",libelle:x.nom,quantite:1,prix:String(x.prixCents/100).replace(".",",")});last=x}
+      PRPOP=null;DEVOPT=last&&ids.length===1&&(last.options||[]).length?last.id:0;DEVHINT=last&&ids.length===1&&last.avecPiece?"Choisis maintenant : "+(last.pieceAide||"la pièce")+" (cherche-la dans le catalogue ci-dessous).":"";
+      await recharger(FICHE.id)}catch(e){alert(e.message)}},
   addPresta:async function(b){var x=(PRESTA?PRESTA.prestations:[]).filter(function(p){return p.id===+b.dataset.id})[0];if(!x||!FICHE)return;
     try{await api("/devis/ligne",{repairId:FICHE.id,type:"main_oeuvre",libelle:x.nom,quantite:1,prix:String(x.prixCents/100).replace(".",",")});
       DEVOPT=(x.options||[]).length?x.id:0;

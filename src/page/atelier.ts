@@ -67,12 +67,20 @@ function devisHtml(f){
     +"<div class='tot'>Total du devis : "+eur(d.netCents==null?d.totalCents:d.netCents)+"</div>"
     +(d.lignes.length?"<button data-act='facturer' data-id='"+f.id+"'>Facturer ce devis (passer en caisse)</button> <button class='sec' data-act='dvEnvoyer' data-id='"+f.id+"'>📧 Envoyer le devis au client</button>":"")
     +dvEnvHtml(f)+"</div>"}
+var PRPOP=null;
+document.addEventListener('input',function(e){if(e.target&&e.target.id==='pr-q')prFiltre(e.target.value)});
+function prPopHtml(l){
+  var n=Object.keys(PRPOP.sel).length;
+  return"<div class='prpop' data-act='prFond'><div class='prbox'><div class='step'>Toutes les prestations</div><input id='pr-q' placeholder='Rechercher une prestation…' autocomplete='off'><div class='prlist'>"
+    +l.map(function(x){var on=PRPOP.sel[x.id];return"<button class='prrow"+(on?" on":"")+"' data-act='prTog' data-id='"+x.id+"' data-n='"+esc(x.nom.toLowerCase())+"'><span>"+(on?"✓ ":"")+esc(x.nom)+"</span><span class='muted'>"+eur(x.prixCents)+(x.avecPiece?" + "+esc(x.pieceAide||"pièce"):"")+"</span></button>"}).join("")
+    +"</div><div class='actions'><button data-act='prAjoute'"+(n?"":" disabled")+">Ajouter la sélection ("+n+")</button><button class='sec' data-act='prFerme'>Fermer</button></div></div></div>"}
 function prestaBox(f){
   prestaLoad();
   var l=(PRESTA?PRESTA.prestations:[]).filter(function(x){return x.actif});
   var h="<div class='step' style='margin-top:10px'>Prestations</div>";
   if(!l.length)h+="<div class='muted'>Aucune prestation. Un admin peut en créer dans ⚙ Paramètres.</div>";
-  else h+="<div class='presta'>"+l.map(function(x){return"<button class='sec' data-act='addPresta' data-id='"+x.id+"'><b>"+esc(x.nom)+"</b><br><span class='muted'>"+eur(x.prixCents)+(x.avecPiece?" + "+esc(x.pieceAide||"pièce"):"")+"</span></button>"}).join("")+"</div>";
+  else h+="<div class='presta'>"+l.slice(0,8).map(function(x){return"<button class='sec' data-act='addPresta' data-id='"+x.id+"'><b>"+esc(x.nom)+"</b><br><span class='muted'>"+eur(x.prixCents)+(x.avecPiece?" + "+esc(x.pieceAide||"pièce"):"")+"</span></button>"}).join("")+"</div>"+(l.length>8?"<button class='sec' data-act='prPop' style='margin:4px 0'>Voir toutes les prestations ("+l.length+")</button>":"");
+  if(PRPOP)h+=prPopHtml(l);
   if(PRESTA&&PRESTA.multi&&PRESTA.multi.remiseCents)h+="<div class='muted'>"+PRESTA.multi.seuil+" prestations ou plus : -"+eur(PRESTA.multi.remiseCents)+" (sans offre cumulée)</div>";
   var xo=DEVOPT?(PRESTA?PRESTA.prestations:[]).filter(function(p){return p.id===DEVOPT})[0]:null;
   if(xo&&(xo.options||[]).length)h+="<div class='step' style='margin-top:10px'>Options pour "+esc(xo.nom)+"</div><div class='presta'>"+xo.options.map(function(o){return"<button class='sec' data-act='addOpt' data-pid='"+xo.id+"' data-id='"+o.id+"'><b>"+esc(o.nom)+"</b><br><span class='muted'>+"+eur(o.prixCents)+"</span></button>"}).join("")+"</div>";
