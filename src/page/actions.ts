@@ -1,4 +1,4 @@
-export const ACTIONS = `function prFiltre(q){q=(q||'').toLowerCase();document.querySelectorAll('.prrow').forEach(function(r){r.style.display=r.dataset.n.indexOf(q)>=0?'':'none'})}
+export const ACTIONS = `function prFiltre(q){q=(q||'').toLowerCase();document.querySelectorAll('.prrow').forEach(function(r){r.style.display=r.dataset.n.indexOf(q)>=0?'':'none'});document.querySelectorAll('.prfam').forEach(function(h){var e=h.nextElementSibling,v=false;while(e&&e.classList.contains('prrow')){if(e.style.display!=='none')v=true;e=e.nextElementSibling}h.style.display=v?'':'none'})}
 var ACTS={
   chooseMag:function(b){loadProfils(b.dataset.mag)},
   choosePrenom:choosePrenom,
