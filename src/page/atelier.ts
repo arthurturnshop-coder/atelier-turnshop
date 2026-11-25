@@ -13,14 +13,15 @@ function vEnc(){
   if(FICHE){vFiche();return}
   app.innerHTML=subHtml()+"<div id='vues' class='vues'></div><div id='liste'>Chargement…</div>";
   loadEnc()}
-var VUES=[["tout","Tout"],["rdv","Rendez-vous"],["afaire","À faire"],["commande","En commande"],["pretes","Prêtes"],["garantie","Sous garantie"]];
+var VUES=[["tout","Tout"],["rdv","Rendez-vous"],["afaire","À faire"],["commande","En commande"],["pretes","Prêtes"],["garantie","Sous garantie"],["pieces","🛠 Pièces garantie"]];
 function vuesHtml(cpt){
-  return VUES.map(function(x){return"<button class='"+(VUE===x[0]?"on":"")+"' data-act='vue' data-vue='"+x[0]+"'>"+x[1]+"<b>"+(cpt?cpt[x[0]=="rdv"?"rdv":x[0]]:0)+"</b></button>"}).join("")}
+  return VUES.map(function(x){return"<button class='"+(VUE===x[0]?"on":"")+"' data-act='vue' data-vue='"+x[0]+"'>"+x[1]+"<b>"+(x[0]==="pieces"?(SAV?SAV.length:0):(cpt?cpt[x[0]=="rdv"?"rdv":x[0]]:0))+"</b></button>"}).join("")}
 async function loadEnc(){
   var el=document.getElementById("liste");if(!el)return;var d;
-  try{d=await api("/reparations?vue="+encodeURIComponent(VUE))}catch(e){el.innerHTML="<div class='card'>"+esc(e.message)+"</div>";return}
+  try{d=await api("/reparations?vue="+encodeURIComponent(VUE==="pieces"?"tout":VUE));try{SAV=(await api("/sav/dossiers")).dossiers}catch(e2){}}catch(e){el.innerHTML="<div class='card'>"+esc(e.message)+"</div>";return}
   LST=d;
   var vu=document.getElementById("vues");if(vu)vu.innerHTML=vuesHtml(d.compteurs);
+  if(VUE==="pieces"){el.innerHTML=(SAV&&SAV.length?blocGaranties():"<div class='card'>Aucune pièce sous garantie en cours. Pour en ouvrir une : fiche client > Achats > ouvre le ticket > « 🛠 Garantie pièce ».</div>");return}
   var l=d.reparations;
   if(!l.length){el.innerHTML="<div class='card'>Aucune réparation dans cette vue.</div>";return}
   var card=function(r){
