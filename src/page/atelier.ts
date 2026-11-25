@@ -21,7 +21,7 @@ async function loadEnc(){
   try{d=await api("/reparations?vue="+encodeURIComponent(VUE==="pieces"?"tout":VUE));try{SAV=(await api("/sav/dossiers")).dossiers}catch(e2){}}catch(e){el.innerHTML="<div class='card'>"+esc(e.message)+"</div>";return}
   LST=d;
   var vu=document.getElementById("vues");if(vu)vu.innerHTML=vuesHtml(d.compteurs);
-  if(VUE==="pieces"){el.innerHTML=(SAV&&SAV.length?blocGaranties():"<div class='card'>Aucune pièce sous garantie en cours. Pour en ouvrir une : fiche client > Achats > ouvre le ticket > « 🛠 Garantie pièce ».</div>");return}
+  if(VUE==="pieces"){el.innerHTML=(SAV&&SAV.length?blocGaranties(true):"<div class='card'>Aucune pièce sous garantie en cours. Pour en ouvrir une : fiche client > Achats > ouvre le ticket > « 🛠 Garantie pièce ».</div>");return}
   var l=d.reparations;
   if(!l.length){el.innerHTML="<div class='card'>Aucune réparation dans cette vue.</div>";return}
   var card=function(r){

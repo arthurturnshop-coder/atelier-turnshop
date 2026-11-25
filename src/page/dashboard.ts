@@ -45,10 +45,11 @@ function blocTaches(){
 var SAV=null,SAVED=0;
 function savReload(){return api("/sav/dossiers").then(function(d){SAV=d.dossiers;render()}).catch(function(){})}
 function savDate(x){return x?x.slice(8,10)+"/"+x.slice(5,7):""}
-function blocGaranties(){
-  if(!SAV||!SAV.length)return"";
-  var h="<div class='card'><b>Garanties en cours ("+SAV.length+")</b>";
-  SAV.forEach(function(d){
+function blocGaranties(tous){
+  var L=(SAV||[]).filter(function(d){return tous||d.statut==="a_traiter"||d.enRetard});
+  if(!L.length)return"";
+  var h="<div class='card'><b>"+(tous?"Garanties en cours (":"Garanties à traiter (")+L.length+")</b>"+(tous?"":"<div class='muted'>Seulement ce qui demande une action : demande à faire, ou relance due.</div>");
+  L.forEach(function(d){
     var st=d.statut==="a_traiter"?"À traiter : faire la demande au fournisseur":"Demande faite"+(d.demandeLe?" le "+savDate(String(d.demandeLe).slice(0,10)):"")+(d.fournisseur?" chez "+esc(d.fournisseur):"")+(d.rma?" · RMA "+esc(d.rma):"");
     h+="<div style='border-top:1px solid #e3e3e3;padding:8px 0'><b>"+esc(d.libelle)+"</b> · "+esc(d.client||"sans client")+" · "+esc(d.numero)+(d.motif?"<div class='muted'>"+esc(d.motif)+"</div>":"")
       +"<div"+(d.enRetard?" style='color:#b00;font-weight:700'":" class='muted'")+">"+st+(d.relanceLe?" · prochaine relance le "+savDate(d.relanceLe):"")+"</div>";
