@@ -1,4 +1,8 @@
 export const CREATION = `// ---------- Création directe : prise en charge / rendez-vous / devis (dans l'Atelier) ----------
+var CREF={};
+function creRestore(){Object.keys(CREF).forEach(function(k){var e=document.getElementById(k);if(!e)return;if(e.type==="checkbox")e.checked=CREF[k];else if(e.tagName==="SELECT"){for(var i=0;i<e.options.length;i++){if(e.options[i].value===CREF[k]&&!e.options[i].disabled){e.value=CREF[k];break}}}else e.value=CREF[k]});var n=document.getElementById("ct-new"),sl=document.getElementById("ct-sel");if(n&&sl)n.style.display=sl.value==="new"?"":"none"}
+function creSave(e){var t=e.target;if(!t||!t.id||!/^(cr|ct|cn)-/.test(t.id)||ATSUB!=="creer")return;CREF[t.id]=t.type==="checkbox"?t.checked:t.value}
+document.addEventListener("input",creSave);document.addEventListener("change",creSave);
 var LISTES=null;
 function listesCharge(){if(LISTES===null){LISTES=undefined;api("/parametres/listes").then(function(d){LISTES=d;render()}).catch(function(){LISTES={pannes:[],etats:[]};render()})}}
 var CRE={mode:"prise",q:"",res:null,cli:null,msg:"",busy:false};
@@ -38,9 +42,9 @@ function vCreer(){
     +(m==="prise"?"<div style='display:flex;align-items:center;gap:10px'><span class='muted'>Nombre de tickets</span>"+pecNbSelect("cr")+"</div>":"")+"</div>";
   h+="</div>";
   h+="<div class='cre-bar'><button data-act='creOk'"+(CRE.busy?" disabled":"")+" style='min-width:260px'>"+(m==="devis"?"Créer le devis":(m==="rdv"?"Créer le rendez-vous":"Créer la prise en charge"))+"</button><button class='sec' data-act='creAnnule'>Annuler</button></div>";
-  app.innerHTML=h}
-ACTS.creer=function(b){CRE={mode:b.dataset.k,q:"",res:null,cli:null,msg:"",busy:false};FICHE=null;TAB="enc";ATSUB="creer";render();setTimeout(function(){var e=document.getElementById("cre-q");if(e)e.focus()},50)};
-ACTS.crePanne=function(b){var e=document.getElementById("cr-p");if(!e)return;var t=b.dataset.t,x=e.value.trim();if((", "+x+", ").toLowerCase().indexOf(", "+t.toLowerCase()+", ")>=0||x.toLowerCase()===t.toLowerCase())return;e.value=x?x+", "+t:t;e.focus()};
+  app.innerHTML=h;creRestore()}
+ACTS.creer=function(b){CREF={};CRE={mode:b.dataset.k,q:"",res:null,cli:null,msg:"",busy:false};FICHE=null;TAB="enc";ATSUB="creer";render();setTimeout(function(){var e=document.getElementById("cre-q");if(e)e.focus()},50)};
+ACTS.crePanne=function(b){var e=document.getElementById("cr-p");if(!e)return;var t=b.dataset.t,x=e.value.trim();if((", "+x+", ").toLowerCase().indexOf(", "+t.toLowerCase()+", ")>=0||x.toLowerCase()===t.toLowerCase())return;e.value=x?x+", "+t:t;CREF["cr-p"]=e.value;e.focus()};
 ACTS.creAnnule=function(){ATSUB="liste";render()};
 ACTS.creAutreCli=function(){CRE.cli=null;CRE.res=null;render()};
 ACTS.creChercher=function(){CRE.q=v("cre-q");if(!CRE.q)return;api("/search?q="+encodeURIComponent(CRE.q)).then(function(r){CRE.res=r;render()}).catch(function(e){CRE.msg=e.message;render()})};
@@ -63,7 +67,7 @@ ACTS.creOk=async function(){
     else{if(!v("ct-m")||!v("ct-mo"))throw new Error("Indique la marque et le modèle de la trottinette.");
       var dt=await api("/trottinettes",{customerId:cid,marque:v("ct-m"),modele:v("ct-mo"),serie:v("ct-s")||("NC-"+Date.now())});tid=dt.id}
     var d=await api("/reparations",{customerId:cid,trottinetteId:tid,panne:(m==="devis"?"Devis : ":"")+pn,etat:v("cr-e"),remarques:v("cr-r"),boite:v("cr-b"),affaires:affairesLire("cr"),codeAcces:v("cr-k"),dateDepot:v("cr-d"),enMagasin:!(abs&&abs.checked),sousGarantie:!!(gar&&gar.checked)});
-    CRE.busy=false;ATSUB="liste";
+    CRE.busy=false;CREF={};ATSUB="liste";
     await ouvrirFiche(d.id);
     if(m==="prise"&&pec&&pec.checked&&!(abs&&abs.checked))await imprimerPEC(d.id,nbp)
   }catch(e){CRE.busy=false;CRE.msg=e.message;render()}};
