@@ -102,6 +102,9 @@ button.link{background:none;color:#111;border:0;text-decoration:underline;min-he
 .dl{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .dl input,.dl select{margin:4px 0}
 .dl .q{flex:0 0 70px;width:70px}.dl .p{flex:0 0 100px;width:100px}.dl .t{flex:0 0 150px;width:150px}
+.seg{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0}.seg button{flex:1 1 150px;width:auto;min-height:52px;margin:0;background:#f6f8f6;color:#26332b;border:2px solid #cfd8d2;border-radius:0;font-weight:700;font-size:16px}.seg button.on{background:var(--vert);border-color:var(--vert);color:#fff}
+.paytiles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:8px 0}.paytiles div{background:#f6f8f6;border:1px solid #d9dfda;padding:12px 14px}.paytiles span{display:block;font-size:13px;color:#5b6a61;font-weight:600}.paytiles b{font-size:24px}.paytiles .due{background:#fdf3e1;border-color:#d68910}.paytiles .okk{background:#e9f5ee;border-color:#1e8449}
+.payh{width:100%;border-collapse:collapse;margin:6px 0}.payh th,.payh td{padding:7px 8px;border-bottom:1px solid #e3e8e4;text-align:left;font-size:14px}.payh .n{text-align:right}
 .sel{-webkit-appearance:none;appearance:none;flex:0 0 auto;width:auto!important;min-width:200px;min-height:48px;margin:4px 0!important;padding:0 40px 0 14px!important;font-size:16px!important;font-weight:600;color:#26332b!important;letter-spacing:0!important;background:#fff url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='9'><path d='M1 1l6 6 6-6' fill='none' stroke='%231e8449' stroke-width='2'/></svg>") no-repeat right 14px center!important;border:1px solid var(--vert)!important;border-radius:0!important;cursor:pointer}.dl .lb{flex:1 1 180px}
 .dl button{width:auto;flex:0 0 auto;margin:4px 0}
 .panier td input{width:70px;padding:6px;margin:0}

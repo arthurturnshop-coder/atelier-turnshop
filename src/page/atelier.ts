@@ -74,7 +74,6 @@ function prFam(n){n=(n||"").toLowerCase();var i=4;
   else if(/batterie|data|moteur|contr|gâchette|gachette|éclairage|eclairage|led/.test(n))i=2;
   else if(/colonne|garde-boue|boue/.test(n))i=3;
   return i}
-document.addEventListener('input',function(e){if(e.target&&(e.target.id==='ac-r'||e.target.id==='ac-m')){var m=pxCents(v('ac-m')),r=pxCents(v('ac-r')),o=document.getElementById('ac-rendu');if(o)o.textContent=r>m&&m>0?'💶 À rendre au client : '+eur(r-m):''}});
 var PRPOP=null;
 document.addEventListener('input',function(e){if(e.target&&e.target.id==='pr-q')prFiltre(e.target.value)});
 function prPopHtml(l){
@@ -158,14 +157,36 @@ function webHtml(f){
   else if(st==="annule")h+="<div class='muted'><span class='tag warn'>Annulé par le client</span> Pense à rembourser l'acompte s'il y en a un.</div>";
   else if(st==="confirme")h+="<div class='muted'><span class='tag ok'>RDV confirmé</span> Place-le dans le Planning.</div>";
   return h+"</div>"}
+var ACM="carte",ACV=null,ACR="",RBM="";
+function moyBtns(cur,act){return"<div class='seg'>"+[["carte","💳 Carte"],["especes","💶 Espèces"],["virement","🏦 Virement"]].map(function(m){return"<button class='"+(cur===m[0]?"on":"")+"' data-act='"+act+"' data-m='"+m[0]+"'>"+m[1]+"</button>"}).join("")+"</div>"}
+function payInfo(f){
+  var a=f.acompte||{verseCents:0,rembourseCents:0,resteCents:0,histo:[],facture:null},d=f.devis||{lignes:[]};
+  var tot=d.lignes&&d.lignes.length?(d.netCents==null?d.totalCents:d.netCents):0;
+  var net=a.verseCents-(a.rembourseCents||0),due=tot-net;
+  return{a:a,tot:tot,net:net,due:due}}
 function acompteHtml(f){
-  var a=f.acompte||{verseCents:0,resteCents:0,liste:[]};
-  var h="<div class='card'><div class='step'>Acompte / paiement d'avance</div>";
-  if(a.verseCents>0)h+="<div>Versé : <b>"+eur(a.verseCents-(a.rembourseCents||0))+"</b>"+(a.rembourseCents?" <span class='muted'>(acomptes "+eur(a.verseCents)+", dont "+eur(a.rembourseCents)+" remboursé)</span>":"")+" · À déduire de la facture : <b>"+eur(a.resteCents)+"</b></div>";
-  else h+="<div class='muted'>Aucun acompte versé.</div>";
-  h+="<div class='dl'><input id='ac-m' class='p' placeholder='Montant €'><select id='ac-t' class='sel'><option value='carte'>Carte</option><option value='especes'>Espèces</option><option value='virement'>Virement</option></select><button data-act='acompte' data-id='"+f.id+"'>Encaisser l'acompte</button></div><div class='dl'><input id='ac-r' style='flex:0 0 230px;width:230px' placeholder='Donné par le client €'><div id='ac-rendu' class='big' style='color:#b00;margin:0'></div></div>";
-  if(a.resteCents>0&&estResp())h+="<div class='step' style='margin-top:10px'>Rembourser l'acompte ("+eur(a.resteCents)+")</div><div class='dl'><select id='rb-t' class='sel'><option value=''>Comment ?</option><option value='carte'>Par carte</option><option value='especes'>En espèces</option><option value='virement'>Par virement</option><option value='carte_cadeau'>Carte cadeau Shopify (bon d'achat, en ligne + boutique)</option><option value='bon'>Bon d'achat atelier (caisse du logiciel)</option></select><button class='danger' data-act='rembourse' data-id='"+f.id+"' data-c='"+a.resteCents+"'>Rembourser</button></div>";
+  var P=payInfo(f),a=P.a,tot=P.tot,net=P.net,due=P.due;
+  var h="<div class='card'><div class='step'>💶 Paiements de la réparation</div>";
+  var etat=a.facture?["Facturé","ok"]:(tot>0?(due<=0?(due<0?["Trop perçu : à rembourser","warn"]:["Soldé : prêt à facturer","ok"]):(net>0?["Acompte versé : reste "+eur(due),"warn"]:["Aucun paiement","warn"])):["Devis vide","warn"]);
+  h+="<div class='paytiles'><div><span>Total du devis</span><b>"+(tot>0?eur(tot):"—")+"</b></div><div><span>Déjà versé</span><b>"+eur(net)+"</b></div><div class='"+(due>0?"due":"okk")+"'><span>"+(due<0?"À rembourser":"Reste à payer")+"</span><b>"+(tot>0?eur(Math.abs(due)):"—")+"</b></div></div>"
+    +"<div style='margin:6px 0'><span class='tag "+etat[1]+"'>"+etat[0]+(a.facture&&a.facture.numero?" "+esc(a.facture.numero):"")+"</span></div>";
+  if((a.histo||[]).length){h+="<table class='payh'><tr><th>Date</th><th>Mouvement</th><th>Moyen</th><th>Par</th><th class='n'>Montant</th></tr>"+a.histo.map(function(x){var re=x.kind==="remboursement";return"<tr><td>"+esc(dateLongue(x.date))+"</td><td>"+(re?"↩ Remboursement":"➕ Acompte / paiement")+"</td><td>"+esc((x.moyen||"").replace(/_/g," ").replace("especes","espèces"))+"</td><td>"+esc(x.par||"")+"</td><td class='n' style='color:"+(re?"#b00":"#1e8449")+"'><b>"+(re?"-":"+")+eur(x.cents)+"</b></td></tr>"}).join("")+"</table>"}
+  else h+="<div class='muted'>Aucun paiement pour l'instant.</div>";
+  if(!a.facture){
+    var def=ACV!==null?ACV:(due>0?String(due/100).replace(".",","):"");
+    h+="<div class='step' style='margin-top:14px'>Encaisser (acompte ou solde)</div>"+moyBtns(ACM,"acMoy")
+      +"<div class='dl'><input id='ac-m' style='flex:0 0 180px;width:180px' placeholder='Montant €' value='"+esc(def)+"'>"
+      +(due>0?"<button class='sec' data-act='acSolde' data-v='"+String(due/100).replace(".",",")+"'>Solde : "+eur(due)+"</button>"+(net===0&&due>=200?"<button class='sec' data-act='acSolde' data-v='"+String(Math.round(due/2)/100).replace(".",",")+"'>50 % : "+eur(Math.round(due/2))+"</button>":""):"")+"</div>"
+      +(ACM==="especes"?"<div class='dl'><input id='ac-r' style='flex:0 0 230px;width:230px' placeholder='Donné par le client €' value='"+esc(ACR)+"'><div id='ac-rendu' class='big' style='color:#b00;margin:0'></div></div>":"")
+      +"<button data-act='acompte' data-id='"+f.id+"' style='width:100%;min-height:52px'>Encaisser le paiement</button>";
+    if(tot>0&&(f.devis.lignes||[]).length)h+="<div class='step' style='margin-top:14px'>Facture finale</div>"
+      +"<button data-act='acSolder' data-id='"+f.id+"' style='width:100%;min-height:52px'>"+(due>0?"✅ Encaisser le solde ("+eur(due)+") et facturer":"✅ Facturer (déjà soldé)")+"</button>"
+      +"<div class='muted'>Les acomptes sont déduits automatiquement. Offres ou cagnotte à appliquer ? <button class='link' data-act='facturer' data-id='"+f.id+"'>Passer en caisse</button> (tu pourras revenir sur la fiche depuis l'Atelier).</div>";
+    if(net>0&&estResp())h+="<div class='step' style='margin-top:14px'>Rembourser le client</div><div class='seg'>"+[["carte","💳 Carte"],["especes","💶 Espèces"],["virement","🏦 Virement"],["bon","🎟 Bon d'achat atelier"],["carte_cadeau","🎁 Carte cadeau Shopify"]].map(function(m){return"<button class='"+(RBM===m[0]?"on":"")+"' data-act='rbMoy' data-m='"+m[0]+"'>"+m[1]+"</button>"}).join("")+"</div>"
+      +"<div class='dl'><input id='rb-m' style='flex:0 0 180px;width:180px' placeholder='Montant € (vide = tout)' value=''>"+(due<0?"<button class='sec' data-act='rbTrop' data-v='"+String(-due/100).replace(".",",")+"'>Trop perçu : "+eur(-due)+"</button>":"")+"<button class='danger' data-act='rbFait' data-id='"+f.id+"'>Rembourser</button></div><div class='muted'>Maximum remboursable : "+eur(a.resteCents)+"</div>"}
+  else h+="<div class='muted'>Facture "+esc(a.facture.numero||"")+" de "+eur(a.facture.cents)+" · "+esc(dateLongue(a.facture.date))+". Pour la réimprimer : « Ticket facture » en haut de la fiche.</div>";
   return h+"</div>"}
+document.addEventListener('input',function(e){if(!e.target)return;if(e.target.id==='ac-m')ACV=e.target.value;if(e.target.id==='ac-r')ACR=e.target.value;if(e.target.id==='ac-m'||e.target.id==='ac-r'){var m=pxCents(v('ac-m')),r=pxCents(v('ac-r')),o=document.getElementById('ac-rendu');if(o)o.textContent=r>m&&m>0?'💶 À rendre au client : '+eur(r-m):''}});
 async function recharger(id){try{FICHE=await api("/reparation?id="+id);render()}catch(e){FICHE=null;render()}}
 
 async function refresh(){if(CUR){CUR=await api("/customer?id="+CUR.id);render()}}

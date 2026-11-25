@@ -58,11 +58,27 @@ var ACTS={
       CACO=f.acompte?f.acompte.resteCents:0;
       CCLI=d.client;CFID=d.fidelite;CUSE=false;CAVOFF=[];CREC=null;CHOPEN=0;CREP=f.id;CAFF=f.affaires||[];CRAFF=[];CPAY={carte:"",especes:"",virement:"",bon_achat:""};CMSG="";
       FICHE=null;CUR=null;TAB="accueil";await chargeHisto()}catch(e){alert(e.message)}},
+  acMoy:function(b){ACM=b.dataset.m;render()},
+  acSolde:function(b){ACV=b.dataset.v;render()},
+  rbMoy:function(b){RBM=b.dataset.m;render()},
+  rbTrop:function(b){var e=document.getElementById("rb-m");if(e)e.value=b.dataset.v},
   acompte:async function(b){var m=pxCents(v("ac-m"));if(m<=0){alert("Indique le montant.");return}
-    try{var mdpA=await demandeCode("Qui encaisse l'acompte ?");if(mdpA===null)return;var d=await api("/reparations/acompte",{mdpCaissier:mdpA,repairId:+b.dataset.id,paiements:[{moyen:v("ac-t"),montant:v("ac-m")}]});await recharger(+b.dataset.id);CREC=d.vente;alert(d.message)}catch(e){alert(e.message)}},
-  rembourse:async function(b){var t=v("rb-t");if(!t){alert("Choisis comment rembourser.");return}
-    if(!confirm("Rembourser "+eur(+b.dataset.c)+" au client ?"))return;
-    try{var d=await api("/reparations/rembourser",{repairId:+b.dataset.id,moyen:t});alert(d.message);await recharger(+b.dataset.id)}catch(e){alert(e.message)}},
+    try{var mdpA=await demandeCode("Qui encaisse ?");if(mdpA===null)return;var d=await api("/reparations/acompte",{mdpCaissier:mdpA,repairId:+b.dataset.id,paiements:[{moyen:ACM,montant:v("ac-m")}]});
+      var rendu=ACM==="especes"?pxCents(v("ac-r"))-m:0;ACV=null;ACR="";await recharger(+b.dataset.id);CREC=null;alert(d.message+(rendu>0?"\\n💶 Monnaie à rendre au client : "+eur(rendu):""))}catch(e){alert(e.message)}},
+  acSolder:async function(b){var f=FICHE;if(!f)return;var P=payInfo(f),due=P.due;
+    if(due>0){var pm=pxCents(v("ac-m"));if(pm!==due){if(!confirm("Le montant saisi ("+eur(pm)+") ne correspond pas au solde ("+eur(due)+"). Encaisser le solde complet de "+eur(due)+" en "+({carte:"carte",especes:"espèces",virement:"virement"}[ACM])+" ?"))return}}
+    var rendu=(ACM==="especes"&&due>0)?pxCents(v("ac-r"))-due:0;
+    try{var mdpC=await demandeCode("Qui encaisse ?");if(mdpC===null)return;
+      var lignes=f.devis.lignes.map(function(l){return{libelle:l.libelle,quantite:l.quantite,prix:String(l.prixCents/100).replace(".",","),type:l.type,variantId:l.variantId||"",sku:l.sku||""}});
+      if(f.garde&&f.garde.fraisCents>0)lignes.push({libelle:"Gardiennage ("+f.garde.joursFrais+" jours x "+(f.garde.prixCents/100)+" EUR)",quantite:f.garde.joursFrais,prix:String(f.garde.prixCents/100).replace(".",","),type:"article",variantId:"",sku:""});
+      var c=await api("/caisse/client?id="+f.customerId);
+      var pay=due>0?[{moyen:ACM,montant:String(due/100).replace(".",",")}]:[];
+      var d=await api("/caisse/encaisser",{lignes:lignes,paiements:pay,clientId:f.customerId,utiliserFidelite:false,avantageIds:[],repairId:f.id,mdpCaissier:mdpC});
+      ACV=null;ACR="";await recharger(f.id);alert("✅ Facture créée"+(d.vente&&d.vente.numeroFacture?" : "+d.vente.numeroFacture:"")+"."+(rendu>0?"\\n💶 Monnaie à rendre au client : "+eur(rendu):""))}catch(e){alert(e.message)}},
+  rbFait:async function(b){if(!RBM){alert("Choisis comment rembourser.");return}
+    var P=payInfo(FICHE),mt=v("rb-m"),cents=mt?pxCents(mt):P.a.resteCents;
+    if(!confirm("Rembourser "+eur(cents)+" au client ?"))return;
+    try{var d=await api("/reparations/rembourser",{repairId:+b.dataset.id,moyen:RBM,montant:mt});RBM="";alert(d.message);await recharger(+b.dataset.id)}catch(e){alert(e.message)}},
   cAnnuleRep:function(){CREP=null;CAFF=[];CACO=0;PAN=[];lirePay();render()},
   cShopRetry:async function(b){try{var d=await api("/caisse/shopify",{venteId:+b.dataset.id});if(!d.ok)alert(d.erreur);await chargeHisto();if(CREC&&CREC.id===+b.dataset.id){var h=await api("/caisse/historique"+(CCLI?"?clientId="+CCLI.id:""));var m=h.ventes.filter(function(x){return x.id===CREC.id})[0];if(m){CREC=m;render()}}}catch(e){alert(e.message)}},
   tickSave:async function(){try{var d=await api("/reglages/ticket",{entete:v("tk-ent"),avisAmiens:v("tk-am"),avisRouen:v("tk-ro"),rdvUrl:v("tk-rdv"),siteUrl:v("tk-site"),coordAmiens:v("tk-ca"),coordRouen:v("tk-cr")});TICKMSG=d.message;TICK=null;render()}catch(e){TICKMSG=e.message;render()}},
