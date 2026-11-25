@@ -45,7 +45,7 @@ function achatsHtml(){
   PACH.list.forEach(function(r){
     var res=r.lignes.slice(0,2).map(function(l){return esc(l.libelle)}).join(", ")+(r.lignes.length>2?"…":"");
     h+="<button class='sec hrow' data-act='pAchOpen' data-id='"+r.id+"'><b>"+esc(dateLongue(r.date))+"</b> · "+eur(r.totalCents)+savTags(r)+"<br><span class='muted'>"+res+"</span></button>";
-    if(PACHOPEN===r.id)h+=recuHtml(r)+"<div class='actions'><button class='sec' data-act='cPrint' data-id='"+r.id+"'>Imprimer le reçu</button><button class='sec' data-act='cEmail' data-id='"+r.id+"'>✉ Envoyer par email</button></div><div class='actions'>"+(estResp()?"<button class='sec' data-act='svOpen' data-m='remb' data-id='"+r.id+"'>↩ Rembourser</button>":"")+"<button class='sec' data-act='svOpen' data-m='ech' data-id='"+r.id+"'>🔁 Échanger / bon d achat</button><button class='sec' data-act='svOpen' data-m='gar' data-id='"+r.id+"'>🛠 Garantie pièce</button></div>"+savForm(r)});
+    if(PACHOPEN===r.id)h+=recuBloc(r)});
   return h+"</div>"}
 async function loadAch(){
   var c=CUR;if(!c)return;PACHLOAD=c.id;var d;
