@@ -95,10 +95,12 @@ function pecHtml(f){
     +entBas(es,"Merci de votre confiance !");
   return h}
 function pecCss(){return"@page{size:80mm auto;margin:0}@media print{body>*:not(#impzone){display:none!important}#impzone{position:static;width:80mm;box-sizing:border-box;font-size:12px;padding:0 3mm;margin:0}}"}
-async function imprimerPEC(id){
+function pecNbSelect(k){return"<select id='pecnb-"+k+"' title='Nombre de tickets' style='width:auto;margin:0'><option value=''>⚙ Auto</option><option value='1'>1 seul</option><option value='2'>2</option><option value='3'>3</option></select>"}
+function pecNb(k){var e=document.getElementById("pecnb-"+k);return e&&e.value?+e.value:0}
+async function imprimerPEC(id,nb){
   // Deux exemplaires d'un coup (client + atelier), trois si un casque est laissé (le 3e s'agrafe au casque).
-  try{var f=await api("/reparation?id="+id);var t=pecHtml(f);var casque=(f.affaires||[]).indexOf("Casque")>=0;impImprimer(t,"recu",pecCss(),false,casque?3:2)}catch(e){alert(e.message)}}
-ACTS.pecPrint=function(b){btnFlash(b);imprimerPEC(+b.dataset.id)};
+  try{var f=await api("/reparation?id="+id);var t=pecHtml(f);var casque=(f.affaires||[]).indexOf("Casque")>=0;impImprimer(t,"recu",pecCss(),false,nb>0?nb:(casque?3:2))}catch(e){alert(e.message)}}
+ACTS.pecPrint=function(b){btnFlash(b);imprimerPEC(+b.dataset.id,pecNb(b.dataset.id))};
 
 // ----- Devis / facture en ticket 80 mm -----
 var RDVI=null;

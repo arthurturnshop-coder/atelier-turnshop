@@ -19,7 +19,7 @@ function vCreer(){
     +"<input id='cr-e' placeholder='État à l arrivée'><textarea id='cr-r' rows='2' placeholder='Remarques'></textarea>"+boiteSelect("cr-b")+affairesBox("cr")+"<input id='cr-k' placeholder='🔑 Code / mot de passe de la trottinette (facultatif)'><input id='cr-d' type='date' value='"+today()+"'>"
     +"<label class='muted' style='display:flex;gap:8px;align-items:center'><input id='cr-abs' type='checkbox' style='width:auto;margin:0'"+(m!=="prise"?" checked":"")+"> La trottinette n'est pas encore en magasin</label>"
     +"<label class='muted' style='display:flex;gap:8px;align-items:center'><input id='cr-gar' type='checkbox' style='width:auto;margin:0'> Sous garantie</label>"
-    +(m==="prise"?"<label class='muted' style='display:flex;gap:8px;align-items:center'><input id='cr-pec' type='checkbox' checked style='width:auto;margin:0'> Imprimer le ticket de prise en charge</label>":"")
+    +(m==="prise"?"<label class='muted' style='display:flex;gap:8px;align-items:center'><input id='cr-pec' type='checkbox' checked style='width:auto;margin:0'> Imprimer le ticket de prise en charge "+pecNbSelect("cr")+"</label>":"")
     +"<div class='actions'><button data-act='creOk'"+(CRE.busy?" disabled":"")+">"+(m==="devis"?"Créer le devis":(m==="rdv"?"Créer le rendez-vous":"Créer la prise en charge"))+"</button><button class='sec' data-act='creAnnule'>Annuler</button></div></div>";
   app.innerHTML=h}
 ACTS.creer=function(b){CRE={mode:b.dataset.k,q:"",res:null,cli:null,msg:"",busy:false};FICHE=null;TAB="enc";ATSUB="creer";render();setTimeout(function(){var e=document.getElementById("cre-q");if(e)e.focus()},50)};
@@ -33,7 +33,7 @@ ACTS.creOk=async function(){
   if(CRE.busy)return;
   var m=CRE.mode,pn=v("cr-p");
   if(!pn){alert(m==="devis"?"Indique l objet du devis.":"La panne est obligatoire.");return}
-  var abs=document.getElementById("cr-abs"),gar=document.getElementById("cr-gar"),pec=document.getElementById("cr-pec"),sel=document.getElementById("ct-sel");
+  var nbp=pecNb("cr"),abs=document.getElementById("cr-abs"),gar=document.getElementById("cr-gar"),pec=document.getElementById("cr-pec"),sel=document.getElementById("ct-sel");
   CRE.busy=true;
   try{
     var cid;
@@ -47,6 +47,6 @@ ACTS.creOk=async function(){
     var d=await api("/reparations",{customerId:cid,trottinetteId:tid,panne:(m==="devis"?"Devis : ":"")+pn,etat:v("cr-e"),remarques:v("cr-r"),boite:v("cr-b"),affaires:affairesLire("cr"),codeAcces:v("cr-k"),dateDepot:v("cr-d"),enMagasin:!(abs&&abs.checked),sousGarantie:!!(gar&&gar.checked)});
     CRE.busy=false;ATSUB="liste";
     await ouvrirFiche(d.id);
-    if(m==="prise"&&pec&&pec.checked&&!(abs&&abs.checked))await imprimerPEC(d.id)
+    if(m==="prise"&&pec&&pec.checked&&!(abs&&abs.checked))await imprimerPEC(d.id,nbp)
   }catch(e){CRE.busy=false;CRE.msg=e.message;render()}};
 `;

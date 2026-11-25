@@ -16,7 +16,7 @@ function recepForm(t){
     +"<textarea id='p' rows='3' placeholder='Panne décrite par le client'></textarea><input id='e' placeholder='État à l arrivée'><textarea id='r' rows='2' placeholder='Remarques'></textarea>"+boiteSelect("b")+affairesBox("a")+"<input id='k' placeholder='🔑 Code / mot de passe de la trottinette (facultatif)'><input id='d' type='date' value='"+today()+"'>"
     +"<label class='muted' style='display:flex;gap:8px;align-items:center'><input id='abs' type='checkbox' style='width:auto;margin:0'"+(RACC==="rdv"||RACC==="devis"?" checked":"")+"> La trottinette n'est pas encore en magasin (rendez-vous)</label>"
     +"<label class='muted' style='display:flex;gap:8px;align-items:center'><input id='gar' type='checkbox' style='width:auto;margin:0'> Sous garantie</label>"
-    +"<label class='muted' style='display:flex;gap:8px;align-items:center'><input id='pec' type='checkbox' checked style='width:auto;margin:0'> Imprimer le ticket de prise en charge</label>"
+    +"<label class='muted' style='display:flex;gap:8px;align-items:center'><input id='pec' type='checkbox' checked style='width:auto;margin:0'> Imprimer le ticket de prise en charge "+pecNbSelect("rc")+"</label>"
     +"<button data-act='addR' data-t='"+t.id+"'>Créer la fiche de réparation</button><button class='sec' data-act='cancelRecep'>Annuler</button></div>"}
 function fidHtml(){
   if(FID===null)return"Points fidélité : chargement…";
