@@ -1,5 +1,5 @@
 export const PARAMETRES = `// ---------- Paramètres (admins) ----------
-var BRV=null,BRVBUSY=false,BRVMSG="",PSEC="";var FOURNP=null;
+var BRV=null,BRVBUSY=false,BRVMSG="",BRVTE="",PSEC="";var FOURNP=null;
 var RCEDIT=0,RCMSG="",RCF={txt:"",f:"s1",p:false,raw:null};
 var RCJ=["","lundi","mardi","mercredi","jeudi","vendredi","samedi","dimanche"];
 function rcOptions(){
@@ -69,7 +69,7 @@ function vParam(){
       +(BRV.configure?"<div class='muted'>Brevo est connecté."+(BRV.expediteurEmail?"":" Il manque BREVO_EMAIL_EXPEDITEUR dans Railway pour les emails.")+"</div>":"<div class='muted'><b>Brevo n'est pas connecté.</b> Dans Railway, ajoute les variables BREVO_API_KEY (clé API Brevo) et BREVO_EMAIL_EXPEDITEUR (adresse d'envoi validée dans Brevo).</div>");
     BL.forEach(function(x){h+="<label class='muted'>"+esc(x[1])+"</label><select id='bv-"+x[0]+"'>"+BO.map(function(o){return"<option value='"+o[0]+"'"+((BRV.auto[x[0]]||"off")===o[0]?" selected":"")+">"+o[1]+"</option>"}).join("")+"</select>"});
     h+="<button data-act='brvSave'>Enregistrer</button>"
-      +"<div class='step' style='margin-top:12px'>Tester l'envoi</div><div class='dl'><input id='bv-te' class='lb' placeholder='Ton email'><button class='sec' data-act='brvTest'>Envoyer un test</button></div><div class='muted'>"+esc(BRVMSG)+"</div>";
+      +"<div class='step' style='margin-top:12px'>Tester l'envoi</div><div class='dl'><input id='bv-te' class='lb' placeholder='Ton email' value='"+esc(BRVTE)+"'><button class='sec' data-act='brvTest'>Envoyer un test</button></div><div class='muted'>"+esc(BRVMSG)+"</div>";
     if((BRV.messages||[]).length){h+="<div class='step' style='margin-top:12px'>Derniers envois</div>";BRV.messages.forEach(function(m){h+="<div class='muted'>"+esc(dateLongue(m.cree_le))+" · "+esc(m.type)+" · "+esc(m.canal)+" · "+esc(m.client||m.destinataire)+" · "+(m.statut==="envoye"?"envoyé":"<b>erreur</b> "+esc(m.erreur||""))+"</div>"})}
     h+="</div>"}
   S.brevo=h;h="";
