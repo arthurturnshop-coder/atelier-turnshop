@@ -84,6 +84,11 @@ ACTS.cEnDevis=async function(){
   try{var r=await cartVersDevis();if(!r)return;cartVide();DV.list=null;DV.ed=null;DV.res=null;DV.hint="";DV.msg="Devis "+dvNum(r.id)+" enregistré.";FICHE=null;CUR=null;TAB="enc";ATSUB="devis";
     try{var ls=await api("/devis-simples");DV.list=ls.devis;var d=ls.devis.filter(function(x){return x.id===r.id})[0];if(d){DV.ed=JSON.parse(JSON.stringify(d));if(!DV.ed.lignes.length)DV.ed.lignes=dvVide().lignes}}catch(e2){}
     render()}catch(e){alert(e.message)}};
+ACTS.cCmdClient=async function(){
+  if(!PAN.length){alert("Le panier est vide.");return}
+  if(!CCLI){alert("Choisis d'abord le client (recherche ou scan de carte).");return}
+  if(!confirm("Créer la commande pour "+CCLI.name+" ? Les pièces du panier iront dans le dossier du client, à commander au fournisseur."))return;
+  try{var r=await cartVersDevis();if(!r)return;var p=await api("/devis-simples/rattacher",{id:r.id});await api("/devis-lignes/remise-client",{repairId:p.reparationId,valeur:true});cartVide();DV.list=null;DEVHINT="Commande client : clique sur « À commander » à côté de chaque pièce, puis demande l'acompte ou le paiement. La pièce apparaîtra dans le bloc 📦 Client à son arrivée.";await ouvrirFiche(p.reparationId)}catch(e){alert(e.message)}};
 ACTS.cEnPec=async function(){
   if(!PAN.length){alert("Le panier est vide.");return}
   if(!confirm("Créer une prise en charge (réparation en boutique) avec ce panier ?"))return;

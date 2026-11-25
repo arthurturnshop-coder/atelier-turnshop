@@ -232,7 +232,8 @@ const pcnP = (id: number) => "PC-" + String(id).padStart(4, "0");
 
 app.post("/api/devis-lignes/remise-client", async (c) => {
   const b = await c.req.json().catch(() => ({}));
-  await sql`UPDATE devis_lignes SET remise_client = ${!!b.valeur} WHERE id = ${Number(b.id)}`;
+  if (b.repairId) await sql`UPDATE devis_lignes SET remise_client = ${!!b.valeur} WHERE reparation_id = ${Number(b.repairId)} AND type = 'piece'`;
+  else await sql`UPDATE devis_lignes SET remise_client = ${!!b.valeur} WHERE id = ${Number(b.id)}`;
   return c.json({ message: b.valeur ? "Cette pièce apparaîtra dans le bloc Client à son arrivée." : "Cette pièce reste côté atelier." });
 });
 
