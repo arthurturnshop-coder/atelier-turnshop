@@ -2,6 +2,9 @@ import { app } from "../app";
 import { BLOCAGE_MS, ESSAIS_MAX, MAGASINS, PASSWORD } from "../config";
 import { sql } from "../db";
 import { AppError, clean, magasinsDe, samePassword } from "../util";
+import { createHash } from "node:crypto";
+// Même empreinte que caissier.ts (pas d'import : il enregistrerait ses routes avant ce contrôle d'accès).
+const hashCode = (code: string) => createHash("sha256").update("turn-caisse:" + code).digest("hex");
 
 const essais = new Map<string, { echecs: number; bloqueJusque: number }>();
 
@@ -52,18 +55,41 @@ app.post("/auth/deconnexion", async (c) => {
   return c.json({ message: "Déconnecté." });
 });
 
+// Poste partagé : la personne qui agit vraiment tape son code à 3 chiffres ; l'action est alors faite à son nom et avec SES droits.
+const echecsCode = new Map<string, { n: number; jusque: number }>();
+async function acteurParCode(code: string, magasin: string | null, cle: string) {
+  const e = echecsCode.get(cle);
+  if (e && e.jusque > Date.now()) throw new AppError(429, "Trop d'essais de code. Réessaie dans quelques minutes.");
+  if (/^\d{3}$/.test(code)) {
+    const rc = (await sql`SELECT prenom, role, magasins FROM utilisateurs WHERE actif = true AND code_caisse = ${hashCode(code)}`) as any[];
+    for (const r of rc) if (!magasin || magasinsDe(r).includes(magasin)) { echecsCode.delete(cle); return { prenom: r.prenom, role: r.role, magasin }; }
+  }
+  const x = echecsCode.get(cle) ?? { n: 0, jusque: 0 };
+  x.n += 1; if (x.n >= 5) { x.jusque = Date.now() + 5 * 60_000; x.n = 0; }
+  echecsCode.set(cle, x);
+  throw new AppError(403, "Code inconnu pour ce magasin.");
+}
+
 app.use("/api/*", async (c, next) => {
   const tok = c.req.header("x-atelier-token") ?? "";
+  let base: any = null;
   if (tok) {
     const [s] = await sql`SELECT u.prenom, u.role, s.magasin FROM sessions s JOIN utilisateurs u ON u.id = s.utilisateur_id WHERE s.token = ${tok} AND u.actif = true AND s.cree_le > now() - interval '14 hours'`;
-    if (s) {
-      c.set("user", { prenom: s.prenom, role: s.role, magasin: s.magasin });
-      return next();
-    }
+    if (s) base = { prenom: s.prenom, role: s.role, magasin: s.magasin, session: s.prenom };
   }
-  if (PASSWORD && samePassword(c.req.header("x-atelier-password") ?? "", PASSWORD)) {
-    c.set("user", { prenom: "Secours", role: "admin", magasin: null, secours: true });
-    return next();
+  if (!base && PASSWORD && samePassword(c.req.header("x-atelier-password") ?? "", PASSWORD)) base = { prenom: "Secours", role: "admin", magasin: null, secours: true };
+  if (!base) return c.json({ error: "non autorisé" }, 401);
+  const code = c.req.header("x-atelier-code") ?? "";
+  if (code) {
+    const a = await acteurParCode(code, base.magasin, (tok || "pw").slice(0, 24));
+    base = { ...a, session: base.session ?? "Secours" };
   }
-  return c.json({ error: "non autorisé" }, 401);
+  c.set("user", base);
+  return next();
+});
+
+// Qui est derrière ce code ? (sert au poste partagé)
+app.post("/api/acteur", async (c) => {
+  const u = c.get("user") as any;
+  return c.json({ prenom: u.prenom, role: u.role, magasin: u.magasin });
 });
