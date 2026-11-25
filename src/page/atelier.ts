@@ -91,7 +91,7 @@ function vFiche(){
     +(f.enMagasin===false?"<div class='tag warn' style='margin:6px 0'>Trottinette pas en magasin</div><button data-act='arrivee' data-id='"+f.id+"' data-fiche='1'>Trottinette arrivée</button>":"")
     +"<div class='step' style='margin-top:10px'>Statut</div><div class='stbtns'>"+ST.map(function(s){if(s==="devis envoyé"&&s!==f.statut)return"<button class='dis' disabled title='Se met tout seul quand tu envoies le devis au client'>"+esc(s)+" (auto)</button>";return"<button class='"+(s===f.statut?"on":"")+"' data-act='setStatut' data-id='"+f.id+"' data-s='"+esc(s)+"'>"+esc(s)+"</button>"}).join("")+"</div>"
     +"<label class='muted' style='display:flex;gap:8px;align-items:center'><input type='checkbox' style='width:auto;margin:0' "+(f.sousGarantie?"checked ":"")+"data-act='setGarantie' data-id='"+f.id+"'> Sous garantie</label></div>"
-    +codeCard(f)+boiteCard(f)+garantieHtml(f)+gardeHtml(f)+acompteHtml(f)
+    +codeCard(f)+boiteCard(f)+affairesCard(f)+garantieHtml(f)+gardeHtml(f)+acompteHtml(f)
     +"<div class='card'><div class='step'>Description de la panne</div><textarea id='fp' rows='3'>"+esc(f.panne)+"</textarea>"
     +"<div class='step'>Commentaire interne (visible seulement par TURN)</div><textarea id='fc' rows='3' placeholder='Ce que le client a demandé, ce qu il faudrait lui proposer...'>"+esc(f.commentaireInterne||"")+"</textarea>"
     +"<button data-act='saveFiche' data-id='"+f.id+"'>Enregistrer la description et le commentaire</button></div>"
@@ -108,6 +108,10 @@ function cmdCard(f){
 function codeCard(f){return"<div class='card'><div class='step'>🔑 Code / mot de passe de la trottinette</div><div class='dl'><input id='fk' value='"+esc(f.codeAcces||"")+"' placeholder='Facultatif : code de déverrouillage, mot de passe de l app...'><button class='sec' data-act='codeSave' data-t='"+f.trottinetteId+"' data-id='"+f.id+"'>Enregistrer</button></div><div class='muted'>Gardé sur la trottinette du client : pas besoin de le redemander la prochaine fois.</div></div>"}
 var BXOC=null;
 function boitesCharge(){if(BXOC===null){BXOC=undefined;api("/boites").then(function(d){BXOC=d.boites;if(TAB==="enc")render()}).catch(function(){BXOC=[]})}}
+var AFFL=["Casque","Clés","Chargeur","Autre"];
+function affairesBox(pre){return"<div class='muted' style='margin-top:6px'>🎒 Affaires laissées par le client</div><div class='actions' style='flex-wrap:wrap'>"+AFFL.map(function(a,i){return"<label class='muted' style='display:flex;gap:6px;align-items:center'><input type='checkbox' id='"+pre+"-af"+i+"' style='width:auto;margin:0'> "+a+"</label>"}).join("")+"</div><div class='muted'>Casque coché = 3 tickets (un à agrafer au casque).</div>"}
+function affairesLire(pre){return AFFL.filter(function(a,i){var e=document.getElementById(pre+"-af"+i);return e&&e.checked})}
+function affairesCard(f){var A=f.affaires||[];return"<div class='card'><div class='step'>🎒 Affaires laissées par le client</div><div class='actions' style='flex-wrap:wrap'>"+AFFL.map(function(a){var on=A.indexOf(a)>=0;return"<button class='"+(on?"":"sec")+"' data-act='affSet' data-id='"+f.id+"' data-a='"+a+"'>"+(on?"✓ ":"")+a+"</button>"}).join("")+"</div>"+(A.length?"":"<div class='muted'>Rien de laissé.</div>")+"</div>"}
 function boiteSelect(id){
   boitesCharge();var L=BXOC&&BXOC.length?BXOC:["C1","C2","C3","C4","C5","C6","C7","C8"].map(function(n){return{nom:n,repairId:null}});
   return"<select id='"+id+"'><option value=''>📦 Boîte de rangement (aucune)</option>"+L.map(function(b){return"<option value='"+esc(b.nom)+"'"+(b.repairId?" disabled":"")+">"+esc(b.nom)+(b.repairId?" (prise : "+pcn(b.repairId)+")":"")+"</option>"}).join("")+"</select>"}

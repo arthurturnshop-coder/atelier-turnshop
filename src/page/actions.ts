@@ -28,12 +28,13 @@ export const ACTIONS = `var ACTS={
   showAddT:function(){ADDT=true;render()},cancelAddT:function(){ADDT=false;render()},
   addT:async function(){try{var d=await api("/trottinettes",{customerId:CUR.id,marque:v("m"),modele:v("mo"),serie:v("s")});alert(d.message);ADDT=false;await refresh()}catch(e){alert(e.message)}},
   openRecep:function(b){RECEP=Number(b.dataset.t);render()},cancelRecep:function(){RECEP=null;render()},
+  affSet:function(b){var f=FICHE&&FICHE.id===+b.dataset.id?FICHE:null;var cur=(f&&f.affaires)||[];var a=b.dataset.a;var nv=cur.indexOf(a)>=0?cur.filter(function(x){return x!==a}):cur.concat([a]);api("/reparations/maj",{repairId:+b.dataset.id,affaires:nv}).then(function(){return recharger(+b.dataset.id)}).catch(function(e){alert(e.message)})},
   boiteSet:function(b){api("/reparations/maj",{repairId:+b.dataset.id,boite:b.dataset.b}).then(function(){BXOC=null;return recharger(+b.dataset.id)}).catch(function(e){alert(e.message)})},
   codeSave:function(b){api("/trottinettes/code",{trottinetteId:+b.dataset.t,code:v("fk")}).then(function(d){btnFlash(b,"✓ Enregistré");return recharger(+b.dataset.id)}).catch(function(e){alert(e.message)})},
   codeProfil:function(b){var c=prompt("Code / mot de passe de la trottinette (vide pour effacer) :",b.dataset.c||"");if(c===null)return;api("/trottinettes/code",{trottinetteId:+b.dataset.t,code:c}).then(function(){return refresh()}).catch(function(e){alert(e.message)})},
   validerPiece:function(b){api("/reparations/valider-piece",{repairId:+b.dataset.id}).then(function(d){alert(d.message);return recharger(+b.dataset.id)}).catch(function(e){alert(e.message)})},
   cmdSuiviFiche:function(b){var i=document.getElementById("fsv-"+b.dataset.id);api("/achats/ligne/suivi",{id:+b.dataset.id,suivi:i?i.value:""}).then(function(){return recharger(+b.dataset.r)}).catch(function(e){alert(e.message)})},
-  addR:async function(b){var abs=document.getElementById("abs"),gar=document.getElementById("gar"),pec=document.getElementById("pec");try{var d=await api("/reparations",{customerId:CUR.id,trottinetteId:Number(b.dataset.t),panne:v("p"),etat:v("e"),remarques:v("r"),boite:v("b"),codeAcces:v("k"),dateDepot:v("d"),enMagasin:!(abs&&abs.checked),sousGarantie:!!(gar&&gar.checked)});alert(d.message);RECEP=null;var k=RACC;RACC="";if(k==="devis"&&d.id){await ouvrirFiche(d.id)}else await refresh();if(pec&&pec.checked&&!(abs&&abs.checked)&&d.id)await imprimerPEC(d.id)}catch(e){alert(e.message)}},
+  addR:async function(b){var abs=document.getElementById("abs"),gar=document.getElementById("gar"),pec=document.getElementById("pec");try{var d=await api("/reparations",{customerId:CUR.id,trottinetteId:Number(b.dataset.t),panne:v("p"),etat:v("e"),remarques:v("r"),boite:v("b"),affaires:affairesLire("a"),codeAcces:v("k"),dateDepot:v("d"),enMagasin:!(abs&&abs.checked),sousGarantie:!!(gar&&gar.checked)});alert(d.message);RECEP=null;var k=RACC;RACC="";if(k==="devis"&&d.id){await ouvrirFiche(d.id)}else await refresh();if(pec&&pec.checked&&!(abs&&abs.checked)&&d.id)await imprimerPEC(d.id)}catch(e){alert(e.message)}},
   arrivee:async function(b){try{var d=await api("/reparations/arrivee",{repairId:Number(b.dataset.id)});if(b.dataset.fiche)await recharger(Number(b.dataset.id));else if(TAB==="enc")loadEnc();else await refresh();alert(d.message)}catch(e){alert(e.message)}},
   avisOui:async function(b){try{var d=await api("/reparations/avis",{repairId:Number(b.dataset.id),choix:"programme"});alert(d.message);await refresh()}catch(e){alert(e.message)}},
   avisNon:async function(b){try{var d=await api("/reparations/avis",{repairId:Number(b.dataset.id),choix:"refuse"});alert(d.message);await refresh()}catch(e){alert(e.message)}},
@@ -57,14 +58,14 @@ export const ACTIONS = `var ACTS={
       PAN=f.devis.lignes.map(function(l){return{libelle:l.libelle,quantite:l.quantite,prix:String(l.prixCents/100).replace(".",","),type:l.type,variantId:l.variantId||"",sku:l.sku||""}});
       if(f.garde&&f.garde.fraisCents>0)PAN.push({libelle:"Gardiennage ("+f.garde.joursFrais+" jours x "+(f.garde.prixCents/100)+" EUR)",quantite:f.garde.joursFrais,prix:String(f.garde.prixCents/100).replace(".",","),type:"article",variantId:"",sku:""});
       CACO=f.acompte?f.acompte.resteCents:0;
-      CCLI=d.client;CFID=d.fidelite;CUSE=false;CAVOFF=[];CREC=null;CHOPEN=0;CREP=f.id;CPAY={carte:"",especes:"",virement:"",bon_achat:""};CMSG="";
+      CCLI=d.client;CFID=d.fidelite;CUSE=false;CAVOFF=[];CREC=null;CHOPEN=0;CREP=f.id;CAFF=f.affaires||[];CRAFF=[];CPAY={carte:"",especes:"",virement:"",bon_achat:""};CMSG="";
       FICHE=null;CUR=null;TAB="accueil";await chargeHisto()}catch(e){alert(e.message)}},
   acompte:async function(b){var m=pxCents(v("ac-m"));if(m<=0){alert("Indique le montant.");return}
     try{var mdpA=await demandeCode("Qui encaisse l'acompte ?");if(mdpA===null)return;var d=await api("/reparations/acompte",{mdpCaissier:mdpA,repairId:+b.dataset.id,paiements:[{moyen:v("ac-t"),montant:v("ac-m")}]});await recharger(+b.dataset.id);CREC=d.vente;alert(d.message)}catch(e){alert(e.message)}},
   rembourse:async function(b){var t=v("rb-t");if(!t){alert("Choisis comment rembourser.");return}
     if(!confirm("Rembourser "+eur(+b.dataset.c)+" au client ?"))return;
     try{var d=await api("/reparations/rembourser",{repairId:+b.dataset.id,moyen:t});alert(d.message);await recharger(+b.dataset.id)}catch(e){alert(e.message)}},
-  cAnnuleRep:function(){CREP=null;CACO=0;PAN=[];lirePay();render()},
+  cAnnuleRep:function(){CREP=null;CAFF=[];CACO=0;PAN=[];lirePay();render()},
   cShopRetry:async function(b){try{var d=await api("/caisse/shopify",{venteId:+b.dataset.id});if(!d.ok)alert(d.erreur);await chargeHisto();if(CREC&&CREC.id===+b.dataset.id){var h=await api("/caisse/historique"+(CCLI?"?clientId="+CCLI.id:""));var m=h.ventes.filter(function(x){return x.id===CREC.id})[0];if(m){CREC=m;render()}}}catch(e){alert(e.message)}},
   tickSave:async function(){try{var d=await api("/reglages/ticket",{entete:v("tk-ent"),avisAmiens:v("tk-am"),avisRouen:v("tk-ro"),rdvUrl:v("tk-rdv"),siteUrl:v("tk-site"),coordAmiens:v("tk-ca"),coordRouen:v("tk-cr")});TICKMSG=d.message;TICK=null;render()}catch(e){TICKMSG=e.message;render()}},
   shopCmd:async function(b){try{await api("/reglages/commandes",{actif:b.dataset.v==="1"});SHOPCMD=null;render()}catch(e){alert(e.message)}},
@@ -73,7 +74,7 @@ export const ACTIONS = `var ACTS={
   cScan:function(){return scanCode(v("cq"),"caisse")},
   cProfil:function(){if(!CCLI)return;api("/customer?id="+CCLI.id).then(function(c){CUR=c;TAB="accueil";FICHE=null;ADDT=false;RECEP=null;EDITCLI=false;FID=null;render()}).catch(function(e){alert(e.message)})},
   cProfilMod:function(){if(!CCLI)return;api("/customer?id="+CCLI.id).then(function(c){CUR=c;TAB="accueil";FICHE=null;ADDT=false;RECEP=null;EDITCLI=true;FID=null;render()}).catch(function(e){alert(e.message)})},
-  cClient0:function(){CREP=null;CACO=0;CCLI=null;CFID=null;CUSE=false;CHIST=null;CHOPEN=0;CAVOFF=[];lirePay();render()},
+  cClient0:function(){CREP=null;CAFF=[];CACO=0;CCLI=null;CFID=null;CUSE=false;CHIST=null;CHOPEN=0;CAVOFF=[];lirePay();render()},
   cUse:function(b){CUSE=b.dataset.v==="1";lirePay();var sy=window.scrollY;render();window.scrollTo(0,sy)},
   cAdd:function(){var l=v("cl");if(!l){alert("Donne un libellé.");return}PAN.push({libelle:l,quantite:Math.max(1,Number(v("cq2"))||1),prix:v("cp")||"0"});lirePay();render()},
   trfOpen:function(b){TRF={t:+b.dataset.t,q:"",res:null};render()},
@@ -116,7 +117,7 @@ export const ACTIONS = `var ACTS={
       if(!PAN.every(serieOk)){CMSG="Trottinette : saisis le numéro de série (un par trottinette) avant d encaisser.";render();return}
       if(!CCLI){CMSG="Trottinette : choisis le client (sa garantie est liée à son compte).";render();return}}
     var mdpC=await demandeCode("Qui encaisse ?");if(mdpC===null)return;
-    try{var d=await api("/caisse/encaisser",{lignes:PAN,paiements:pay,clientId:CCLI?CCLI.id:null,utiliserFidelite:CUSE,avantageIds:ids,repairId:CREP,mdpCaissier:mdpC});CMDP="";CREP=null;CACO=0;PAN=[];CPAY={carte:"",especes:"",virement:"",bon_achat:""};CUSE=false;CAVOFF=[];CREC=d.vente;CMSG="";CHOPEN=0;CCLI=null;CFID=null;await chargeHisto()}catch(e){CMSG=e.message;render()}},
+    try{var d=await api("/caisse/encaisser",{lignes:PAN,paiements:pay,clientId:CCLI?CCLI.id:null,utiliserFidelite:CUSE,avantageIds:ids,repairId:CREP,mdpCaissier:mdpC});CMDP="";CRAFF=CREP?CAFF:[];CAFF=[];CREP=null;CACO=0;PAN=[];CPAY={carte:"",especes:"",virement:"",bon_achat:""};CUSE=false;CAVOFF=[];CREC=d.vente;CMSG="";CHOPEN=0;CCLI=null;CFID=null;await chargeHisto()}catch(e){CMSG=e.message;render()}},
   shopTest:async function(){SHOPRES="<div class='muted'>Test en cours…</div>";render();try{var d=await api("/shopify/diagnostic");SHOPRES=d.etapes.map(function(e){return"<div>"+(e.ok?"✅ ":"❌ ")+"<b>"+esc(e.nom)+"</b><div class='muted'>"+esc(e.detail)+"</div></div>"}).join("")}catch(e){SHOPRES=esc(e.message)}render()},
   addPresta:async function(b){var x=(PRESTA?PRESTA.prestations:[]).filter(function(p){return p.id===+b.dataset.id})[0];if(!x||!FICHE)return;
     try{await api("/devis/ligne",{repairId:FICHE.id,type:"main_oeuvre",libelle:x.nom,quantite:1,prix:String(x.prixCents/100).replace(".",",")});

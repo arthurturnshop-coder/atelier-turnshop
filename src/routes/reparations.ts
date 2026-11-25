@@ -17,6 +17,9 @@ export async function devisDe(repId: number) {
 }
 
 await sql`ALTER TABLE reparations ADD COLUMN IF NOT EXISTS boite TEXT`;
+await sql`ALTER TABLE reparations ADD COLUMN IF NOT EXISTS affaires TEXT`;
+const AFFAIRES = ["Casque", "Clés", "Chargeur", "Autre"];
+const affairesClean = (v: any) => (Array.isArray(v) ? AFFAIRES.filter((a) => v.includes(a)) : []);
 const BOITES = ["C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8"];
 
 export function ligneListe(r: any, journal: any[]) {
@@ -46,6 +49,7 @@ export function ligneListe(r: any, journal: any[]) {
     rdvStatut: r.rdv_statut ?? "",
     magasin: r.magasin ?? "",
     boite: r.boite ?? "",
+    affaires: r.affaires ? String(r.affaires).split(",").filter(Boolean) : [],
     garde: infosGarde(r.pret_le, r.statut, r.abandonnee_le),
     abandonnee: !!r.abandonnee_le,
     journal: journal.filter((j) => j.reparation_id === r.id).map((j) => ({ date: j.date, type: j.type, texte: j.texte })),
@@ -102,6 +106,11 @@ app.post("/api/reparations", async (c) => {
   const garantie = b.sousGarantie === true;
   const [r] = await sql`INSERT INTO reparations (client_id, trottinette_id, panne, etat, remarques, date_depot, en_magasin, sous_garantie) VALUES (${clientId}, ${trottId}, ${panne}, ${clean(b.etat, 500)}, ${clean(b.remarques, 1000)}, ${date}, ${enMagasin}, ${garantie}) RETURNING id`;
   if (clean(b.codeAcces, 60)) await sql`UPDATE trottinettes SET code_acces = ${clean(b.codeAcces, 60)} WHERE id = ${trottId}`;
+  const affNouv = affairesClean(b.affaires);
+  if (affNouv.length) {
+    await sql`UPDATE reparations SET affaires = ${affNouv.join(",")} WHERE id = ${r.id}`;
+    await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${r.id}, 'note', ${"Affaires laissées par le client : " + affNouv.join(", ") + signature(c)})`;
+  }
   const boiteNouv = clean(b.boite, 10).toUpperCase();
   if (boiteNouv) {
     const [pris] = (await sql`SELECT id FROM reparations WHERE boite = ${boiteNouv} AND supprime_le IS NULL AND statut <> 'récupéré' AND id <> ${r.id}`) as any[];
@@ -153,6 +162,14 @@ app.post("/api/reparations/maj", async (c) => {
     await sql`UPDATE reparations SET sous_garantie = ${b.sousGarantie}, maj_le = now() WHERE id = ${id}`;
     await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${id}, 'statut', ${(b.sousGarantie ? "Marquée sous garantie" : "Garantie retirée") + signature(c)})`;
     touche = true;
+  }
+  if (Array.isArray(b.affaires)) {
+    const nv = affairesClean(b.affaires).join(",");
+    if (nv !== (r.affaires ?? "")) {
+      await sql`UPDATE reparations SET affaires = ${nv || null}, maj_le = now() WHERE id = ${id}`;
+      await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${id}, 'note', ${(nv ? "Affaires laissées par le client : " + nv.replace(/,/g, ", ") : "Plus d'affaires laissées par le client") + signature(c)})`;
+      touche = true;
+    }
   }
   if (typeof b.boite === "string" && clean(b.boite, 10).toUpperCase() !== (r.boite ?? "")) {
     const nv = clean(b.boite, 10).toUpperCase();

@@ -79,6 +79,7 @@ function pecHtml(f){
   if(f.etat)h+="<div class='rm' style='margin-top:4px'>État à l'arrivée</div><div>"+esc(f.etat)+"</div>";
   if(f.remarques)h+="<div class='rm' style='margin-top:4px'>Remarques</div><div>"+esc(f.remarques)+"</div>";
   if(f.sousGarantie)h+="<div style='margin-top:4px'><b>Sous garantie</b></div>";
+  if(f.affaires&&f.affaires.length)h+="<div style='margin-top:4px'>Affaires laissées : <b>"+esc(f.affaires.join(", "))+"</b></div>";
   if(f.boite)h+="<div style='margin-top:4px'>Matériel rangé : <b>boîte "+esc(f.boite)+"</b></div>";
   var d=f.devis||{lignes:[],netCents:0};
   if(d.lignes&&d.lignes.length){
@@ -95,8 +96,8 @@ function pecHtml(f){
   return h}
 function pecCss(){return"@page{size:80mm auto;margin:0}@media print{body>*:not(#impzone){display:none!important}#impzone{position:static;width:80mm;box-sizing:border-box;font-size:12px;padding:0 3mm;margin:0}}"}
 async function imprimerPEC(id){
-  // Deux exemplaires d'un coup (un pour le client, un pour l'atelier), séparés par un saut de page.
-  try{var f=await api("/reparation?id="+id);var t=pecHtml(f);impImprimer(t,"recu",pecCss(),false,2)}catch(e){alert(e.message)}}
+  // Deux exemplaires d'un coup (client + atelier), trois si un casque est laissé (le 3e s'agrafe au casque).
+  try{var f=await api("/reparation?id="+id);var t=pecHtml(f);var casque=(f.affaires||[]).indexOf("Casque")>=0;impImprimer(t,"recu",pecCss(),false,casque?3:2)}catch(e){alert(e.message)}}
 ACTS.pecPrint=function(b){btnFlash(b);imprimerPEC(+b.dataset.id)};
 
 // ----- Devis / facture en ticket 80 mm -----
