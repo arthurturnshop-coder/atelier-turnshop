@@ -13,6 +13,7 @@ var ACTS={
   tab:function(b){PCR=null;SVF=null;var PREV_TAB=TAB;TAB=b.dataset.tab;if(TAB==="cmd")CMD=null;if(TAB==="stock"){STK=null;STSUB="liste"}if(TAB==="param")PSEC="";if(TAB==="cli"){CLV.ventes=null;CLV.z=null;CLV.open=0}if(TAB==="stats"){STA.d=null}if(TAB==="retours"){RTR.d=null;RTR.msg="";RTR.ctx=PREV_TAB}FICHE=null;if(TAB==="accueil"){CUR=null;CONS=null;CHIF=null;EDITCONS=false;NEWCLI=false;RES=[];SEARCHED=false}render()},
   search:search,
   open:function(b){CUR=RES[+b.dataset.i];RES=[];SEARCHED=false;ADDT=false;RECEP=null;EDITCLI=false;FID=null;FICHE=null;TAB="accueil";render()},
+  cliCaisse:async function(b){var c=RES[+b.dataset.i];if(!c)return;try{var d=await api("/caisse/client?id="+c.id);CCLI=d.client;CFID=d.fidelite;CUSE=false;CMSG="";CAVOFF=[];CHOPEN=0;RES=[];SEARCHED=false;lirePay();await chargeHisto()}catch(e){alert(e.message)}},
   priseEnCharge:function(b){var c=RES[+b.dataset.i];CUR=c;RES=[];SEARCHED=false;TAB="accueil";ADDT=false;RECEP=null;EDITCLI=false;FID=null;FICHE=null;if(!c.trottinettes.length)ADDT=true;render()},
   back:function(){CUR=null;ADDT=false;RECEP=null;EDITCLI=false;FID=null;CONS=null;CHIF=null;render()},
   showNew:function(){NEWPRE="";NEWCLI=true;render()},showNewPre:function(b){NEWPRE=b.dataset.q||"";NEWCLI=true;CUR=null;TAB="accueil";render()},cancelNew:function(){NEWCLI=false;render()},
