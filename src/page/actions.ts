@@ -63,6 +63,8 @@ var ACTS={
       CCLI=d.client;CFID=d.fidelite;CUSE=false;CAVOFF=[];CREC=null;CHOPEN=0;CREP=f.id;CAFF=f.affaires||[];CRAFF=[];CPAY={carte:"",especes:"",virement:"",bon_achat:""};CMSG="";
       CMODE=b.dataset.m||"paiement";CPOP=true;await chargeHisto()}catch(e){alert(e.message)}},
   cpFerme:function(){var id=FICHE?FICHE.id:0;CPOP=false;if(!CREC)cReset();CREC=null;if(id)recharger(id);else render()},
+  pcrPop:function(){PCRPOP=true;PCR=null;PCRO=null;render()},
+  pcrFerme:function(){PCRPOP=false;PCRO=null;PCR=null;render()},
   pcrOpen:function(b){var id=+b.dataset.id;PCRO=(PCRO&&PCRO.id===id&&PCRO.m===b.dataset.m)?null:{id:id,m:b.dataset.m};render()},
   pcrCase:async function(b){try{await api("/pieces/boite",{id:+b.dataset.id,boite:b.dataset.b});PCR=null;PCRO=null;render()}catch(e){alert(e.message)}},
   pcrRatt:async function(b){if(!confirm("Rattacher cette pièce à "+b.textContent.split(" ")[0]+" ? Elle passera dans son devis."))return;try{var d=await api("/pieces/rattacher",{id:+b.dataset.id,repairId:+b.dataset.r});PCR=null;PCRO=null;alert(d.message);render()}catch(e){alert(e.message)}},

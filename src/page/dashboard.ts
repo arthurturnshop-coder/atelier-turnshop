@@ -42,10 +42,21 @@ function blocTaches(){
     if(act.length){h+="<div class='step' style='margin-top:12px'>Planning des récurrences</div>";
       act.forEach(function(r){h+="<div class='muted'>"+esc(r.texte)+" · "+esc(r.libelle)+" · prochaine fois : "+jourCourt(r.prochaine)+"</div>"})}}
   return h+"</div>"}
-var PCR=null,PCRB=false,PCRO=null;
+var PCR=null,PCRB=false,PCRO=null,PCRPOP=false;
+function pPopRender(){
+  var o=document.getElementById("ppop");
+  if(!PCRPOP){if(o)o.remove();return}
+  var st=o&&o.firstChild?o.firstChild.scrollTop:0;
+  if(!o){o=document.createElement("div");o.id="ppop";o.className="cpop";document.body.appendChild(o)}
+  o.innerHTML="<div class='cpbox'><button class='cpx' data-act='pcrFerme' title='Fermer'>✕</button>"+pcrListe()+"</div>";
+  if(st&&o.firstChild)o.firstChild.scrollTop=st}
 function pcrLoad(){if(PCR===null&&!PCRB){PCRB=true;api("/pieces-a-remettre").then(function(d){PCR=d;PCRB=false;render()}).catch(function(){PCR={pieces:[],cases:[]};PCRB=false})}}
 function blocPieces(){
-  pcrLoad();if(!PCR||!PCR.pieces.length)return"";
+  pcrLoad();var n=PCR?PCR.pieces.length:0;
+  return"<button class='"+(n?"":"sec")+"' data-act='pcrPop' style='width:100%;min-height:52px;margin:6px 0'>📦 Pièces à remettre aux clients"+(PCR?" ("+n+")":"")+"</button>"}
+function pcrListe(){
+  if(!PCR)return"<div class='card'><b>📦 Pièces à remettre aux clients</b><div class='muted'>Chargement…</div></div>";
+  if(!PCR.pieces.length)return"<div class='card'><b>📦 Pièces à remettre aux clients</b><div class='muted'>Aucune pièce en attente.</div></div>";
   var h="<div class='card pcr'><b>📦 Pièces à remettre aux clients ("+PCR.pieces.length+")</b><div class='muted'>Commandées exprès, arrivées, rangées en boutique.</div>";
   PCR.pieces.forEach(function(p){
     var reste=p.totalCents-p.versetCents,open=PCRO&&PCRO.id===p.id;

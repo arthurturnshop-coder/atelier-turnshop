@@ -62,6 +62,7 @@ function render(){
   var po0=document.getElementById("cpop"),pst=po0&&po0.firstChild?po0.firstChild.scrollTop:0;
   render0();
   cPopRender(pst);
+  if(typeof pPopRender==="function")pPopRender();
   if(st0){var dr1=document.querySelector(".dright");if(dr1)dr1.scrollTop=st0}
   if(fps||fid){var ne=fid?document.getElementById(fid):document.querySelector("[data-ps='"+fps+"']");if(ne&&document.activeElement!==ne){if(!ne.value&&fval)ne.value=fval;ne.focus({preventScroll:true})}}}
 function render0(){
