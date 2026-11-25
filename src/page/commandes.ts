@@ -72,7 +72,7 @@ function vCmd(){
   if(!CMD){app.innerHTML="<div class='card'>Chargement…</div>";api("/achats").then(function(d){return api("/stock/reappro?magasin="+encodeURIComponent(MAG||"")).then(function(r){RE=r;return d}).catch(function(){RE=null;return d})}).then(function(d){return api("/achats/reparations-ouvertes").then(function(r){REPS=r;return d}).catch(function(){REPS=[];return d})}).then(function(d){CMD=d;render()}).catch(function(e){app.innerHTML="<div class='card'>"+esc(e.message)+"</div>"});return}
   if(CMDF===null){CMDF=undefined;api("/achats/feuille").then(function(d){CMDF=d.fournisseurs;render()}).catch(function(){CMDF=[];render()})}
   if(CCL===null){CCL=undefined;api("/commandes-clients").then(function(d){CCL=d.commandes;render()}).catch(function(){CCL=[];render()})}
-  var h="<div class='pmsg'>"+esc(CMDMSG)+"</div>"+cclHtml()+"<div class='actions'><button class='sec' data-act='cmdFeuille' data-id=''>🖨 Imprimer toutes les commandes (A4)</button></div>"+"<div class='card'><div class='step'>Nouveau fournisseur</div><div class='dl'><input id='fn' class='lb' placeholder='Nom (ex : eWheel)'><input id='fe' class='lb' placeholder='Email pour les commandes'><button data-act='fAdd'>Ajouter</button></div></div>";
+  var h="<div class='pmsg'>"+esc(CMDMSG)+"</div>"+cclHtml()+"<div class='card'><div class='step'>🛒 Remplir le panier fournisseur</div><div class='sub'>1) Glisse ce bouton dans ta barre de favoris (une seule fois) : <a class='btn' href='"+ewLien()+"' onclick='return false' style='display:inline-block;padding:6px 12px;border-radius:8px;background:var(--vert);color:#fff;text-decoration:none'>🛒 Remplir panier</a><br>2) Ci-dessous, clique sur Copier pour le panier fournisseur. 3) Va sur le site du fournisseur (connecté) et clique sur le favori. Tu valides toi-même.</div></div><div class='actions'><button class='sec' data-act='cmdFeuille' data-id=''>🖨 Imprimer toutes les commandes (A4)</button></div>"+"<div class='card'><div class='step'>Nouveau fournisseur</div><div class='dl'><input id='fn' class='lb' placeholder='Nom (ex : eWheel)'><input id='fe' class='lb' placeholder='Email pour les commandes'><button data-act='fAdd'>Ajouter</button></div></div>";
   if(RE&&RE.produits.length){
     h+="<div class='card'><div class='step'>À recommander : stock minimum atteint ("+RE.produits.length+")</div><div class='muted'>Suggestion pour "+esc(RE.magasin)+". Choisis le fournisseur et ajoute au panier.</div>";
     RE.produits.forEach(function(p){
@@ -91,7 +91,7 @@ function vCmd(){
     if(f.panier.length)h+="<table class='devis' style='width:100%'><tr><th>Produit</th><th class='n'>Qté</th><th></th></tr>"+f.panier.map(function(l){return ligneCmd(l,"panier")}).join("")+"</table>";
     else h+="<div class='muted'>Panier vide.</div>";
     h+="<div style='margin-top:8px'>"+prodBox("cmd"+f.id)+"</div><div class='dl' style='margin-top:6px'><input id='cl-"+f.id+"' class='lb' placeholder='Ou saisie libre : produit / référence'><input id='cq-"+f.id+"' class='q' type='number' min='1' value='1'><button class='sec' data-act='cmdLigne' data-id='"+f.id+"'>Ajouter</button></div>";
-    if(f.panier.length)h+="<div class='actions'><button data-act='cmdPasser' data-id='"+f.id+"'>Marquer comme commandé</button><button class='sec' data-act='cmdCopy' data-id='"+f.id+"'>Copier la commande</button><button class='sec' data-act='cmdFeuille' data-id='"+f.id+"'>🖨 Imprimer la feuille A4</button><button class='sec' data-act='cmdCsv' data-id='"+f.id+"'>Télécharger (CSV)</button>"
+    if(f.panier.length)h+="<div class='actions'><button data-act='cmdPasser' data-id='"+f.id+"'>Marquer comme commandé</button><button class='sec' data-act='cmdCopy' data-id='"+f.id+"'>Copier la commande</button><button class='sec' data-act='cmdEwCopy' data-id='"+f.id+"'>🛒 Copier pour le panier fournisseur</button><button class='sec' data-act='cmdFeuille' data-id='"+f.id+"'>🖨 Imprimer la feuille A4</button><button class='sec' data-act='cmdCsv' data-id='"+f.id+"'>Télécharger (CSV)</button>"
       +(f.email?"<a class='btn' href='mailto:"+esc(f.email)+"?subject="+encodeURIComponent("Commande TURN SOCIETY")+"&body="+encodeURIComponent(texteCommande(f))+"'>Envoyer par email</a>":"")+"</div><div class='muted'>L'envoi direct par l'API du fournisseur s'ajoute fournisseur par fournisseur.</div>";
     if(f.commandees.length){h+="<div class='step' style='margin-top:12px'>Commandé, en attente de réception ("+f.commandees.length+")</div>";
       if(f.mode==="unitaire")h+="<table class='devis' style='width:100%'><tr><th>Produit</th><th class='n'>Qté</th><th></th></tr>"+f.commandees.map(function(l){return ligneCmd(l,"commandee")}).join("")+"</table>";
@@ -117,6 +117,39 @@ ACTS.cmdRecevoir=function(b){cmdRun(api("/achats/recevoir",{id:+b.dataset.id}))}
 ACTS.cmdRecevoirTout=function(b){var f=trouveF(+b.dataset.id);if(!f)return;cmdRun(api("/achats/recevoir",{ids:f.commandees.map(function(l){return l.id})}))};
 ACTS.cmdCopy=function(b){var f=trouveF(+b.dataset.id);if(!f)return;var t=texteCommande(f);
   if(navigator.clipboard)navigator.clipboard.writeText(t).then(function(){CMDMSG="Commande copiée.";render()},function(){alert(t)});else alert(t)};
+
+function EWB(){
+  var run=function(txt){
+    if(!txt){return}
+    var L=txt.split("\\n"),ok=[],ko=[],i=0;
+    var next=function(){
+      if(i>=L.length){alert("Panier rempli : "+ok.length+" ligne(s) ajoutée(s)."+(ko.length?"\\nNON ajoutées (à faire à la main) :\\n"+ko.join("\\n"):"")+"\\nVérifie le panier puis valide toi-même.");location.href="/cart";return}
+      var ln=L[i++].trim();if(!ln){next();return}
+      var p=ln.split("\t");if(p.length<2)p=ln.split(";");
+      var sku=(p[0]||"").trim(),q=parseInt(p[1],10)||1;
+      fetch("/search/suggest.json?q="+encodeURIComponent(sku)+"&resources[type]=product&resources[limit]=5").then(function(r){return r.json()}).then(function(j){
+        var ps=(j.resources&&j.resources.results&&j.resources.results.products)||[];
+        var find=function(k){
+          if(k>=ps.length){ko.push(sku+" x"+q+" (introuvable)");next();return}
+          fetch("/products/"+ps[k].handle+".js").then(function(r){return r.json()}).then(function(pr){
+            var v=null;for(var a=0;a<pr.variants.length;a++){var vs=(pr.variants[a].sku||"").toLowerCase(),ws=sku.toLowerCase();if(vs===ws||vs===ws+"-iu")v=pr.variants[a]}
+            if(!v){find(k+1);return}
+            if(!v.available){ko.push(sku+" x"+q+" (rupture)");next();return}
+            fetch("/cart/add.js",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({items:[{id:v.id,quantity:q}]})}).then(function(r){if(r.ok){ok.push(sku)}else{ko.push(sku+" x"+q+" (refusé)")}next()}).catch(function(){ko.push(sku+" (erreur)");next()});
+          }).catch(function(){find(k+1)});
+        };
+        find(0);
+      }).catch(function(){ko.push(sku+" (erreur)");next()});
+    };
+    next();
+  };
+  if(navigator.clipboard&&navigator.clipboard.readText){navigator.clipboard.readText().then(run,function(){run(prompt("Colle la commande copiée depuis FS :"))})}else{run(prompt("Colle la commande copiée depuis FS :"))}
+}
+function ewLien(){return "javascript:("+encodeURIComponent(EWB.toString())+")()"}
+ACTS.cmdEwCopy=function(b){var f=trouveF(+b.dataset.id);if(!f)return;
+  var t=f.panier.filter(function(l){return l.sku}).map(function(l){return l.sku+"\t"+l.quantite}).join("\\n");
+  var sans=f.panier.filter(function(l){return !l.sku}).length;
+  if(navigator.clipboard)navigator.clipboard.writeText(t).then(function(){CMDMSG="Copié. Sur le site du fournisseur, clique sur le favori Remplir panier."+(sans?" "+sans+" ligne(s) sans référence à ajouter à la main.":"");render()},function(){alert(t)});else alert(t)};
 ACTS.cmdCsv=function(b){var f=trouveF(+b.dataset.id);if(!f)return;
   var blob=new Blob([csvCommande(f)],{type:"text/csv"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="commande-"+f.nom.replace(/[^a-z0-9]+/gi,"-")+".csv";document.body.appendChild(a);a.click();a.remove()};
 document.addEventListener("change",function(e){var t=e.target;if(!t||!t.dataset||t.dataset.act!=="cmdQte")return;api("/achats/ligne/maj",{id:+t.dataset.id,quantite:t.value}).then(function(){CMD=null;CMDMSG="";}).catch(function(err){CMDMSG=err.message})});
