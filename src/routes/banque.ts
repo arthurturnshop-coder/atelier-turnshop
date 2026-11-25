@@ -79,16 +79,18 @@ function lireCsv(texte: string) {
   const idx = (re: RegExp) => ent.findIndex((x) => re.test(x));
   const iDate = idx(/^date( de l.?op|$)|^date$/) >= 0 ? idx(/^date( de l.?op|$)|^date$/) : idx(/date/);
   const iLib = idx(/libell|op[ée]ration|d[ée]tail|description/);
+  const iMag = idx(/^magasin$|^boutique$/);
   const iDeb = idx(/d[ée]bit/), iCre = idx(/cr[ée]dit/), iMont = idx(/montant/);
   if (iDate < 0 || iLib < 0 || (iDeb < 0 && iCre < 0 && iMont < 0)) throw new AppError(400, "Colonnes non reconnues : il faut au minimum date, libellé et débit/crédit (ou montant).");
-  const ops: { jour: string; libelle: string; debit: number; credit: number }[] = [];
+  const ops: { jour: string; libelle: string; debit: number; credit: number; magasin: string }[] = [];
   for (const l of lignes.slice(1)) {
     const c = decoupe(l, sep);
     const jour = dateIso(c[iDate]); if (!jour) continue;
     let debit = iDeb >= 0 ? centimes(c[iDeb]) : 0, credit = iCre >= 0 ? centimes(c[iCre]) : 0;
     if (iMont >= 0 && !debit && !credit) { const v = centimes(c[iMont]); if (signe(c[iMont]) < 0) debit = v; else credit = v; }
     if (!debit && !credit) continue;
-    ops.push({ jour, libelle: clean(c[iLib], 400).replace(/\s+/g, " "), debit, credit });
+    const mg = iMag >= 0 ? (/amiens/i.test(c[iMag] ?? "") ? "Amiens" : /rouen/i.test(c[iMag] ?? "") ? "Rouen" : "") : "";
+    ops.push({ jour, libelle: clean(c[iLib], 400).replace(/\s+/g, " "), debit, credit, magasin: mg });
   }
   return ops;
 }
@@ -100,16 +102,19 @@ app.post("/api/banque/import", async (c) => {
   if (!ops.length) throw new AppError(400, "Aucune opération trouvée dans ce fichier.");
   const rs = await regles();
   const vus = new Map<string, number>();
-  let nouveaux = 0;
+  let nouveaux = 0, maj = 0;
   for (const o of ops) {
     const base = `${o.jour}|${o.libelle}|${o.debit}|${o.credit}`;
     const rang = (vus.get(base) ?? 0) + 1; vus.set(base, rang);
     const cle = createHash("sha1").update(base + "|" + rang).digest("hex");
     const k = classe(rs, o.libelle, o.debit, o.credit);
-    const r = (await sql`INSERT INTO banque_ops (cle, jour, libelle, debit_cents, credit_cents, categorie, magasin) VALUES (${cle}, ${o.jour}, ${o.libelle}, ${o.debit}, ${o.credit}, ${k.categorie}, ${k.magasin}) ON CONFLICT (cle) DO NOTHING RETURNING id`) as any[];
+    // Un fichier avec une colonne « magasin » = un compte bancaire par boutique : sauf les ventes en ligne, l'opération est rattachée à ce magasin.
+    const mag = o.magasin && !/ventes en ligne/i.test(k.categorie) ? o.magasin : k.magasin;
+    const r = (await sql`INSERT INTO banque_ops (cle, jour, libelle, debit_cents, credit_cents, categorie, magasin) VALUES (${cle}, ${o.jour}, ${o.libelle}, ${o.debit}, ${o.credit}, ${k.categorie}, ${mag}) ON CONFLICT (cle) DO NOTHING RETURNING id`) as any[];
     if (r.length) nouveaux++;
+    else if (o.magasin) { const u = (await sql`UPDATE banque_ops SET magasin = ${mag} WHERE cle = ${cle} AND manuel = false AND magasin IS DISTINCT FROM ${mag} RETURNING id`) as any[]; if (u.length) maj++; }
   }
-  return c.json({ message: `${nouveaux} opération(s) ajoutée(s), ${ops.length - nouveaux} déjà connue(s).`, nouveaux });
+  return c.json({ message: `${nouveaux} opération(s) ajoutée(s), ${ops.length - nouveaux} déjà connue(s)${maj ? ", " + maj + " rattachée(s) à leur boutique" : ""}.`, nouveaux });
 });
 
 // Opérations d'un mois (ou toutes les « À classer »).
