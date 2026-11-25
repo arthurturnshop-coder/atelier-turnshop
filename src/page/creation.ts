@@ -24,7 +24,7 @@ function vCreer(){
   h+="<div class='cre-sec cre-full'><div class='cre-h'><span class='cre-n'>3</span>"+(m==="devis"?"Objet du devis":"Panne décrite par le client")+"</div>"
     +(m==="devis"?"":"<div class='cre-chips cre-pn'>"+["Suspicion batterie","Pneu crevé","Ne freine pas","Bruit du contrôleur","Accident","Ne s allume pas","Perte de puissance","Écran / afficheur HS"].map(function(t){return"<button type='button' class='cre-pb' data-act='crePanne' data-t='"+t+"'>+ "+t+"</button>"}).join("")+"</div>")
     +"<textarea id='cr-p' rows='3' placeholder='"+(m==="devis"?"Ex : devis changement de batterie":"Panne décrite par le client")+"'></textarea>"
-    +"<div class='cre-2'><input id='cr-e' placeholder='État à l arrivée'><textarea id='cr-r' rows='1' placeholder='Remarques' style='min-height:46px'></textarea></div></div>";
+    +"<div class='cre-2'><select id='cr-e'><option value=''>État à l arrivée…</option>"+["Bon état général","Rayures / traces d usure","Choc / bosse","Carénage cassé","Très sale","Déjà démontée","Pièces manquantes","Autre (voir remarques)"].map(function(t){return"<option>"+t+"</option>"}).join("")+"</select><textarea id='cr-r' rows='1' placeholder='Remarques' style='min-height:46px'></textarea></div></div>";
   // 4. Rangement et affaires
   h+="<div class='cre-sec'><div class='cre-h'><span class='cre-n'>4</span>Rangement et affaires</div>"+boiteSelect("cr-b")+affairesBox("cr")+"<div class='cre-2' style='margin-top:10px'><input id='cr-k' placeholder='🔑 Code / mot de passe (facultatif)'><input id='cr-d' type='date' value='"+today()+"'></div></div>";
   // 5. Options
