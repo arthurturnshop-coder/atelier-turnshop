@@ -2,6 +2,7 @@ export const ACTIONS = `function prFiltre(q){q=(q||'').toLowerCase();document.qu
 function bigOk(t,sub){var o=document.createElement("div");o.style.cssText="position:fixed;inset:0;background:rgba(20,30,25,.55);z-index:9500;display:flex;align-items:center;justify-content:center";
   o.innerHTML="<div style='background:#1e8449;color:#fff;padding:40px 60px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.4)'><div style='font-size:72px'>✅</div><div style='font-size:38px;font-weight:800'>"+esc(t)+"</div>"+(sub?"<div style='font-size:26px;margin-top:12px;font-weight:700'>"+esc(sub)+"</div>":"")+"</div>";
   document.body.appendChild(o);var ms=sub?3500:1600;function f(){if(o.parentNode)o.remove()}o.addEventListener("click",f);setTimeout(f,ms)}
+function cReset(){CREP=null;CAFF=[];CRAFF=[];CACO=0;PAN=[];CPAY={carte:"",especes:"",virement:"",bon_achat:""};CCLI=null;CFID=null;CUSE=false;CAVOFF=[];CMSG=""}
 var ACTS={
   chooseMag:function(b){loadProfils(b.dataset.mag)},
   choosePrenom:choosePrenom,
@@ -61,7 +62,7 @@ var ACTS={
       CACO=f.acompte?f.acompte.resteCents:0;
       CCLI=d.client;CFID=d.fidelite;CUSE=false;CAVOFF=[];CREC=null;CHOPEN=0;CREP=f.id;CAFF=f.affaires||[];CRAFF=[];CPAY={carte:"",especes:"",virement:"",bon_achat:""};CMSG="";
       CMODE=b.dataset.m||"paiement";CPOP=true;await chargeHisto()}catch(e){alert(e.message)}},
-  cpFerme:function(){var id=FICHE?FICHE.id:0;CPOP=false;if(!CREC){CREP=null;CAFF=[];CACO=0;PAN=[];CPAY={carte:"",especes:"",virement:"",bon_achat:""}}CREC=null;if(id)recharger(id);else render()},
+  cpFerme:function(){var id=FICHE?FICHE.id:0;CPOP=false;if(!CREC)cReset();CREC=null;if(id)recharger(id);else render()},
   cMode:function(b){CMODE=b.dataset.m;render()},
   acMoy:function(b){ACM=b.dataset.m;render()},
   acSolde:function(b){ACV=b.dataset.v;render()},
@@ -69,7 +70,7 @@ var ACTS={
   rbTrop:function(b){var e=document.getElementById("rb-m");if(e)e.value=b.dataset.v},
   acompte:async function(b){var m=pxCents(v("ac-m"));if(m<=0){alert("Indique le montant.");return}
     try{var mdpA=await demandeCode("Qui encaisse ?");if(mdpA===null)return;var d=await api("/reparations/acompte",{mdpCaissier:mdpA,repairId:+b.dataset.id,paiements:[{moyen:ACM,montant:v("ac-m")}]});
-      var rendu=ACM==="especes"?pxCents(v("ac-r"))-m:0;ACV=null;ACR="";CPOP=false;bigOk("Acompte encaissé",rendu>0?"💶 Monnaie à rendre au client : "+eur(rendu):"");await recharger(+b.dataset.id);CREC=null}catch(e){alert(e.message)}},
+      var rendu=ACM==="especes"?pxCents(v("ac-r"))-m:0;ACV=null;ACR="";CPOP=false;cReset();bigOk("Acompte encaissé",rendu>0?"💶 Monnaie à rendre au client : "+eur(rendu):"");await recharger(+b.dataset.id);CREC=null}catch(e){alert(e.message)}},
   acSolder:async function(b){var f=FICHE;if(!f)return;var P=payInfo(f),due=P.due;
     if(due>0){var pm=pxCents(v("ac-m"));if(pm!==due){if(!confirm("Le montant saisi ("+eur(pm)+") ne correspond pas au solde ("+eur(due)+"). Encaisser le solde complet de "+eur(due)+" en "+({carte:"carte",especes:"espèces",virement:"virement"}[ACM])+" ?"))return}}
     var rendu=(ACM==="especes"&&due>0)?pxCents(v("ac-r"))-due:0;
