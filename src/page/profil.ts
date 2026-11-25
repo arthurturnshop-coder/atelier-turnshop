@@ -97,7 +97,7 @@ function vProfil(){
   }else{
     h+="<div class='big'>"+esc(c.name||"Client")+"</div>"
       +"<div class='muted'>"+esc(c.phone||"Pas de téléphone")+" · "+esc(c.email||"Pas d'email")+"</div><div class='muted'>Client depuis le "+esc(day(c.creeLe))+"</div>"
-      +"<button class='sec' data-act='editCli'>Modifier</button>"+(estResp()?" <button class='sec' data-act='cliFusion'>Fusionner dans une autre fiche</button> <button class='danger' data-act='cliSuppr'>Supprimer la fiche</button>":"");
+      +avisBandeau(c.id)+"<button class='sec' data-act='editCli'>Modifier</button>"+(estResp()?" <button class='sec' data-act='cliFusion'>Fusionner dans une autre fiche</button> <button class='danger' data-act='cliSuppr'>Supprimer la fiche</button>":"");
   }
   h+="</div><div id='kpi' style='flex:0 0 auto;margin-left:auto'>"+kpiHtml()+"</div></div></div>";
   h+=fusionHtml();
@@ -137,4 +137,11 @@ async function loadFid(){
   FIDLOAD=null;
   if(!CUR||CUR.id!==c.id)return;
   FID=d;kpiMaj()}
+var AVC={};
+function avisBandeau(id){
+  if(!id)return"";var a=AVC[id];
+  if(a===undefined){AVC[id]=null;api("/clients/avis?id="+id).then(function(d){AVC[id]=d;render()}).catch(function(){AVC[id]={err:1}});return""}
+  if(!a||a.err)return"";
+  if(a.recompenseLe)return"<div class='muted' style='margin-top:6px'>&#127873; Récompense avis Google offerte le "+esc(day(a.recompenseLe))+(a.recompensePar?" par "+esc(a.recompensePar):"")+".</div>";
+  return"<div style='margin-top:8px;padding:10px 12px;border-radius:8px;background:#fdf0d5'><b>&#127873; Avis Google"+(a.envoyeLe?" : demande envoyée le "+esc(day(a.envoyeLe)):"")+"</b><div class='muted'>Si le client montre son avis posté sur son téléphone, offre-lui la récompense.</div><button data-act='avisRec' data-id='"+id+"' style='margin-top:6px'>&#9989; Avis vu, récompense offerte</button></div>"}
 `;

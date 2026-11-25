@@ -162,4 +162,5 @@ function vCasiers(){
   return h+"</div>"}
 ACTS.casiRef=function(){CASI=null;render()};
 ACTS.casiOpen=function(b){ouvrirFiche(Number(b.dataset.id))};
+ACTS.avisRec=async function(b){var id=+b.dataset.id;if(!confirm("Tu as vu l'avis Google posté par ce client ? La récompense sera notée comme offerte (une seule fois)."))return;try{await api("/clients/avis-recompense",{id:id});delete AVC[id];render()}catch(e){alert(e.message)}};
 `;

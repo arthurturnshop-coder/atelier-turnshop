@@ -273,3 +273,23 @@ app.post("/api/trottinettes", async (c) => {
   }
   return c.json({ id: tid.id, message: "Trottinette associée." });
 });
+
+// ---------- Avis Google : la demande a-t-elle été envoyée ? la récompense a-t-elle été offerte ? (Google ne dit pas qui a posté : on vérifie l'avis sur le téléphone du client) ----------
+await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS avis_recompense_le TIMESTAMPTZ`;
+await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS avis_recompense_par TEXT`;
+app.get("/api/clients/avis", async (c) => {
+  const id = Number(c.req.query("id"));
+  if (!(id > 0)) throw new AppError(404, "Client introuvable.");
+  const [cl] = (await sql`SELECT avis_recompense_le, avis_recompense_par FROM clients WHERE id = ${id}`) as any[];
+  if (!cl) throw new AppError(404, "Client introuvable.");
+  const [e] = (await sql`SELECT max(cree_le) AS le FROM messages_envoyes WHERE client_id = ${id} AND type = 'avis' AND statut = 'envoye'`) as any[];
+  return c.json({ envoyeLe: e?.le ?? null, recompenseLe: cl.avis_recompense_le, recompensePar: cl.avis_recompense_par });
+});
+app.post("/api/clients/avis-recompense", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const id = Number(b.id);
+  const u = c.get("user") as any;
+  const [cl] = (await sql`UPDATE clients SET avis_recompense_le = now(), avis_recompense_par = ${u?.prenom ?? ""} WHERE id = ${id} AND avis_recompense_le IS NULL RETURNING id`) as any[];
+  if (!cl) throw new AppError(409, "La récompense d'avis a déjà été offerte à ce client.");
+  return c.json({ message: "Noté : récompense d'avis offerte." });
+});
