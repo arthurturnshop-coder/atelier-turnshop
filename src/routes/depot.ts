@@ -143,6 +143,12 @@ app.post("/api/depots/reverser", async (c) => {
   if (!r || r.statut !== "vendu") throw new AppError(400, "Ce dépôt n'est pas vendu, ou déjà reversé.");
   const v = await vue(r);
   const moyen = ["virement", "especes", "cheque"].includes(b.moyen) ? b.moyen : "virement";
+  const magU = (c.get("user") as any)?.magasin === "Rouen" ? "Rouen" : "Amiens";
+  if (moyen === "especes") {
+    const [ouv] = (await sql`SELECT id FROM caisse_sessions WHERE magasin = ${magU} AND fermee_le IS NULL LIMIT 1`) as any[];
+    if (!ouv) throw new AppError(409, "Reversement en espèces : ouvre d'abord la caisse (la sortie de cash y est enregistrée).");
+    await sql`INSERT INTO mouvements_cash (magasin, sens, montant_cents, motif, par) VALUES (${magU}, 'sortie', ${v.reverserCents}, ${"Reversement dépôt-vente DV-" + id}, ${(c.get("user") as any)?.prenom ?? ""})`;
+  }
   await sql`UPDATE depots_vente SET statut = 'reverse', reverse_le = now(), reverse_par = ${c.get("user")?.prenom ?? ""}, reverse_moyen = ${moyen}, reverse_cents = ${v.reverserCents} WHERE id = ${id}`;
   if (r.reparation_id) await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${r.reparation_id}, 'note', ${`Dépôt-vente DV-${id} : ${(v.reverserCents / 100).toFixed(2)} € reversés au déposant (${moyen})${signature(c)}`})`;
   return c.json({ message: `Reversement de ${(v.reverserCents / 100).toFixed(2).replace(".", ",")} € enregistré.` });

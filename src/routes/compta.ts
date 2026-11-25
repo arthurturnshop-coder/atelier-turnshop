@@ -136,6 +136,15 @@ app.get("/api/compta/export", async (c) => {
     if (tva) ecr(dt, piece, def.get("tva_collectee") ?? "44571", "TVA collectée 20 %", 0, tva, an, cl);
     totalC += H + tva + dette;
   }
+  // Reversements aux déposants (dépôt-vente) : on solde la dette 467 contre la caisse (530) ou la banque (512).
+  const rv = (await sql`SELECT d.id, d.reverse_le, d.reverse_moyen, d.reverse_cents, c.prenom, c.nom FROM depots_vente d JOIN clients c ON c.id = d.client_id WHERE d.statut = 'reverse' AND d.reverse_cents > 0 AND (d.reverse_le AT TIME ZONE 'Europe/Paris')::date BETWEEN ${du}::date AND ${au}::date ORDER BY d.reverse_le`) as any[];
+  for (const r of rv) {
+    const dt = new Date(r.reverse_le), piece = "RV-DV" + String(r.id).padStart(5, "0"), cl = `${r.prenom ?? ""} ${r.nom ?? ""}`.trim();
+    const cpt = r.reverse_moyen === "especes" ? (def.get("especes") ?? "530") : "512";
+    const e = (compte: string, lib: string, deb: number, cre: number) => L.push([ "OD", jjmmaaaa(dt), piece, compte, comptes.get(compte) ?? "", lib, deb ? eur2(deb) : "", cre ? eur2(cre) : "", "", cl ].map(csv).join(";"));
+    e("467", `Reversement dépôt-vente DV#${r.id} au déposant`, r.reverse_cents, 0);
+    e(cpt, `Reversement dépôt-vente DV#${r.id} (${r.reverse_moyen})`, 0, r.reverse_cents);
+  }
   const nom = `journal-ventes-${du}-${au}.csv`;
   return new Response("﻿" + L.join("\r\n") + "\r\n", { headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": `attachment; filename="${nom}"` } });
 });
