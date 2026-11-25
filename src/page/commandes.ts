@@ -23,8 +23,20 @@ function rattHtml(l){
   if(l.reparationId)h+="<button class='link' data-act='cmdDetach' data-id='"+l.id+"'>Détacher de la fiche "+l.reparationId+"</button>";
   else h+="<select id='rt-"+l.id+"'><option value=''>Rattacher à une prise en charge…</option>"+(REPS||[]).map(function(r){return"<option value='"+r.id+"'>#"+r.id+" "+esc(r.client)+"</option>"}).join("")+"</select><button class='sec' data-act='cmdRatt' data-id='"+l.id+"'>Rattacher</button>";
   return h+"</div>"}
+function refsInline(l){
+  var h="";
+  if(l.sku)h+="<span class='muted'>SKU "+esc(l.sku)+" <button class='link' data-act='copier' data-t='"+esc(l.sku)+"' data-l='Copier'>Copier</button></span>";
+  if(l.barcode)h+="<span class='muted'>CB "+esc(l.barcode)+" <button class='link' data-act='copier' data-t='"+esc(l.barcode)+"' data-l='Copier'>Copier</button></span>";
+  if(!l.sku&&!l.barcode)h+="<span class='muted'>Sans réf. <button class='link' data-act='copier' data-t='"+esc(l.libelle)+"' data-l='Copier le nom'>Copier le nom</button></span>";
+  return h}
 function ligneCmd(l,mode){
-  var h="<tr><td>"+(l.commandeId&&mode!=="panier"?"<span class='tag'>"+cmdNum(l.commandeId)+"</span> ":"")+esc(l.libelle)+refsCmd(l)+(l.client?"<div class='muted'>Pour "+esc(l.client)+(l.reparationId?" (fiche "+l.reparationId+")":"")+"</div>":"")+(mode==="commandee"?suiviHtml(l):mode==="commandee-g"?"<div class='muted'>Commandé il y a "+joursCmd(l)+" j</div>":"")+(mode!=="recue"?rattHtml(l):"")+"</td>";
+  var fx="display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center";
+  var h="<tr><td><div style='"+fx+"'>"+(l.commandeId&&mode!=="panier"?"<span class='tag'>"+cmdNum(l.commandeId)+"</span>":"")+"<b>"+esc(l.libelle)+"</b>"+refsInline(l)+(l.client?"<span class='muted'>Pour "+esc(l.client)+(l.reparationId?" (fiche "+l.reparationId+")":"")+"</span>":"");
+  if(mode==="commandee"){var j=joursCmd(l),tard=j>=7;h+="<span class='tag"+(tard?" warn":"")+"'>"+j+" j"+(tard?" · toujours pas arrivé ?":"")+"</span><input id='sv-"+l.id+"' value='"+esc(l.suivi||"")+"' placeholder='N° de suivi' style='max-width:150px'><button class='sec' data-act='cmdSuivi' data-id='"+l.id+"'>OK</button>"+(l.suivi?"<a class='link' target='_blank' rel='noopener' href='https://t.17track.net/fr#nums="+encodeURIComponent(l.suivi)+"'>Suivre</a>":"")}
+  else if(mode==="commandee-g")h+="<span class='muted'>il y a "+joursCmd(l)+" j</span>";
+  if(mode!=="recue"){if(l.reparationId)h+="<button class='link' data-act='cmdDetach' data-id='"+l.id+"'>Détacher fiche "+l.reparationId+"</button>";
+    else h+="<select id='rt-"+l.id+"' style='max-width:210px'><option value=''>Rattacher à une prise en charge…</option>"+(REPS||[]).map(function(r){return"<option value='"+r.id+"'>#"+r.id+" "+esc(r.client)+"</option>"}).join("")+"</select><button class='sec' data-act='cmdRatt' data-id='"+l.id+"'>Rattacher</button>"}
+  h+="</div></td>";
   if(mode==="panier")h+="<td class='n'><input type='number' min='1' value='"+l.quantite+"' data-act='cmdQte' data-id='"+l.id+"'></td><td class='n'><button class='link' data-act='cmdDel' data-id='"+l.id+"'>Retirer</button></td>";
   else if(mode==="commandee"||mode==="commandee-g")h+="<td class='n'>"+l.quantite+"</td><td class='n'><button data-act='cmdRecevoir' data-id='"+l.id+"'>Réceptionner</button></td>";
   else h+="<td class='n'>"+l.quantite+"</td><td class='n'><span class='tag ok'>Reçu</span></td>";
