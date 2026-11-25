@@ -8,6 +8,8 @@ import { AppError, clean, exigeAdmin } from "../util";
 // ---------- Compta > Synthèse : CA logiciel, CA banque, rapprochement, TVA estimée, dépenses par pôle, marge ----------
 await sql`CREATE TABLE IF NOT EXISTS tva_deductible_mois (mois TEXT PRIMARY KEY, montant_cents INT NOT NULL)`;
 
+await sql`CREATE TABLE IF NOT EXISTS ca_reel_mois (mois TEXT NOT NULL, magasin TEXT NOT NULL, ttc_cents INT NOT NULL, PRIMARY KEY (mois, magasin))`;
+
 const ENT = ["Amiens", "Rouen", "Commun"] as const;
 type Ent = (typeof ENT)[number];
 const entDe = (m: any): Ent => (m === "Amiens" || m === "Rouen" ? m : "Commun");
@@ -64,8 +66,14 @@ app.get("/api/compta/synthese", async (c) => {
 
   // --- CA retenu pour la marge : logiciel s'il y a des ventes ce mois-là, sinon encaissements de la banque ---
   const source = nbLog > 0 ? "logiciel" : "banque";
+  const reelRows = (await sql`SELECT magasin, ttc_cents FROM ca_reel_mois WHERE mois = ${mois}`) as any[];
+  const reel: Record<string, number | null> = { Amiens: null, Rouen: null, Commun: null };
+  for (const r of reelRows) reel[entDe(r.magasin)] = r.ttc_cents;
   const caTtc = zero();
   for (const e of ENT) caTtc[e] = source === "logiciel" ? Math.max(0, logTtc[e] - logRemb[e]) + (e === "Commun" ? bVir_enLigne(cre) : 0) : bCa[e];
+  // Le CA réel saisi (ex. relevé Shifter) remplace, boutique par boutique, le CA logiciel ou banque.
+  for (const e of ENT) if (reel[e] != null) caTtc[e] = reel[e] as number;
+  const sourceSaisie = ENT.some((e) => reel[e] != null);
   function bVir_enLigne(rows: any[]) { return rows.filter((r) => /ventes en ligne/i.test(String(r.categorie))).reduce((t, r) => t + r.n, 0); }
 
   // --- Rapprochement logiciel / banque ---
@@ -104,7 +112,7 @@ app.get("/api/compta/synthese", async (c) => {
   }
   const pct = (n: number, d: number) => (d > 0 ? Math.round((n * 1000) / d) / 10 : null);
   return c.json({
-    liste: lm, mois, releve, source, nbVentes: nbLog,
+    liste: lm, mois, releve, source: sourceSaisie ? "saisi" : source, nbVentes: nbLog, caReel: { amiens: reel.Amiens, rouen: reel.Rouen, commun: reel.Commun }, caRetenu: { amiens: caTtc.Amiens, rouen: caTtc.Rouen, commun: caTtc.Commun },
     caLogiciel: { amiens: { ttc: logTtc.Amiens, remb: logRemb.Amiens, nb: logNb.Amiens }, rouen: { ttc: logTtc.Rouen, remb: logRemb.Rouen, nb: logNb.Rouen }, commun: { ttc: logTtc.Commun, remb: logRemb.Commun, nb: logNb.Commun } },
     caBanque: { amiens: bCa.Amiens, rouen: bCa.Rouen, commun: bCa.Commun, retraitsEspeces: retraits },
     rapprochement, tva,
@@ -124,4 +132,20 @@ app.post("/api/compta/tva-deductible", async (c) => {
   if (!Number.isFinite(n) || n < 0) throw new AppError(400, "Montant invalide.");
   await sql`INSERT INTO tva_deductible_mois (mois, montant_cents) VALUES (${mois}, ${Math.round(n * 100)}) ON CONFLICT (mois) DO UPDATE SET montant_cents = EXCLUDED.montant_cents`;
   return c.json({ message: "TVA déductible du mois enregistrée." });
+});
+
+app.post("/api/compta/ca-reel", async (c) => {
+  exigeAdmin(c);
+  const b = await c.req.json().catch(() => ({}));
+  const mois = clean(b.mois, 7);
+  if (!/^\d{4}-\d{2}$/.test(mois)) throw new AppError(400, "Mois invalide.");
+  for (const [mg, cle] of [["Amiens", "amiens"], ["Rouen", "rouen"], ["Commun", "commun"]] as const) {
+    if (!(cle in b)) continue;
+    const brut = String(b[cle] ?? "").trim();
+    if (!brut) { await sql`DELETE FROM ca_reel_mois WHERE mois = ${mois} AND magasin = ${mg}`; continue; }
+    const n = Number(brut.replace(/\s/g, "").replace(",", "."));
+    if (!Number.isFinite(n) || n < 0) throw new AppError(400, "Montant invalide.");
+    await sql`INSERT INTO ca_reel_mois (mois, magasin, ttc_cents) VALUES (${mois}, ${mg}, ${Math.round(n * 100)}) ON CONFLICT (mois, magasin) DO UPDATE SET ttc_cents = EXCLUDED.ttc_cents`;
+  }
+  return c.json({ message: "CA réel du mois enregistré : marge et TVA sont recalculées dessus." });
 });
