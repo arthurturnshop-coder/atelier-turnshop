@@ -68,6 +68,8 @@ ACTS.cmdFeuille=function(b){
   api("/achats/feuille"+(id?"?fournisseurId="+id:"")).then(function(d){
     if(!d.fournisseurs.length){alert("Aucune ligne dans le panier à imprimer.");return}
     impImprimer(feuilleHtml(d.fournisseurs),"",feuilleCss())}).catch(function(e){alert(e.message)})};
+var TINTS=[["#eef6ff","#4a90d9"],["#effaf0","#4caf50"],["#fff6e6","#f5a623"],["#f6f0ff","#9b6fd6"],["#fff0f0","#e57373"]];
+function cmdAjoutRapide(ctx,msg){var y=window.scrollY;return api("/achats").then(function(d){CMD=d;CMDF=null;CMDMSG=msg||"";render();window.scrollTo(0,y);var i=document.querySelector("input[data-ps='"+ctx+"']");if(i)i.focus()})}
 function vCmd(){
   if(!CMD){app.innerHTML="<div class='card'>Chargement…</div>";api("/achats").then(function(d){return api("/stock/reappro?magasin="+encodeURIComponent(MAG||"")).then(function(r){RE=r;return d}).catch(function(){RE=null;return d})}).then(function(d){return api("/achats/reparations-ouvertes").then(function(r){REPS=r;return d}).catch(function(){REPS=[];return d})}).then(function(d){CMD=d;render()}).catch(function(e){app.innerHTML="<div class='card'>"+esc(e.message)+"</div>"});return}
   if(CMDF===null){CMDF=undefined;api("/achats/feuille").then(function(d){CMDF=d.fournisseurs;render()}).catch(function(){CMDF=[];render()})}
@@ -82,8 +84,9 @@ function vCmd(){
         +"<button data-act='cmdReappro' data-id='"+p.id+"'>Ajouter au panier</button></div>"});
     h+="</div>"}
   if(!CMD.fournisseurs.length)h+="<div class='card'>Ajoute ton premier fournisseur ci-dessus (eWheel, ...). Chaque fournisseur a son panier.</div>";
-  CMD.fournisseurs.forEach(function(f){
-    h+="<div class='card'><div class='head'><div class='big'>"+esc(f.nom)+"</div><div class='dl'><input id='fe-"+f.id+"' value='"+esc(f.email)+"' placeholder='Email de commande' class='lb'><button class='sec' data-act='fMail' data-id='"+f.id+"'>Enregistrer l'email</button><button class='sec' data-act='fMode' data-id='"+f.id+"' title='Bloc = un seul suivi pour toute la commande ; Unitaire = un suivi par produit'>Mode : "+(f.mode==="unitaire"?"par produit":"bloc")+"</button></div></div>";
+  CMD.fournisseurs.forEach(function(f,fi){
+    var tc=TINTS[fi%TINTS.length];
+    h+="<div class='card' style='background:"+tc[0]+";border-left:5px solid "+tc[1]+"'><div class='head'><div class='big'>"+esc(f.nom)+"</div><div class='dl'><input id='fe-"+f.id+"' value='"+esc(f.email)+"' placeholder='Email de commande' class='lb'><button class='sec' data-act='fMail' data-id='"+f.id+"'>Enregistrer l'email</button><button class='sec' data-act='fMode' data-id='"+f.id+"' title='Bloc = un seul suivi pour toute la commande ; Unitaire = un suivi par produit'>Mode : "+(f.mode==="unitaire"?"par produit":"bloc")+"</button></div></div>";
     h+=francoHtml(f);
     if(REC&&REC.fid===f.id)h+=recepHtml(f);
     h+="<div class='actions' style='margin-top:6px'><button class='sec' data-act='histoOpen' data-id='"+f.id+"'>"+(HISTC&&HISTC.fid===f.id?"Masquer l'historique":"Historique des commandes")+"</button></div>"+(HISTC&&HISTC.fid===f.id?histoCmdHtml():"");
