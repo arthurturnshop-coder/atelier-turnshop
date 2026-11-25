@@ -166,10 +166,16 @@ function cloTotaux(t){
   h+="</table><div class='muted'>"+t.nbVentes+" vente(s) · "+t.nbAcomptes+" acompte(s) · CA ventes "+eur(t.caCents)+"</div>";
   if((t.trottinettes||[]).length){h+="<div class='step' style='margin-top:8px'>🛴 Trottinettes vendues (n° de série)</div>"+t.trottinettes.map(function(x){return"<div class='muted'>"+esc(x.serie)+" · "+esc(x.libelle)+(x.client?" · "+esc(x.client):"")+(x.facture?" · "+esc(x.facture):"")+"</div>"}).join("")}
   return h}
+var CNT=[[50000,"Billet 500 €"],[20000,"Billet 200 €"],[10000,"Billet 100 €"],[5000,"Billet 50 €"],[2000,"Billet 20 €"],[1000,"Billet 10 €"],[500,"Billet 5 €"],[200,"Pièce 2 €"],[100,"Pièce 1 €"],[50,"Pièce 50 c"],[20,"Pièce 20 c"],[10,"Pièce 10 c"],[5,"Pièce 5 c"],[2,"Pièce 2 c"],[1,"Pièce 1 c"]];
+function cntHtml(cible){
+  return"<details class='card' style='margin:8px 0'><summary style='cursor:pointer;font-weight:700'>🧮 Compter par billets et pièces</summary><div class='muted'>Tape le nombre de chaque billet ou pièce : le total se met tout seul dans le montant.</div>"
+    +"<div style='display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:8px'>"
+    +CNT.map(function(x){return"<label class='muted' style='display:flex;flex-direction:column;gap:2px'>"+x[1]+"<input type='number' min='0' step='1' inputmode='numeric' placeholder='0' data-cnt='"+cible+"' data-c='"+x[0]+"' style='margin:0'></label>"}).join("")
+    +"</div><div style='margin-top:8px'>Total compté : <b id='cnt-tot-"+cible+"'>0,00 €</b></div></details>"}
 function cloEcartTxt(c){return(c>0?"+":"")+eur(c)}
 function cloOuvreForm(d){
   var sug=d.fondConseilleCents?(d.fondConseilleCents/100).toFixed(2).split(".").join(","):"";
-  return"<div class='step' style='margin-top:10px'>Ouvrir la caisse</div><div class='dl'><label class='muted'>Montant présent dans le tiroir (€)</label><input id='clo-fond' placeholder='Compte le tiroir' value='"+sug+"'></div>"
+  return"<div class='step' style='margin-top:10px'>Ouvrir la caisse</div><div class='dl'><label class='muted'>Montant présent dans le tiroir (€)</label><input id='clo-fond' placeholder='Compte le tiroir' value='"+sug+"'></div>"+cntHtml("clo-fond")
     +"<div class='actions'><button data-act='cloOuvrir'>Ouvrir la caisse</button></div>"}
 function cloHist(){
   var h=CLO.h;if(!h)return"<div class='muted'>Chargement...</div>";
@@ -205,7 +211,7 @@ function cloHtml(){
     if(o.perimee)h+="<div class='card' style='border:2px solid #b00'><b style='color:#b00'>La caisse du "+esc(o.jour.split("-").reverse().join("/"))+" n est pas fermée.</b><div class='muted'>Compte le tiroir et ferme-la : impossible d ouvrir la caisse du jour ou d encaisser tant que ce n est pas fait.</div></div>";
     h+="<div><span class='tag ok'>Caisse ouverte</span> depuis "+esc(cloHeure(o.ouverteLe))+" par "+esc(o.ouvertPar)+" · tiroir à l ouverture "+eur(o.fondCents)+"</div>"+cloTotaux(d.live)
       +"<div class='muted'>Espèces attendues dans le tiroir : <b id='clo-att'>"+eur(att)+"</b></div>"
-      +"<div class='dl'><label class='muted'>Espèces comptées (€)</label><input id='clo-compte' placeholder='Compte le tiroir'></div>"
+      +"<div class='dl'><label class='muted'>Espèces comptées (€)</label><input id='clo-compte' placeholder='Compte le tiroir'></div>"+cntHtml("clo-compte")
       +"<div class='muted'>Écart : <b id='clo-ecart'>-</b></div><div class='dl'><input id='clo-note' placeholder='Note (facultatif)'></div>"
       +"<div class='actions'><button data-act='cloFermer'>Fermer la caisse (ticket Z)</button></div>"}
   else{
@@ -258,6 +264,13 @@ ACTS.cloZ=function(b){
   if(!z&&CLO.h)z=CLO.h.sessions.filter(function(x){return x.id===id})[0];
   if(z)cloImprimeZ(z)};
 document.addEventListener("input",function(e){
+  var t0=e.target;
+  if(t0&&t0.dataset&&t0.dataset.cnt){
+    var cib=t0.dataset.cnt,tot=0;
+    document.querySelectorAll("input[data-cnt='"+cib+"']").forEach(function(i){tot+=Math.max(0,Math.round(Number(i.value)||0))*Number(i.dataset.c)});
+    var te=document.getElementById("cnt-tot-"+cib);if(te)te.textContent=eur(tot);
+    var ci=document.getElementById(cib);if(ci){ci.value=(tot/100).toFixed(2).split(".").join(",");ci.dispatchEvent(new Event("input",{bubbles:true}))}
+    return}
   var t=e.target;if(!t||t.id!=="clo-compte"||!CLO.d||!CLO.d.ouverte)return;
   var a=CLO.d.ouverte.fondCents+CLO.d.live.especesNettes,ec=document.getElementById("clo-ecart");
   if(ec)ec.textContent=t.value.trim()?cloEcartTxt(Math.round((Number(t.value.split(",").join("."))||0)*100)-a):"-"});
