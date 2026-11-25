@@ -24,6 +24,29 @@ await sql`CREATE TABLE IF NOT EXISTS depots_vente (
   cree_le TIMESTAMPTZ NOT NULL DEFAULT now(), cree_par TEXT NOT NULL DEFAULT ''
 )`;
 
+await sql`ALTER TABLE depots_vente ADD COLUMN IF NOT EXISTS magasin TEXT NOT NULL DEFAULT 'Amiens'`;
+await sql`ALTER TABLE depots_vente ADD COLUMN IF NOT EXISTS options JSONB NOT NULL DEFAULT '{}'`;
+
+const esc = (x: any) => String(x ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+// Questionnaire de dépôt : champs texte puis cases à cocher, utilisés pour remplir la fiche Shopify automatiquement.
+const CHAMPS: [string, string][] = [["couleur", "Couleur"], ["vitesse", "Vitesse maximale"], ["autonomie", "Autonomie réelle"], ["poids", "Poids"], ["batterie", "Batterie"], ["moteur", "Moteur"], ["freins", "Freins"], ["pneus", "Pneus"], ["suspensions", "Suspensions"], ["eclairage", "Éclairage"], ["ecran", "Écran / afficheur"], ["garantie", "Garantie restante"]];
+const ACCESSOIRES = ["Chargeur d'origine", "Clés", "Notice", "Facture d'achat", "Béquille", "Rétroviseurs", "Siège", "Sacoche", "Antivol", "Support téléphone", "Garde-boue", "Clignotants"];
+function descriptionDepot(r: any) {
+  const o = r.options ?? {};
+  const li: string[] = [];
+  if (r.annee) li.push(`<li>Année : ${esc(r.annee)}</li>`);
+  if (r.km) li.push(`<li>Kilométrage : ${esc(r.km)} km</li>`);
+  for (const [k, l] of CHAMPS) if (o[k]) li.push(`<li>${l} : ${esc(o[k])}</li>`);
+  if (r.etat) li.push(`<li>État : ${esc(r.etat)}</li>`);
+  const acc: string[] = Array.isArray(o.accessoires) ? o.accessoires : [];
+  return `<p>${esc(r.marque)} ${esc(r.modele)} d'occasion en dépôt-vente, révisée par nos techniciens (révision complète et pièces critiques remplacées).</p>`
+    + (li.length ? `<h3>Caractéristiques</h3><ul>${li.join("")}</ul>` : "")
+    + (acc.length ? `<h3>Fournis avec la trottinette</h3><ul>${acc.map((a) => `<li>${esc(a)}</li>`).join("")}</ul>` : "")
+    + (r.note ? `<p>${esc(r.note)}</p>` : "")
+    + `<p>Disponible en boutique à ${esc(r.magasin)}.</p>`;
+}
+app.get("/api/depots/questionnaire", (c) => c.json({ champs: CHAMPS.map(([k, l]) => ({ k, l })), accessoires: ACCESSOIRES }));
+
 const pcn = (id: number) => "PC-" + String(id).padStart(4, "0");
 const cents = (x: any) => Math.round((Number(String(x ?? "").replace(",", ".")) || 0) * 100);
 
@@ -40,7 +63,7 @@ async function vue(r: any) {
   const commission = r.commission_fixe_cents + Math.round((base * Number(r.commission_pct)) / 100);
   return {
     id: r.id, clientId: r.client_id, client: `${r.prenom ?? ""} ${r.nom ?? ""}`.trim(), telephone: r.telephone ?? "",
-    marque: r.marque, modele: r.modele, annee: r.annee, km: r.km, etat: r.etat, note: r.note, emplacement: r.emplacement,
+    magasin: r.magasin, options: r.options ?? {}, marque: r.marque, modele: r.modele, annee: r.annee, km: r.km, etat: r.etat, note: r.note, emplacement: r.emplacement,
     prixCents: r.prix_cents, fixeCents: r.commission_fixe_cents, pct: Number(r.commission_pct),
     fraisCents: frais, fraisAuto, commissionCents: commission, reverserCents: Math.max(0, base - commission - frais),
     statut: r.statut, repairId: r.reparation_id, numero: r.reparation_id ? pcn(r.reparation_id) : "",
@@ -54,6 +77,13 @@ app.get("/api/depots", async (c) => {
   return c.json({ depots: await Promise.all(rows.map(vue)) });
 });
 
+const magasinDe = (c: any) => (c.get("user")?.magasin === "Rouen" ? "Rouen" : "Amiens");
+function opts(o: any) {
+  const out: any = {};
+  for (const [k] of CHAMPS) if (o && o[k]) out[k] = clean(o[k], 120);
+  if (o && Array.isArray(o.accessoires)) out.accessoires = o.accessoires.map((a: any) => clean(a, 60)).filter(Boolean).slice(0, 20);
+  return out;
+}
 app.post("/api/depots", async (c) => {
   const b = await c.req.json().catch(() => ({}));
   const clientId = Number(b.clientId);
@@ -74,8 +104,8 @@ app.post("/api/depots", async (c) => {
   const date = new Date().toISOString().slice(0, 10);
   const panne = "Dépôt-vente : révision complète obligatoire + remplacement de toutes les pièces en état critique";
   const [r] = (await sql`INSERT INTO reparations (client_id, trottinette_id, panne, etat, remarques, date_depot, en_magasin, sous_garantie) VALUES (${clientId}, ${trottId}, ${panne}, ${clean(b.etat, 500)}, ${"Trottinette en dépôt-vente. " + clean(b.note, 500)}, ${date}, true, false) RETURNING id`) as any[];
-  const [d] = (await sql`INSERT INTO depots_vente (client_id, trottinette_id, reparation_id, marque, modele, annee, km, etat, note, emplacement, prix_cents, cree_par)
-    VALUES (${clientId}, ${trottId}, ${r.id}, ${marque}, ${modele}, ${clean(b.annee, 20)}, ${clean(b.km, 20)}, ${clean(b.etat, 500)}, ${clean(b.note, 1000)}, ${clean(b.emplacement, 80)}, ${prix}, ${c.get("user")?.prenom ?? ""}) RETURNING id`) as any[];
+  const [d] = (await sql`INSERT INTO depots_vente (client_id, trottinette_id, reparation_id, marque, modele, annee, km, etat, note, emplacement, prix_cents, cree_par, magasin, options)
+    VALUES (${clientId}, ${trottId}, ${r.id}, ${marque}, ${modele}, ${clean(b.annee, 20)}, ${clean(b.km, 20)}, ${clean(b.etat, 500)}, ${clean(b.note, 1000)}, ${clean(b.emplacement, 80)}, ${prix}, ${c.get("user")?.prenom ?? ""}, ${magasinDe(c)}, ${JSON.stringify(opts(b.options))}::jsonb) RETURNING id`) as any[];
   await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${r.id}, 'note', ${`Dépôt-vente DV-${d.id} : prix souhaité ${(prix / 100).toFixed(2)} €. Révision obligatoire + pièces critiques${signature(c)}`})`;
   return c.json({ message: `Dépôt enregistré. Prise en charge ${pcn(r.id)} créée pour la révision.`, id: d.id, repairId: r.id });
 });
@@ -93,8 +123,9 @@ app.post("/api/depots/maj", async (c) => {
   const statut = b.statut && statuts.includes(b.statut) && !["vendu", "reverse"].includes(d.statut) ? b.statut : d.statut;
   const emp = b.emplacement !== undefined ? clean(b.emplacement, 80) : d.emplacement;
   const note = b.note !== undefined ? clean(b.note, 1000) : d.note;
+  const options = b.options !== undefined ? opts(b.options) : d.options;
   if (prix <= 0) throw new AppError(400, "Prix invalide.");
-  await sql`UPDATE depots_vente SET prix_cents = ${prix}, commission_fixe_cents = ${fixe}, commission_pct = ${pct}, frais_remise_cents = ${frais}, statut = ${statut}, emplacement = ${emp}, note = ${note} WHERE id = ${id}`;
+  await sql`UPDATE depots_vente SET options = ${JSON.stringify(options)}::jsonb, prix_cents = ${prix}, commission_fixe_cents = ${fixe}, commission_pct = ${pct}, frais_remise_cents = ${frais}, statut = ${statut}, emplacement = ${emp}, note = ${note} WHERE id = ${id}`;
   return c.json({ message: "Enregistré." });
 });
 
@@ -136,21 +167,33 @@ app.post("/api/depots/shopify", async (c) => {
       await sql`INSERT INTO parametres (cle, valeur, maj_le) VALUES ('depot_collection_gid', ${coll}, now()) ON CONFLICT (cle) DO UPDATE SET valeur = EXCLUDED.valeur, maj_le = now()`;
     }
     const titre = `${r.marque} ${r.modele} (occasion, dépôt-vente)`.trim();
-    const html = `<p>Trottinette d'occasion en dépôt-vente, révisée par nos techniciens.</p><ul>${r.annee ? `<li>Année : ${r.annee}</li>` : ""}${r.km ? `<li>Kilométrage : ${r.km}</li>` : ""}${r.etat ? `<li>État : ${r.etat}</li>` : ""}</ul>${r.note ? `<p>${r.note}</p>` : ""}`;
-    const d2 = await shopifyMutate(`mutation($p: ProductCreateInput!) { productCreate(product: $p) { product { id onlineStoreUrl handle variants(first: 1) { nodes { id } } } userErrors { message } } }`, { p: { title: titre, descriptionHtml: html, status: "DRAFT", vendor: r.marque || "Dépôt-vente", productType: "Trottinette d'occasion", tags: ["dépôt-vente", "occasion"], collectionsToJoin: [coll] } });
+    const html = descriptionDepot(r);
+    const d2 = await shopifyMutate(`mutation($p: ProductCreateInput!) { productCreate(product: $p) { product { id onlineStoreUrl handle variants(first: 1) { nodes { id } } } userErrors { message } } }`, { p: { title: titre, descriptionHtml: html, status: "DRAFT", vendor: r.marque || "Dépôt-vente", productType: "Trottinette d'occasion", tags: ["dépôt-vente", "occasion", r.magasin], collectionsToJoin: [coll] } });
     const e2 = d2.productCreate.userErrors?.[0]?.message;
     if (e2) throw new Error(e2);
     const prod = d2.productCreate.product;
     const vid = prod.variants.nodes[0]?.id;
     if (vid) {
-      const d3 = await shopifyMutate(`mutation($p: ID!, $v: [ProductVariantsBulkInput!]!) { productVariantsBulkUpdate(productId: $p, variants: $v) { userErrors { message } } }`, { p: prod.id, v: [{ id: vid, price: (r.prix_cents / 100).toFixed(2) }] });
+      const d3 = await shopifyMutate(`mutation($p: ID!, $v: [ProductVariantsBulkInput!]!) { productVariantsBulkUpdate(productId: $p, variants: $v) { userErrors { message } } }`, { p: prod.id, v: [{ id: vid, price: (r.prix_cents / 100).toFixed(2), inventoryItem: { tracked: true } }] });
       const e3 = d3.productVariantsBulkUpdate.userErrors?.[0]?.message;
       if (e3) throw new Error(e3);
     }
+    // Disponible uniquement dans la boutique du dépôt (Amiens ou Rouen) : 1 exemplaire.
+    let dispo = "";
+    try {
+      const L = await shopifyMutate(`query { locations(first: 20) { nodes { id name } } }`, {});
+      const loc = (L.locations?.nodes ?? []).find((n: any) => String(n.name).toLowerCase().includes(String(r.magasin).toLowerCase()));
+      const inv = (await shopifyMutate(`query($id: ID!) { productVariant(id: $id) { inventoryItem { id } } }`, { id: vid })).productVariant?.inventoryItem?.id;
+      if (loc && inv) {
+        await shopifyMutate(`mutation($i: ID!, $l: ID!) { inventoryActivate(inventoryItemId: $i, locationId: $l) { userErrors { message } } }`, { i: inv, l: loc.id }).catch(() => {});
+        const q = await shopifyMutate(`mutation($i: InventorySetQuantitiesInput!) { inventorySetQuantities(input: $i) { userErrors { message } } }`, { i: { name: "available", reason: "correction", ignoreCompareQuantity: true, quantities: [{ inventoryItemId: inv, locationId: loc.id, quantity: 1 }] } });
+        dispo = q.inventorySetQuantities.userErrors?.[0]?.message ? "" : ` Stock : 1 à ${r.magasin}.`;
+      }
+    } catch { /* droit locations manquant : le stock se règle à la main */ }
     const num = prod.id.split("/").pop();
     const admin = `https://${(Bun.env.SHOPIFY_STORE_DOMAIN ?? "").replace(/^https?:\/\//, "")}/admin/products/${num}`;
     await sql`UPDATE depots_vente SET shopify_product_id = ${prod.id}, shopify_url = ${admin} WHERE id = ${id}`;
-    return c.json({ message: "Fiche Shopify créée en brouillon dans la collection « Dépôt-vente ». Ajoute les photos puis publie-la.", url: admin });
+    return c.json({ message: "Fiche Shopify créée en brouillon dans la collection « Dépôt-vente ». Ajoute les photos puis publie-la." + dispo, url: admin });
   } catch (e: any) {
     throw new AppError(400, "Shopify : " + (e?.message ?? e) + " (si c'est un problème de droits, l'app doit avoir le droit d'écrire les produits).");
   }
