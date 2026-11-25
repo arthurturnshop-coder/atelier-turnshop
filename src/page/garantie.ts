@@ -44,4 +44,53 @@ document.addEventListener("change",function(e){
   rd.onload=function(){var data=String(rd.result).split(",")[1]||"";GAR.msg="Envoi du PDF...";render();
     api("/garantie/pdf",{repairId:GAR.id,nom:fl.name,data:data,type:String(t.id).replace("gar-file-","")}).then(function(d){GAR.msg=d.message;garMaj()}).catch(function(er){GAR.msg=er.message;render()})};
   rd.readAsDataURL(fl)});
+// ----- Fiche d'un dossier garantie pièce (chargeur, pièce détachée...) : ticket, infos, factures d'achat, journal -----
+var SVF=null;
+function svLoad(id){api("/sav/dossier/"+id).then(function(d){if(SVF&&SVF.id===id){SVF.d=d;render()}}).catch(function(e){alert(e.message);SVF=null;render()})}
+function svMaj(){if(SVF){var id=SVF.id;SVF.d=null;render();svLoad(id)}}
+function svPdfLigne(p){return"<div class='hist'><button class='link' data-act='svPdf' data-id='"+p.id+"'>"+esc(p.nom)+"</button> · "+garTaille(p.taille)+" · "+esc(p.par||"")+" · "+esc(garJour(p.le))+" <button class='link' data-act='svPdfDel' data-id='"+p.id+"'>Supprimer</button></div>"}
+function vSavFiche(){
+  if(!SVF.d){app.innerHTML="<button class='sec' data-act='svBack' style='max-width:260px'>← Retour aux pièces garantie</button><div class='card'>Chargement…</div>";return}
+  var d=SVF.d,x=d.dossier,v=d.vente;
+  var etat=x.statut==="a_traiter"?"À traiter : faire la demande au fournisseur":x.statut==="demande_faite"?"Demande faite"+(x.demandeLe?" le "+garJour(x.demandeLe):"")+(x.relanceLe?" · prochaine relance le "+esc(savDate(x.relanceLe)):""):x.statut==="termine"?(x.issue==="piece_recue"?"Terminé : pièce reçue":x.issue==="rembourse_fournisseur"?"Terminé : remboursé par le fournisseur":x.issue==="refus"?"Terminé : refusé":"Terminé"):"Annulé";
+  var h="<button class='sec' data-act='svBack' style='max-width:260px'>← Retour aux pièces garantie</button>"
+    +"<div class='card'><div class='head'><div><b style='font-size:20px'>🛠 Garantie pièce · "+esc(x.libelle)+"</b><div class='muted'>"+(d.client?esc(d.client.name)+" · "+esc(d.client.phone||"pas de tél.")+" · "+esc(d.client.email||"pas d'email"):"Sans client")+(v?" · Facture "+esc(v.numero||"Ticket n° "+v.id):"")+"</div></div><span class='tag "+(x.statut==="termine"?"ok":"warn")+"'>"+esc(etat)+"</span></div>"
+    +(d.client?"<div class='actions'><button class='sec' data-act='svClient' data-cid='"+d.client.id+"'>Voir le profil du client</button></div>":"")+"</div>";
+  h+="<div style='display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start'>";
+  h+="<div style='flex:0 1 360px;min-width:260px'>"+(v?recuHtml(v):"<div class='card muted'>Ticket introuvable.</div>")+"</div>";
+  h+="<div style='flex:1 1 380px;min-width:300px'>";
+  h+="<div class='card'><div class='step'>Dossier</div><div class='dl'><label class='muted'>Problème constaté</label><input id='sv-d-mot' value='"+esc(x.motif||"")+"'></div><div class='dl'><label class='muted'>Fournisseur</label><input id='sv-d-f' value='"+esc(x.fournisseur||"")+"' placeholder='Fournisseur'></div><div class='dl'><label class='muted'>N° RMA</label><input id='sv-d-r' value='"+esc(x.rma||"")+"' placeholder='N° de retour fournisseur'></div><div class='actions'><button class='sec' data-act='svInfos'>Enregistrer</button></div>";
+  if(x.statut==="a_traiter")h+="<div class='actions'><button data-act='svAction' data-a='demande'>Demande faite au fournisseur</button><button class='sec' data-act='svAction' data-a='annule'>Annuler le dossier</button></div>";
+  else if(x.statut==="demande_faite")h+="<div class='actions'><button class='sec' data-act='svAction' data-a='relance'>Relancé</button><button data-act='svAction' data-a='piece_recue'>✓ Pièce reçue</button><button data-act='svAction' data-a='rembourse_fournisseur'>✓ Remboursé</button><button class='sec' data-act='svAction' data-a='refus'>Refusé</button><button class='sec' data-act='svAction' data-a='annule'>Annuler</button></div>";
+  h+="</div>";
+  var cl=d.pdfs.filter(function(p){return p.type==="facture_client"}),fo=d.pdfs.filter(function(p){return p.type==="facture_fournisseur"}),au=d.pdfs.filter(function(p){return p.type!=="facture_client"&&p.type!=="facture_fournisseur"});
+  h+="<div class='card'><div class='step'>Factures d'achat</div>"
+    +"<div class='step' style='margin-top:6px'>Facture d'achat du client</div>"+(cl.length?cl.map(svPdfLigne).join(""):"<div class='muted'>Aucune.</div>")+"<div class='dl'><input type='file' id='sv-file-facture_client' accept='application/pdf'></div>"
+    +"<div class='step' style='margin-top:10px'>Facture d'achat fournisseur</div>"+(fo.length?fo.map(svPdfLigne).join(""):"<div class='muted'>Aucune.</div>")+"<div class='dl'><input type='file' id='sv-file-facture_fournisseur' accept='application/pdf'></div>"
+    +(au.length?"<div class='step' style='margin-top:10px'>Autres PDF</div>"+au.map(svPdfLigne).join(""):"")+(SVF.msg?"<div class='muted'>"+esc(SVF.msg)+"</div>":"")+"</div>";
+  h+="<div class='card'><div class='step'>Historique du dossier</div><div class='dl'><input id='sv-note' placeholder='Ajouter une note (appel fournisseur, réponse...)'><button class='sec' data-act='svNote'>Ajouter</button></div>";
+  if(!d.journal.length)h+="<div class='muted'>Rien pour l'instant.</div>";
+  d.journal.slice().reverse().forEach(function(j){h+="<div class='hist'>"+esc(dateLongue(j.le))+(j.par?" · "+esc(j.par):"")+" · "+esc(j.texte)+"</div>"});
+  h+="</div></div></div>";
+  app.innerHTML=h}
+ACTS.svOuvre=function(b){SVF={id:+b.dataset.id,d:null,msg:""};FICHE=null;TAB="enc";ATSUB="liste";render();svLoad(SVF.id);window.scrollTo(0,0)};
+ACTS.svBack=function(){SVF=null;VUE="pieces";render()};
+ACTS.svClient=function(b){api("/customer?id="+b.dataset.cid).then(function(c){SVF=null;CUR=c;TAB="accueil";FICHE=null;ADDT=false;RECEP=null;EDITCLI=false;FID=null;PTAB="rep";render();window.scrollTo(0,0)}).catch(function(e){alert(e.message)})};
+ACTS.svInfos=function(){if(!SVF)return;api("/sav/dossier/infos",{id:SVF.id,motif:v("sv-d-mot"),fournisseur:v("sv-d-f"),rma:v("sv-d-r")}).then(function(){SVF.msg="";svMaj();savReload()}).catch(function(e){alert(e.message)})};
+ACTS.svAction=function(b){if(!SVF)return;var a=b.dataset.a;var q={annule:"Annuler ce dossier ?",refus:"Marquer comme refusé par le fournisseur ?"};if(q[a]&&!confirm(q[a]))return;
+  api("/sav/maj",{id:SVF.id,action:a,fournisseur:v("sv-d-f"),rma:v("sv-d-r")}).then(function(){svMaj();savReload()}).catch(function(e){alert(e.message)})};
+ACTS.svNote=function(){if(!SVF)return;api("/sav/dossier/note",{id:SVF.id,texte:v("sv-note")}).then(function(){svMaj()}).catch(function(e){alert(e.message)})};
+ACTS.svPdf=function(b){
+  var w=window.open("","_blank");
+  var h={};if(TOK)h["x-atelier-token"]=TOK;else h["x-atelier-password"]=PW;
+  fetch("/api/sav/pdf/"+b.dataset.id+"/fichier",{headers:h}).then(function(r){if(!r.ok)throw new Error("PDF introuvable");return r.blob()}).then(function(bl){var u=URL.createObjectURL(bl);if(w)w.location=u;else window.location=u}).catch(function(e){if(w)w.close();alert(e.message)})};
+ACTS.svPdfDel=function(b){if(!confirm("Supprimer ce PDF ?"))return;api("/sav/pdf/supprimer",{id:+b.dataset.id}).then(function(){svMaj()}).catch(function(e){alert(e.message)})};
+document.addEventListener("change",function(e){
+  var t=e.target;if(!t||String(t.id).indexOf("sv-file-")!==0||!t.files||!t.files[0]||!SVF)return;
+  var fl=t.files[0];
+  if(fl.size>8*1024*1024){alert("PDF trop lourd (8 Mo maximum).");t.value="";return}
+  var rd=new FileReader();
+  rd.onload=function(){var data=String(rd.result).split(",")[1]||"";SVF.msg="Envoi du PDF...";render();
+    api("/sav/pdf",{dossierId:SVF.id,nom:fl.name,data:data,type:String(t.id).replace("sv-file-","")}).then(function(d){SVF.msg="";svMaj()}).catch(function(er){SVF.msg=er.message;render()})};
+  rd.readAsDataURL(fl)});
 `;

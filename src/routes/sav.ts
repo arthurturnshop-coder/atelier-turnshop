@@ -3,6 +3,7 @@ import { sql } from "../db";
 import "./auth";
 import { delaiRelance } from "./garantie";
 import { AppError, clean, exigeResponsable, signature } from "../util";
+import { detailVente } from "./caisse";
 
 // SAV depuis une vente : remboursement, échange (bon d'achat), garantie d'une pièce (suivi + relances hebdomadaires jusqu'à contrôle).
 await sql`CREATE TABLE IF NOT EXISTS sav_dossiers (
@@ -13,6 +14,10 @@ await sql`CREATE TABLE IF NOT EXISTS sav_dossiers (
   statut TEXT NOT NULL DEFAULT 'a_traiter', demande_le TIMESTAMPTZ, relance_le DATE, issue TEXT NOT NULL DEFAULT '',
   cree_par TEXT, cree_le TIMESTAMPTZ NOT NULL DEFAULT now(), close_le TIMESTAMPTZ, close_par TEXT)`;
 await sql`ALTER TABLE remboursements ADD COLUMN IF NOT EXISTS vente_id INT, ADD COLUMN IF NOT EXISTS magasin TEXT`;
+
+await sql`CREATE TABLE IF NOT EXISTS sav_journal (id SERIAL PRIMARY KEY, dossier_id INT NOT NULL, texte TEXT NOT NULL, par TEXT NOT NULL DEFAULT '', cree_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
+await sql`CREATE TABLE IF NOT EXISTS sav_pdfs (id SERIAL PRIMARY KEY, dossier_id INT NOT NULL, nom TEXT NOT NULL, taille INT NOT NULL, data BYTEA NOT NULL, type TEXT NOT NULL DEFAULT 'autre', par TEXT NOT NULL DEFAULT '', cree_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
+const jn = async (dossierId: number, texte: string, c: any) => { const u = c.get("user") as any; await sql`INSERT INTO sav_journal (dossier_id, texte, par) VALUES (${dossierId}, ${texte}, ${u?.prenom ?? ""})`; };
 
 const euros = (x: any) => Math.round((Number(String(x ?? "").replace(",", ".")) || 0) * 100);
 const eur = (c: number) => (c / 100).toFixed(2).replace(".", ",") + " €";
@@ -78,8 +83,10 @@ app.post("/api/sav/garantie", async (c) => {
   if (gd.n) throw new AppError(400, "Un dossier garantie est déjà ouvert pour cet article.");
   const u = c.get("user") as any;
   const jours = 3;
-  await sql`INSERT INTO sav_dossiers (vente_id, client_id, magasin, type, libelle, quantite, montant_cents, motif, fournisseur, statut, relance_le, cree_par) VALUES (${v.id}, ${v.client_id ?? null}, ${v.magasin ?? null}, 'garantie', ${l.libelle}, 1, ${l.prix_unitaire_cents}, ${clean(b.motif, 300)}, ${clean(b.fournisseur, 80)}, 'a_traiter', ${(await sql`SELECT ((now() AT TIME ZONE 'Europe/Paris')::date + ${jours}::int)::text AS d`)[0].d}, ${u?.prenom ?? ""})`;
-  return c.json({ message: "Dossier garantie créé : il apparaît dans « Garanties en cours » sur le dashboard." });
+  const [nd] = (await sql`INSERT INTO sav_dossiers (vente_id, client_id, magasin, type, libelle, quantite, montant_cents, motif, fournisseur, statut, relance_le, cree_par) VALUES (${v.id}, ${v.client_id ?? null}, ${v.magasin ?? null}, 'garantie', ${l.libelle}, 1, ${l.prix_unitaire_cents}, ${clean(b.motif, 300)}, ${clean(b.fournisseur, 80)}, 'a_traiter', ${(await sql`SELECT ((now() AT TIME ZONE 'Europe/Paris')::date + ${jours}::int)::text AS d`)[0].d}, ${u?.prenom ?? ""}) RETURNING id`) as any[];
+  await jn(nd.id, `Dossier ouvert : ${l.libelle}${clean(b.motif, 200) ? " · " + clean(b.motif, 200) : ""}`, c);
+
+  return c.json({ message: "Dossier garantie créé.", id: nd.id });
 });
 
 app.get("/api/sav/dossiers", async (c) => {
@@ -110,6 +117,8 @@ app.post("/api/sav/maj", async (c) => {
     await sql`UPDATE sav_dossiers SET statut = ${a === "annule" ? "annule" : "termine"}, issue = ${a}, close_le = now(), close_par = ${u?.prenom ?? ""}, relance_le = NULL WHERE id = ${id}`;
     await sql`UPDATE taches SET fait = true, fait_le = now() WHERE fait = false AND cree_par = 'Garantie' AND texte LIKE ${"Garantie #" + id + " %"}`;
   } else throw new AppError(400, "Action inconnue.");
+  const LIB: Record<string, string> = { demande: "Demande faite au fournisseur" + (clean(b.fournisseur, 80) ? " (" + clean(b.fournisseur, 80) + ")" : ""), relance: "Fournisseur relancé", piece_recue: "Pièce reçue", rembourse_fournisseur: "Remboursé par le fournisseur", refus: "Refusé par le fournisseur", annule: "Dossier annulé" };
+  await jn(id, LIB[a], c);
   return c.json({ message: "OK" });
 });
 
@@ -129,3 +138,70 @@ async function relancer() {
 }
 setInterval(relancer, 30 * 60 * 1000);
 setTimeout(relancer, 90 * 1000);
+
+// Fiche d'un dossier garantie pièce : ticket, infos, factures d'achat (PDF), journal.
+app.get("/api/sav/dossier/:id", async (c) => {
+  const id = Number(c.req.param("id"));
+  const [d] = (await sql`SELECT d.*, to_char(d.relance_le, 'YYYY-MM-DD') AS relance FROM sav_dossiers d WHERE d.id = ${id}`) as any[];
+  if (!d) throw new AppError(404, "Dossier introuvable.");
+  const [v] = (await sql`SELECT v.*, trim(cl.prenom || ' ' || cl.nom) AS client_nom FROM ventes v LEFT JOIN clients cl ON cl.id = v.client_id WHERE v.id = ${d.vente_id}`) as any[];
+  const [cl] = d.client_id ? ((await sql`SELECT id, prenom, nom, telephone, email FROM clients WHERE id = ${d.client_id}`) as any[]) : [null];
+  const pdfs = (await sql`SELECT id, nom, taille, type, par, cree_le FROM sav_pdfs WHERE dossier_id = ${id} ORDER BY id`) as any[];
+  const journal = (await sql`SELECT texte, par, cree_le FROM sav_journal WHERE dossier_id = ${id} ORDER BY id`) as any[];
+  return c.json({
+    dossier: { id: d.id, type: d.type, libelle: d.libelle, quantite: d.quantite, montantCents: d.montant_cents, motif: d.motif, fournisseur: d.fournisseur, rma: d.rma, statut: d.statut, issue: d.issue, demandeLe: d.demande_le, relanceLe: d.relance, creeLe: d.cree_le, creePar: d.cree_par, venteId: d.vente_id },
+    client: cl ? { id: cl.id, name: `${cl.prenom} ${cl.nom}`.trim(), phone: cl.telephone, email: cl.email } : null,
+    vente: v ? await detailVente(v) : null,
+    pdfs: pdfs.map((p) => ({ id: p.id, nom: p.nom, taille: p.taille, type: p.type, par: p.par, le: p.cree_le })),
+    journal: journal.map((j) => ({ texte: j.texte, par: j.par, le: j.cree_le })),
+  });
+});
+
+app.post("/api/sav/dossier/infos", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const id = Number(b.id);
+  const [d] = (await sql`SELECT id FROM sav_dossiers WHERE id = ${id}`) as any[];
+  if (!d) throw new AppError(404, "Dossier introuvable.");
+  await sql`UPDATE sav_dossiers SET fournisseur = ${clean(b.fournisseur, 80)}, rma = ${clean(b.rma, 60)}, motif = ${clean(b.motif, 300)} WHERE id = ${id}`;
+  await jn(id, `Infos mises à jour (fournisseur : ${clean(b.fournisseur, 80) || "-"}, RMA : ${clean(b.rma, 60) || "-"})`, c);
+  return c.json({ message: "Enregistré." });
+});
+
+app.post("/api/sav/dossier/note", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const id = Number(b.id);
+  const t = clean(b.texte, 500);
+  if (!t) throw new AppError(400, "Écris une note.");
+  await jn(id, t, c);
+  return c.json({ message: "Note ajoutée." });
+});
+
+app.post("/api/sav/pdf", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const id = Number(b.dossierId);
+  const [d] = (await sql`SELECT id FROM sav_dossiers WHERE id = ${id}`) as any[];
+  if (!d) throw new AppError(404, "Dossier introuvable.");
+  const buf = Buffer.from(String(b.data ?? ""), "base64");
+  if (buf.length < 20 || buf.subarray(0, 5).toString("latin1") !== "%PDF-") throw new AppError(400, "Ce fichier n'est pas un PDF.");
+  if (buf.length > 8 * 1024 * 1024) throw new AppError(400, "PDF trop lourd (8 Mo maximum).");
+  const [n] = (await sql`SELECT count(*)::int AS n FROM sav_pdfs WHERE dossier_id = ${id}`) as any[];
+  if (n.n >= 10) throw new AppError(400, "10 PDF maximum par dossier.");
+  const type = ["facture_client", "facture_fournisseur"].includes(String(b.type)) ? String(b.type) : "autre";
+  const nom = clean(String(b.nom ?? "facture.pdf"), 120) || "facture.pdf";
+  const u = c.get("user") as any;
+  await sql`INSERT INTO sav_pdfs (dossier_id, nom, taille, data, type, par) VALUES (${id}, ${nom}, ${buf.length}, ${buf}, ${type}, ${u?.prenom ?? ""})`;
+  await jn(id, `${type === "facture_client" ? "Facture d'achat client" : type === "facture_fournisseur" ? "Facture d'achat fournisseur" : "PDF"} ajouté(e) : ${nom}`, c);
+  return c.json({ message: "PDF ajouté." });
+});
+
+app.get("/api/sav/pdf/:id/fichier", async (c) => {
+  const [p] = (await sql`SELECT nom, data FROM sav_pdfs WHERE id = ${Number(c.req.param("id"))}`) as any[];
+  if (!p) throw new AppError(404, "PDF introuvable.");
+  return new Response(p.data, { headers: { "Content-Type": "application/pdf", "Content-Disposition": `inline; filename="${encodeURIComponent(p.nom)}"` } });
+});
+
+app.post("/api/sav/pdf/supprimer", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  await sql`DELETE FROM sav_pdfs WHERE id = ${Number(b.id)}`;
+  return c.json({ message: "PDF supprimé." });
+});

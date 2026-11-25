@@ -121,7 +121,7 @@ ACTS.fichePlanif=function(b){var id=+b.dataset.id,f=FICHE;ATSUB="planning";FICHE
 ACTS.dvEnvoyer=function(b){var id=+b.dataset.id;if(!confirm("Envoyer le devis actuel au client (email avec lien pour accepter ou refuser) ?"))return;DVENV.msg="Envoi en cours...";render();
   api("/devis/envoyer",{repairId:id}).then(function(d){DVENV={id:0,list:null,msg:d.message};return recharger(id)}).catch(function(e){DVENV.msg=e.message;render()})};
 ACTS.dvCopier=function(b){var u=b.dataset.url;if(navigator.clipboard)navigator.clipboard.writeText(u).then(function(){DVENV.msg="Lien copié.";render()},function(){prompt("Lien du devis :",u)});else prompt("Lien du devis :",u)};
-ACTS.subEnc=function(b){ATSUB=b.dataset.sub;if(ATSUB==="devis"){DV.ed=null;DV.list=null;DV.msg=""}FICHE=null;PSEL=null;PPEND=null;PMSG="";render()};
+ACTS.subEnc=function(b){SVF=null;ATSUB=b.dataset.sub;if(ATSUB==="devis"){DV.ed=null;DV.list=null;DV.msg=""}FICHE=null;PSEL=null;PPEND=null;PMSG="";render()};
 ACTS.pDay=function(b){PJOUR=decaleJour(PJOUR,(+b.dataset.d)*(PVIEW==="semaine"?7:1));PSEL=null;PPEND=null;loadPlan()};
 ACTS.pToday=function(){PJOUR=aujourdhui();PSEL=null;PPEND=null;loadPlan()};
 ACTS.pFilt=function(b){PFILT=b.dataset.f;renderPlan()};

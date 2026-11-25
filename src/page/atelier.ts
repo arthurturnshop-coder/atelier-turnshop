@@ -10,6 +10,7 @@ function vEnc(){
     return}
   if(ATSUB==="creer"){vCreer();return}
   if(ATSUB==="devis"){vDevis();return}
+  if(SVF){vSavFiche();return}
   if(FICHE){vFiche();return}
   app.innerHTML=subHtml()+"<div id='vues' class='vues'></div><div id='liste'>Chargement…</div>";
   loadEnc()}
@@ -38,7 +39,7 @@ async function loadEnc(){
 // ---------- Fiche d'une réparation : clic sur le ticket ----------
 async function ouvrirFiche(id){
   try{FICHE=await api("/reparation?id="+id)}catch(e){alert(e.message);return}
-  TAB="enc";ATSUB="liste";CUR=null;render()}
+  SVF=null;TAB="enc";ATSUB="liste";CUR=null;render()}
 var DVENV={id:0,list:null,msg:""};
 function dvEnvHtml(f){
   if(DVENV.id!==f.id){DVENV={id:f.id,list:null,msg:DVENV.msg};api("/devis/envois?repairId="+f.id).then(function(l){DVENV.list=l;render()}).catch(function(){})}
