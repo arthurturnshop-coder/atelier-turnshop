@@ -16,13 +16,10 @@ export const ACTIONS = `var ACTS={
   addC:async function(){try{var d=await api("/clients",{prenom:v("pn"),nom:v("nm"),telephone:v("tel"),email:v("em")});alert(d.message);NEWCLI=false;CUR=await api("/customer?id="+d.id);EDITCLI=false;FID=null;ADDT=true;TAB="accueil";render()}catch(e){alert(e.message)}},
   cliSuppr:async function(){if(!CUR||!confirm("Supprimer la fiche de "+CUR.name+" ? (possible seulement si elle n'a ni réparation ni vente)"))return;
     try{var d=await api("/clients/supprimer",{id:CUR.id});alert(d.message);CUR=null;RES=[];SEARCHED=false;TAB="accueil";render()}catch(e){alert(e.message)}},
-  cliFusion:async function(){if(!CUR)return;var q=prompt("Fusionner "+CUR.name+" dans quelle fiche ? Tape le nom, l'email ou le téléphone de la fiche à GARDER :");if(!q)return;
-    try{var l=(await api("/search?q="+encodeURIComponent(q))).filter(function(x){return x.id!==CUR.id});
-      if(!l.length){alert("Aucune autre fiche trouvée.");return}
-      var n=prompt("Garder quelle fiche ? Tape le numéro :"+nlc()+l.map(function(x,i){return(i+1)+" = "+x.name+" · "+(x.phone||"")+" · "+(x.email||"")}).join(nlc()),"1");if(!n)return;
-      var k=l[(+n)-1];if(!k){alert("Numéro inconnu.");return}
-      if(!confirm("Tout déplacer de "+CUR.name+" vers "+k.name+" puis supprimer "+CUR.name+" ?"))return;
-      var d=await api("/clients/fusionner",{id:CUR.id,versId:k.id});alert(d.message);CUR=await api("/customer?id="+d.id);RES=[];render()}catch(e){alert(e.message)}},
+  cliFusion:async function(){if(!CUR)return;FUS={id:CUR.id,sug:null,res:null,q:"",liste:[]};render();try{FUS.sug=await api("/clients/doublons?id="+CUR.id)}catch(e){FUS.sug=[]}render()},
+  fusNo:function(){FUS=null;render()},
+  fusCherche:async function(){var q=v("fus-q");if(!q||!FUS)return;FUS.q=q;try{FUS.res=(await api("/search?limit=15&q="+encodeURIComponent(q))).filter(function(x){return x.id!==CUR.id})}catch(e){alert(e.message);return}render()},
+  fusOk:async function(b){var k=FUS&&FUS.liste[+b.dataset.i];if(!k)return;if(!confirm("Tout déplacer de "+CUR.name+" vers "+k.name+" ("+(k.phone||k.email||"fiche "+k.id)+") puis supprimer "+CUR.name+" ?"))return;try{var d=await api("/clients/fusionner",{id:CUR.id,versId:k.id});alert(d.message);FUS=null;CUR=await api("/customer?id="+d.id);RES=[];PACH=null;render()}catch(e){alert(e.message)}},
   editCli:function(){EDITCLI=true;render()},cancelCli:function(){EDITCLI=false;render()},
   saveCli:async function(){try{var d=await api("/clients/modifier",{id:CUR.id,prenom:v("ep"),nom:v("en"),telephone:v("et"),email:v("ee")});alert(d.message);EDITCLI=false;await refresh()}catch(e){alert(e.message)}},
   showAddT:function(){ADDT=true;render()},cancelAddT:function(){ADDT=false;render()},
@@ -106,6 +103,7 @@ export const ACTIONS = `var ACTS={
     if(q[a]&&!confirm(q[a]))return;try{await api("/sav/maj",{id:+b.dataset.id,action:a});await savReload()}catch(e){toastKo(e.message)}},
   cVjFerme:function(){VJ=null;VJOPEN=0;vjSync()},
   cVjRecu:function(b){var id=+b.dataset.id;VJOPEN=VJOPEN===id?0:id;vjSync()},
+  pTab:function(b){PTAB=b.dataset.t;render()},
   pAchOpen:function(b){var id=+b.dataset.id;PACHOPEN=PACHOPEN===id?0:id;render()},
   cRecu:function(b){var id=+b.dataset.id;CHOPEN=CHOPEN===id?0:id;lirePay();render()},
   cFermeRecu:function(){CREC=null;lirePay();render()},

@@ -22,6 +22,19 @@ function fidHtml(){
   if(FID===null)return"Points fidélité : chargement…";
   if(!FID.trouve)return"Points fidélité : non disponible";
   return"Points fidélité : "+esc(FID.points)+" points (réduction disponible : "+esc(FID.euros)+" €)"}
+var FUS=null;
+function fusLigne(x,i){return"<button class='sec hrow' data-act='fusOk' data-i='"+i+"'><b>"+esc(x.name)+"</b> · "+esc(x.phone||"pas de tél.")+" · "+esc(x.email||"pas d'email")+"<br><span class='muted'>Créée le "+esc(day(x.creeLe))+" · "+x.trottinettes.length+" trottinette"+(x.trottinettes.length>1?"s":"")+" · "+x.trottinettes.reduce(function(n,t){return n+t.reparations.length},0)+" réparation(s)</span></button>"}
+function fusionHtml(){
+  var c=CUR;if(!FUS||!c||FUS.id!==c.id)return"";
+  var h="<div class='card avbox'><b>Fusionner « "+esc(c.name)+" » dans quelle fiche ?</b><div class='muted'>Choisis la fiche à GARDER : tout (trottinettes, réparations, achats) sera déplacé dessus, puis cette fiche-ci sera supprimée.</div>";
+  FUS.liste=(FUS.sug||[]).concat((FUS.res||[]).filter(function(r){return !(FUS.sug||[]).some(function(s){return s.id===r.id})}));
+  if(FUS.sug===null)h+="<div class='muted'>Recherche des fiches ressemblantes…</div>";
+  else if(FUS.sug.length)h+="<div class='step' style='margin-top:8px'>Fiches qui lui ressemblent</div>"+FUS.sug.map(function(x,i){return fusLigne(x,i)}).join("");
+  else h+="<div class='muted'>Aucune fiche ressemblante trouvée automatiquement.</div>";
+  h+="<div class='dl' style='margin-top:8px'><input id='fus-q' value='"+esc(FUS.q||"")+"' placeholder='Ou cherche : nom, email, téléphone'><button data-act='fusCherche'>Chercher</button><button class='link' data-act='fusNo'>Fermer</button></div>";
+  if(FUS.res){var ex=FUS.res.filter(function(r){return !(FUS.sug||[]).some(function(s){return s.id===r.id})});h+=ex.length?ex.map(function(x){return fusLigne(x,FUS.liste.indexOf(x))}).join(""):"<div class='muted'>Rien d'autre trouvé.</div>"}
+  return h+"</div>"}
+var PTAB="rep";
 var CACLI=null,CALOAD=null,PACH=null,PACHLOAD=0,PACHOPEN=0;
 function achatsHtml(){
   var c=CUR;if(!c)return"";
@@ -72,9 +85,12 @@ function vProfil(){
       +"<button class='sec' data-act='editCli'>Modifier</button>"+(estResp()?" <button class='sec' data-act='cliFusion'>Fusionner dans une autre fiche</button> <button class='danger' data-act='cliSuppr'>Supprimer la fiche</button>":"");
   }
   h+="</div><div id='kpi' style='flex:0 0 auto;margin-left:auto'>"+kpiHtml()+"</div></div></div>";
+  h+=fusionHtml();
   if(ADDT)h+="<div class='card'><b>Ajouter une trottinette</b><input id='m' placeholder='Marque'><input id='mo' placeholder='Modèle'><input id='s' placeholder='Numéro de série'><button data-act='addT'>Associer</button><button class='sec' data-act='cancelAddT'>Annuler</button></div>";
   else h+="<button class='sec' data-act='showAddT'>+ Ajouter une trottinette</button>";
-  h+=achatsHtml();
+  var nbR=0;c.trottinettes.forEach(function(t){nbR+=t.reparations.length});
+  h+="<div class='dl' style='margin-top:14px'><button class='"+(PTAB==="rep"?"":"sec")+"' data-act='pTab' data-t='rep'>🔧 Réparations ("+nbR+")</button><button class='"+(PTAB==="ach"?"":"sec")+"' data-act='pTab' data-t='ach'>🛒 Achats"+(PACH&&PACH.id===c.id?" ("+PACH.list.length+")":"")+"</button></div>";
+  if(PTAB==="ach"){h+=achatsHtml();app.innerHTML=h;if((!PACH||PACH.id!==c.id)&&PACHLOAD!==c.id)loadAch();if(FID===null&&FIDLOAD!==c.id)loadFid();if((CACLI===null||CACLI.id!==c.id)&&CALOAD!==c.id)loadCa();return}
   h+="<div class='step' style='margin-top:14px'>Trottinettes</div>";
   if(!c.trottinettes.length)h+="<div class='card muted'>Aucune trottinette associée. Ajoute-la ci-dessus.</div>";
   c.trottinettes.forEach(function(t){

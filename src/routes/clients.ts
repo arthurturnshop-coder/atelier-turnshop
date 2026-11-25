@@ -45,7 +45,8 @@ app.get("/api/search", async (c) => {
     }
     return s;
   };
-  const ids = pool.map((r) => ({ id: r.id, s: sc(r) })).filter((x) => x.s >= 0).sort((a, b) => b.s - a.s).slice(0, 5);
+  const lim = Math.max(5, Math.min(20, Number(c.req.query("limit")) || 5));
+  const ids = pool.map((r) => ({ id: r.id, s: sc(r) })).filter((x) => x.s >= 0).sort((a, b) => b.s - a.s).slice(0, lim);
   return c.json(await Promise.all(ids.map((r) => fiche(r.id))));
 });
 
@@ -140,6 +141,21 @@ export async function verifieDoublon(email: string, tel: string, sauf: number, a
     if (x) throw new AppError(409, `Ce numéro est déjà sur la fiche de ${`${x.prenom} ${x.nom}`.trim()}. Ouvre cette fiche (ou fusionne les deux).`);
   }
 }
+
+// Fiches qui ressemblent à celle-ci (même nom, même email ou même téléphone) : candidates à la fusion.
+app.get("/api/clients/doublons", async (c) => {
+  const id = Number(c.req.query("id"));
+  const [me] = (await sql`SELECT id, lower(trim(prenom)) AS p, lower(trim(nom)) AS n, lower(trim(email)) AS e, right(regexp_replace(telephone, '\\D', '', 'g'), 9) AS t FROM clients WHERE id = ${id}`) as any[];
+  if (!me) return c.json([]);
+  const rows = (await sql`SELECT id FROM clients WHERE id <> ${id} AND (
+      (${me.e} <> '' AND lower(trim(email)) = ${me.e})
+      OR (length(${me.t}) = 9 AND right(regexp_replace(telephone, '\\D', '', 'g'), 9) = ${me.t})
+      OR (lower(trim(prenom)) = ${me.p} AND lower(trim(nom)) = ${me.n})
+      OR (lower(trim(prenom)) = ${me.n} AND lower(trim(nom)) = ${me.p})
+      OR (${me.n} <> '' AND lower(trim(nom)) = ${me.n})
+    ) ORDER BY id LIMIT 10`) as any[];
+  return c.json(await Promise.all(rows.map((r) => fiche(r.id))));
+});
 
 app.get("/api/customer", async (c) => c.json(await fiche(Number(c.req.query("id")))));
 
