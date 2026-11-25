@@ -64,7 +64,9 @@ async function cartVersDevis(){
   return r}
 function cartVide(){PAN=[];CPAY={carte:"",especes:"",virement:"",bon_achat:""};CMSG="";CCLI=null;CFID=null;CUSE=false;CAVOFF=[];CREP=null;CACO=0}
 ACTS.cEnDevis=async function(){
-  try{var r=await cartVersDevis();if(!r)return;cartVide();DV.list=null;DV.ed=null;DV.res=null;DV.hint="";DV.msg="Devis "+dvNum(r.id)+" enregistré. Ouvre-le pour le facturer ou créer une prise en charge.";FICHE=null;CUR=null;TAB="enc";ATSUB="devis";render()}catch(e){alert(e.message)}};
+  try{var r=await cartVersDevis();if(!r)return;cartVide();DV.list=null;DV.ed=null;DV.res=null;DV.hint="";DV.msg="Devis "+dvNum(r.id)+" enregistré.";FICHE=null;CUR=null;TAB="enc";ATSUB="devis";
+    try{var ls=await api("/devis-simples");DV.list=ls.devis;var d=ls.devis.filter(function(x){return x.id===r.id})[0];if(d){DV.ed=JSON.parse(JSON.stringify(d));if(!DV.ed.lignes.length)DV.ed.lignes=dvVide().lignes}}catch(e2){}
+    render()}catch(e){alert(e.message)}};
 ACTS.cEnPec=async function(){
   if(!PAN.length){alert("Le panier est vide.");return}
   if(!confirm("Créer une prise en charge (réparation en boutique) avec ce panier ?"))return;
