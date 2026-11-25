@@ -10,6 +10,31 @@ await sql`CREATE TABLE IF NOT EXISTS prestation_options (id SERIAL PRIMARY KEY, 
 const [{ n }] = (await sql`SELECT count(*)::int AS n FROM prestations`) as any[];
 if (n === 0) await sql`INSERT INTO prestations (nom, prix_cents, avec_piece, piece_aide) VALUES ('Pneu + pose', 3000, true, 'pneu')`;
 
+// Prestations de la page « Tarifs de réparation » du site (création unique ; les prix à fourchette sont au plus bas, à ajuster au devis).
+{
+  const [dejaFait] = (await sql`SELECT 1 FROM reglages WHERE cle = 'seed_prestations_tarifs_site'`) as any[];
+  if (!dejaFait) {
+    const L: [string, number, string][] = [
+      ["Révision complète", 3990, ""], ["Express pneus et freins (supplément)", 1000, ""],
+      ["Chambre à air", 2500, "la chambre à air"], ["Pneu à chambre", 2500, "le pneu"], ["Pneu tubeless", 3000, "le pneu tubeless"], ["Pneu plein", 3000, "le pneu plein"], ["Valve tubeless", 1500, "la valve tubeless"],
+      ["Réglage / nettoyage frein (avant ou arrière)", 1500, ""], ["Réglage / nettoyage frein (avant + arrière)", 2000, ""],
+      ["Purge de frein (avant ou arrière)", 2000, ""], ["Purge de frein (avant + arrière)", 3000, ""],
+      ["Plaquettes de frein, pose (avant ou arrière)", 1500, "les plaquettes"], ["Plaquettes de frein, pose (avant + arrière)", 2000, "les plaquettes"],
+      ["Disque de frein, pose (avant ou arrière)", 1700, "le disque"], ["Disque de frein, pose (avant + arrière)", 2400, "le disque"],
+      ["Levier de frein mécanique, pose (D ou G)", 2000, "le levier de frein"], ["Câble de frein, pose", 1500, "le câble de frein"],
+      ["Diagnostic batterie", 4900, ""], ["Pose éclairage LED", 2000, "l'éclairage LED"], ["Pose gâchette", 2500, "la gâchette"], ["Câble data, pose", 2500, "le câble data"],
+      ["Pose câble moteur", 8000, "le câble moteur"], ["Pose kit contrôleur", 8000, "le kit contrôleur"],
+      ["Roulement roue non motrice", 3000, "le roulement"], ["Réglage jeu de colonne", 1900, ""], ["Pose garde-boue", 1900, "le garde-boue"], ["Nettoyage trottinette", 3000, ""],
+      ["Main-d'œuvre (taux horaire)", 6000, ""],
+    ];
+    for (const [nom, prix, aide] of L) {
+      const [ex] = (await sql`SELECT 1 FROM prestations WHERE lower(nom) = lower(${nom})`) as any[];
+      if (!ex) await sql`INSERT INTO prestations (nom, prix_cents, avec_piece, piece_aide) VALUES (${nom}, ${prix}, ${aide !== ""}, ${aide})`;
+    }
+    await sql`INSERT INTO reglages (cle, valeur) VALUES ('seed_prestations_tarifs_site', '1') ON CONFLICT (cle) DO NOTHING`;
+  }
+}
+
 // Remise "plusieurs prestations" : X € dès N prestations, jamais cumulée avec une offre.
 export async function lireMulti() {
   const rows = (await sql`SELECT cle, valeur FROM reglages WHERE cle IN ('multi_seuil', 'multi_remise_cents')`) as any[];
