@@ -196,6 +196,11 @@ app.post("/api/clients/fusionner", async (c) => {
   }
   await sql`UPDATE reparations SET client_id = ${vers} WHERE client_id = ${id}`;
   await sql`UPDATE ventes SET client_id = ${vers} WHERE client_id = ${id}`;
+  // Toutes les autres tables qui pointent vers un client (bons d'achat, paiements web, SAV, messages...) : sinon la suppression est refusée.
+  for (const t of ["bons_achat", "paiements_web", "devis_simples", "messages_envoyes", "remboursements", "sav_dossiers"]) {
+    try { await sql.unsafe(`UPDATE ${t} SET client_id = ${vers} WHERE client_id = ${id}`); } catch (e: any) { console.log(JSON.stringify({ event: "fusion", table: t, message: String(e?.message ?? e).slice(0, 200) })); }
+  }
+  try { await sql`UPDATE trott_transferts SET de_client = ${vers} WHERE de_client = ${id}`; await sql`UPDATE trott_transferts SET vers_client = ${vers} WHERE vers_client = ${id}`; } catch { /* table facultative */ }
   await sql`UPDATE clients SET email = CASE WHEN email = '' THEN ${a.email} ELSE email END, telephone = CASE WHEN telephone = '' THEN ${a.telephone} ELSE telephone END, shopify_id = COALESCE(shopify_id, ${a.shopify_id ?? null}) WHERE id = ${vers}`;
   await sql`DELETE FROM clients WHERE id = ${id}`;
   return c.json({ message: "Fiches fusionnées.", id: vers });
