@@ -143,7 +143,7 @@ function caisseHtml(){
   if(!CLO.d&&!CLOBUSY){CLOBUSY=true;api("/caisse/session").then(function(d){CLO.d=d;CLOBUSY=false;render()}).catch(function(){CLOBUSY=false})}
   if(!CLO.d)return"<div class='caisse'><h3>Caisse</h3><div class='muted'>Chargement...</div></div>";
   if(caisseBloquee()){
-    var hb="<div class='caisse'><h3>Caisse"+(CPOP?"":" <button class='sec' data-act='cVjOuvre' style='float:right'>📋 Ventes du jour</button>"+((PAN.length||CCLI||CREP)?" <button class='sec' data-act='cNouv' title='Nouvelle vente (vide panier et client)' style='float:right;margin-right:8px;width:48px;height:48px;padding:0;font-size:24px'>↻</button>":""))+"</h3>";
+    var hb="<div class='caisse'><h3>Caisse"+(CPOP?"":" <button class='sec' data-act='cVjOuvre' title='Ventes du jour' style='float:right;width:48px;height:48px;padding:0;font-size:24px'>📋</button>"+((PAN.length||CCLI||CREP)?" <button class='sec' data-act='cNouv' title='Nouvelle vente (vide panier et client)' style='float:right;margin-right:8px;width:48px;height:48px;padding:0;font-size:24px'>↻</button>":""))+"</h3>";
     if(CREC)hb+="<div class='card'><b>Vente enregistrée</b>"+recuHtml(CREC)+"<div class='actions'><button data-act='cPrint' data-id='"+CREC.id+"'>Imprimer le reçu</button><button class='sec' data-act='cFermeRecu'>Fermer</button></div></div>";
     hb+="<div class='card' style='text-align:center'><div style='font-size:28px;font-weight:700;color:#b00'>🔒 CAISSE FERMÉE</div><div class='muted'>"+(CLO.d.ouverte?"Ferme la caisse de la veille pour continuer.":"Ouvre la caisse pour accéder aux ventes.")+"</div></div>";
     return hb+(CPOP?"":histoHtml()+cloHtml())+"</div>"}
