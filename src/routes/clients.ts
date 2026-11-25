@@ -2,7 +2,7 @@ import { app } from "../app";
 import { SYNC } from "../config";
 import { sql } from "../db";
 import { PRODUITS_QUERY, PRODUITS_QUERY_LIEUX, shopifyRead } from "../shopify";
-import { AppError, clean, exigeResponsable } from "../util";
+import { AppError, clean, exigeAdmin, exigeResponsable } from "../util";
 
 export async function fiche(id: number) {
   const [client] = await sql`SELECT * FROM clients WHERE id = ${id}`;
@@ -292,4 +292,50 @@ app.post("/api/clients/avis-recompense", async (c) => {
   const [cl] = (await sql`UPDATE clients SET avis_recompense_le = now(), avis_recompense_par = ${u?.prenom ?? ""} WHERE id = ${id} AND avis_recompense_le IS NULL RETURNING id`) as any[];
   if (!cl) throw new AppError(409, "La récompense d'avis a déjà été offerte à ce client.");
   return c.json({ message: "Noté : récompense d'avis offerte." });
+});
+
+// ---------- Import de clients (export Shifter) : sans toucher à Shopify, sans doublon (email ou téléphone déjà connus) ----------
+await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS magasin TEXT`;
+await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS entreprise TEXT NOT NULL DEFAULT ''`;
+await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS naissance TEXT NOT NULL DEFAULT ''`;
+function telNational(t: string): string {
+  let d = String(t ?? "").replace(/[^\d+]/g, "");
+  if (d.startsWith("+33")) d = "0" + d.slice(3); else if (d.startsWith("0033")) d = "0" + d.slice(4);
+  d = d.replace(/\D/g, "");
+  return /^0\d{9}$/.test(d) ? d.replace(/(\d{2})(?=\d)/g, "$1 ") : String(t ?? "").trim();
+}
+function coupeNom(brut: string): { nom: string; prenom: string } {
+  const mots = brut.trim().split(/\s+/).filter(Boolean);
+  if (mots.length <= 1) return { nom: mots[0] ?? "", prenom: "" };
+  const maj = (m: string) => m.length > 1 && m === m.toUpperCase() && m !== m.toLowerCase();
+  const grands = mots.filter(maj);
+  if (grands.length && grands.length < mots.length) return { nom: grands.join(" "), prenom: mots.filter((m) => !maj(m)).join(" ") };
+  return { nom: mots[0], prenom: mots.slice(1).join(" ") }; // convention Shifter : NOM Prénom
+}
+app.post("/api/clients/import", async (c) => {
+  exigeAdmin(c);
+  const b = await c.req.json().catch(() => ({}));
+  const mag = b.magasin === "Rouen" ? "Rouen" : "Amiens";
+  const lignes = String(b.texte ?? "").replace(/^\uFEFF/, "").split(/\r?\n/).filter((l) => l.trim());
+  if (lignes.length < 2) throw new AppError(400, "Fichier vide.");
+  const ent = lignes[0].split(";").map((x) => x.trim().toLowerCase());
+  const i = (k: string) => ent.indexOf(k);
+  if (i("nom") < 0) throw new AppError(400, "Colonnes non reconnues : il faut au minimum « nom » (séparateur ;).");
+  const connus = (await sql`SELECT lower(trim(email)) AS e, right(regexp_replace(telephone, '\\D', '', 'g'), 9) AS t FROM clients`) as any[];
+  const emails = new Set(connus.map((r) => r.e).filter(Boolean)), tels = new Set(connus.map((r) => r.t).filter((x) => x && x.length === 9));
+  let ajoutes = 0, doublons = 0, vides = 0;
+  for (const l of lignes.slice(1)) {
+    const f = l.split(";").map((x) => x.trim());
+    const { nom, prenom } = coupeNom(f[i("nom")] ?? "");
+    if (!nom) { vides++; continue; }
+    const email = clean(f[i("email")] ?? "", 120).toLowerCase();
+    const tel = telNational(f[i("mobile")] || f[i("fixe")] || "");
+    const t9 = tel.replace(/\D/g, "").slice(-9);
+    if ((email && emails.has(email)) || (t9.length === 9 && tels.has(t9))) { doublons++; continue; }
+    if (email) emails.add(email);
+    if (t9.length === 9) tels.add(t9);
+    await sql`INSERT INTO clients (prenom, nom, telephone, email, magasin, entreprise, naissance) VALUES (${clean(prenom, 80)}, ${clean(nom, 80)}, ${clean(tel, 40)}, ${email}, ${mag}, ${clean(f[i("entreprise")] ?? "", 120)}, ${clean(f[i("naissance")] ?? "", 20)})`;
+    ajoutes++;
+  }
+  return c.json({ message: `${ajoutes} client(s) ajouté(s) à ${mag}, ${doublons} déjà connu(s) (même téléphone ou email)${vides ? ", " + vides + " sans nom ignoré(s)" : ""}.`, ajoutes, doublons });
 });

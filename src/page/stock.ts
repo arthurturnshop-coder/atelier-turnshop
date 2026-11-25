@@ -170,6 +170,7 @@ function sauvParam(){
   h+="<div class='muted'>"+(d.dernierTelechargement?"Dernier téléchargement : "+esc(dayHour(d.dernierTelechargement.date))+" par "+esc(d.dernierTelechargement.par):"Jamais téléchargée à la main.")+"</div></div>";
   h+="<div class='card'><div class='step'>Sauvegarde automatique chaque nuit (3 h)</div><div class='muted'>Un email avec le fichier est envoyé à cette adresse. Garde ces emails : ils servent à tout restaurer.</div><div class='dl'><input id='sv-e' class='lb' placeholder='Email de réception' value='"+esc(d.email||"")+"'><button data-act='sauvSave'>Enregistrer</button><button class='sec' data-act='sauvEnv'>Envoyer maintenant</button></div>";
   h+="<div class='muted'>"+(d.derniere?"Dernière sauvegarde auto : "+esc(dayHour(d.derniere.date))+" · "+(d.derniere.statut==="ok"?"✅ ":"⚠ ")+esc(d.derniere.message):"Aucune sauvegarde automatique envoyée pour l'instant.")+"</div><div class='muted'>"+esc(SAUVMSG)+"</div></div>";
+  h+="<div class='card'><div class='step'>Importer des clients (export Shifter, CSV)</div><div class='muted'>Les clients déjà connus (même téléphone ou email) sont ignorés. Rien n'est envoyé à Shopify.</div><div class='dl' style='align-items:center'><select id='im-m'><option>Amiens</option><option>Rouen</option></select><label class='sec' style='cursor:pointer;padding:8px 12px;border:1px solid #1c5a34;border-radius:8px'>⬆ Choisir le fichier clients<input id='im-file' type='file' accept='.csv,.txt' style='display:none'></label></div></div>";
   h+="<div class='card'><div class='step'>Mise en production : vider les données de test</div><div class='muted'>Supprime définitivement tous les clients, prises en charge, devis, ventes, bons d'achat, commandes, tâches et clôtures de caisse. Garde : utilisateurs et codes, réglages, fournisseurs, prestations, produits maîtres, stock, banque et compta. Il faut d'abord télécharger une sauvegarde (bouton plus haut), valable 30 minutes.</div><div class='actions'><button class='danger' data-act='viderTests'>Vider les données de test</button></div></div>";
   return h}
 ACTS.viderTests=function(){
@@ -183,4 +184,9 @@ ACTS.sauvDl=function(){
     var a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="sauvegarde-fs-"+today()+".json.gz";document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},500);SAUVMSG="Sauvegarde téléchargée ("+Math.round(b.size/1024)+" Ko).";SAUV=null;render()}).catch(function(e){SAUVMSG=e.message;render()})};
 ACTS.sauvSave=function(){api("/sauvegarde/reglage",{email:v("sv-e")}).then(function(d){SAUVMSG=d.message;SAUV=null;render()}).catch(function(e){SAUVMSG=e.message;render()})};
 ACTS.sauvEnv=function(){SAUVMSG="Envoi…";render();api("/sauvegarde/envoyer",{}).then(function(d){SAUVMSG=d.message;SAUV=null;render()}).catch(function(e){SAUVMSG=e.message;SAUV=null;render()})};
+
+document.addEventListener("change",function(e){var t=e.target;if(!t||t.id!=="im-file"||!t.files||!t.files[0])return;
+  var m=v("im-m")||"Amiens";if(!confirm("Importer ce fichier de clients dans "+m+" ?"))return;
+  var fr=new FileReader();fr.onload=function(){SAUVMSG="Import en cours…";render();api("/clients/import",{texte:String(fr.result),magasin:m}).then(function(d){SAUVMSG=d.message;alert(d.message);render()}).catch(function(er){SAUVMSG=er.message;alert(er.message);render()})};
+  fr.readAsText(t.files[0],"utf-8")});
 `;
