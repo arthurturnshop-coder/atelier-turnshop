@@ -65,7 +65,7 @@ function devisHtml(f){
   return"<div class='devis'>"+ajout+"<hr style='margin:14px 0'><div class='step'>Devis en cours</div>"+table("Forfaits main-d'œuvre",mo)+table("Pièces détachées",pi)
     +(d.remiseMultiCents?"<div class='muted'>Remise plusieurs prestations : -"+eur(d.remiseMultiCents)+" (non cumulable avec une offre)</div>":"")
     +"<div class='tot'>Total du devis : "+eur(d.netCents==null?d.totalCents:d.netCents)+"</div>"
-    +(d.lignes.length?"<button data-act='facturer' data-id='"+f.id+"'>Facturer ce devis (passer en caisse)</button> <button class='sec' data-act='dvEnvoyer' data-id='"+f.id+"'>📧 Envoyer le devis au client</button>":"")
+    +payRecap(f)+"<div class='actions'>"+((f.acompte&&f.acompte.facture)?"":"<button class='sec' data-act='facturer' data-m='acompte' data-id='"+f.id+"'>💶 Acompte / paiement d'avance</button>")+(d.lignes.length?"<button data-act='facturer' data-m='paiement' data-id='"+f.id+"'>🧾 Facturer ce devis</button> <button class='sec' data-act='dvEnvoyer' data-id='"+f.id+"'>📧 Envoyer le devis au client</button>":"")+"</div>"
     +dvEnvHtml(f)+"</div>"}
 var PRFAM=[["Freins","#c0392b","#fbeceb"],["Pneus et roues","#2471a3","#eaf2fa"],["Électrique","#d68910","#fdf3e1"],["Mécanique","#7d3c98","#f4ecf7"],["Entretien et divers","#1e8449","#e9f5ee"]];
 function prFam(n){n=(n||"").toLowerCase();var i=4;
@@ -109,7 +109,7 @@ function vFiche(){
     +(f.enMagasin===false?"<div class='tag warn' style='margin:6px 0'>Trottinette pas en magasin</div><button data-act='arrivee' data-id='"+f.id+"' data-fiche='1'>Trottinette arrivée</button>":"")
     +"<div class='step' style='margin-top:10px'>Statut</div><div class='stbtns'>"+ST.map(function(s){if(s==="devis envoyé"&&s!==f.statut)return"<button class='dis' disabled title='Se met tout seul quand tu envoies le devis au client'>"+esc(s)+" (auto)</button>";return"<button class='"+(s===f.statut?"on":"")+"' data-act='setStatut' data-id='"+f.id+"' data-s='"+esc(s)+"'>"+esc(s)+"</button>"}).join("")+"</div>"
     +"<label class='muted' style='display:flex;gap:8px;align-items:center'><input type='checkbox' style='width:auto;margin:0' "+(f.sousGarantie?"checked ":"")+"data-act='setGarantie' data-id='"+f.id+"'> Sous garantie</label></div>"
-    +codeCard(f)+boiteCard(f)+affairesCard(f)+garantieHtml(f)+(f.sousGarantie?facturesAchatHtml(f):"")+gardeHtml(f)+acompteHtml(f)
+    +codeCard(f)+boiteCard(f)+affairesCard(f)+garantieHtml(f)+(f.sousGarantie?facturesAchatHtml(f):"")+gardeHtml(f)
     +"<div class='card'><div class='step'>Description de la panne</div><textarea id='fp' rows='3'>"+esc(f.panne)+"</textarea>"
     +"<div class='step'>Commentaire interne (visible seulement par TURN)</div><textarea id='fc' rows='3' placeholder='Ce que le client a demandé, ce qu il faudrait lui proposer...'>"+esc(f.commentaireInterne||"")+"</textarea>"
     +"<button data-act='saveFiche' data-id='"+f.id+"'>Enregistrer la description et le commentaire</button></div>"
@@ -157,6 +157,8 @@ function webHtml(f){
   else if(st==="annule")h+="<div class='muted'><span class='tag warn'>Annulé par le client</span> Pense à rembourser l'acompte s'il y en a un.</div>";
   else if(st==="confirme")h+="<div class='muted'><span class='tag ok'>RDV confirmé</span> Place-le dans le Planning.</div>";
   return h+"</div>"}
+function payRecap(f){var P=payInfo(f);if(!P.a.verseCents&&!P.a.facture)return"";
+  return"<div class='muted' style='margin:6px 0'>💶 Versé : <b>"+eur(P.net)+"</b>"+(P.tot>0?" · "+(P.due<0?"À rembourser : <b>"+eur(-P.due)+"</b>":"Reste à payer : <b>"+eur(P.due)+"</b>"):"")+(P.a.facture?" · <span class='tag ok'>Facturé "+esc(P.a.facture.numero||"")+"</span>":"")+"</div>"}
 var ACM="carte",ACV=null,ACR="",RBM="";
 function moyBtns(cur,act){return"<div class='seg'>"+[["carte","💳 Carte"],["especes","💶 Espèces"],["virement","🏦 Virement"]].map(function(m){return"<button class='"+(cur===m[0]?"on":"")+"' data-act='"+act+"' data-m='"+m[0]+"'>"+m[1]+"</button>"}).join("")+"</div>"}
 function payInfo(f){
@@ -179,7 +181,7 @@ function acompteHtml(f){
       +(due>0?"<button class='sec' data-act='acSolde' data-v='"+String(due/100).replace(".",",")+"'>Solde : "+eur(due)+"</button>"+(net===0&&due>=200?"<button class='sec' data-act='acSolde' data-v='"+String(Math.round(due/2)/100).replace(".",",")+"'>50 % : "+eur(Math.round(due/2))+"</button>":""):"")+"</div>"
       +(ACM==="especes"?"<div class='dl'><input id='ac-r' style='flex:0 0 300px;width:300px' placeholder='Espèces remises par le client €' value='"+esc(ACR)+"'><div id='ac-rendu' class='big' style='color:#b00;margin:0'></div></div>":"")
       +"<button data-act='acompte' data-id='"+f.id+"' style='width:100%;min-height:52px'>Encaisser le paiement</button>";
-    if(tot>0&&(f.devis.lignes||[]).length)h+="<div class='step' style='margin-top:14px'>Facture finale</div>"
+    if(!CPOP&&tot>0&&(f.devis.lignes||[]).length)h+="<div class='step' style='margin-top:14px'>Facture finale</div>"
       +"<button data-act='acSolder' data-id='"+f.id+"' style='width:100%;min-height:52px'>"+(due>0?"✅ Encaisser le solde ("+eur(due)+") et facturer":"✅ Facturer (déjà soldé)")+"</button>"
       +"<div class='muted'>Les acomptes sont déduits automatiquement. Offres ou cagnotte à appliquer ? <button class='link' data-act='facturer' data-id='"+f.id+"'>Passer en caisse</button> (tu pourras revenir sur la fiche depuis l'Atelier).</div>";
     if(net>0&&estResp())h+="<div class='step' style='margin-top:14px'>Rembourser le client</div><div class='seg'>"+[["carte","💳 Carte"],["especes","💶 Espèces"],["virement","🏦 Virement"],["bon","🎟 Bon d'achat atelier"],["carte_cadeau","🎁 Carte cadeau Shopify"]].map(function(m){return"<button class='"+(RBM===m[0]?"on":"")+"' data-act='rbMoy' data-m='"+m[0]+"'>"+m[1]+"</button>"}).join("")+"</div>"

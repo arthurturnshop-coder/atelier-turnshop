@@ -1,4 +1,5 @@
 export const CAISSE = `// ---------- Caisse (colonne de droite du Dashboard) ----------
+var CMODE="paiement";
 var PAN=[],CCLI=null,CFID=null,CUSE=false,CPAY={carte:"",especes:"",virement:"",bon_achat:""},CREP=null,CMSG="",CAFF=[],CRAFF=[];
 function affBanner(a){return a&&a.length?"<div class='card avbox' style='border:2px solid #b00'><b>🎒 À rendre au client : "+esc(a.join(", "))+"</b></div>":""}
 var CVEH=false;
@@ -148,6 +149,7 @@ function caisseHtml(){
   var brut=panierTotal(),av=avRemTotal(brut),rem=remiseCents(),aco=acoDeduit(brut-av-rem),net=brut-av-rem-aco;
   var h="<div class='caisse'><h3>Caisse <button class='sec' data-act='cVjOuvre' style='float:right'>📋 Ventes du jour</button></h3>";
   if(CREC)h+="<div class='card'><b>Vente enregistrée</b>"+affBanner(CRAFF)+recuHtml(CREC)+shopHtml(CREC)+avisBtns(CREC)+"<div class='actions'><button data-act='cPrint' data-id='"+CREC.id+"'>Imprimer le reçu</button><button class='sec' data-act='cEmail' data-id='"+CREC.id+"'>✉ Envoyer par email</button><button class='sec' data-act='cFermeRecu'>Fermer</button></div></div>";
+  if(CREP&&CPOP)h+="<div class='seg'><button class='"+(CMODE==="acompte"?"on":"")+"' data-act='cMode' data-m='acompte'>1 · Acompte</button><button class='"+(CMODE==="paiement"?"on":"")+"' data-act='cMode' data-m='paiement'>2 · Paiement (facture)</button></div>";
   if(CREP)h+=affBanner(CAFF)+"<div class='card avbox'><b>Facturation de la réparation n°"+CREP+"</b><div class='muted'>Les lignes du devis sont dans le panier. À l'encaissement, la commande est créée dans Shopify.</div><button class='link' data-act='cpFerme'>↩ Retour à la prise en charge</button></div>";
   h+="<div class='card'><div class='step'>Client (scan carte, email ou téléphone)</div><div class='search'><input id='cq' placeholder='Scan carte, email ou téléphone'><button data-act='cScan'>Chercher</button></div>";
   if(CCLI)h+="<div style='margin-top:8px'><b>"+esc(CCLI.name)+"</b> <span class='muted'>"+esc(CCLI.phone||"")+"</span> <button class='link' data-act='cClient0'>Retirer</button></div><div class='actions' style='margin-top:4px'><button class='sec' data-act='cProfil'>Voir le profil</button><button class='sec' data-act='cProfilMod'>Modifier</button></div>"+(CCLI.anniversaire?"<div class='card avbox' style='margin-top:6px'><b>🎂 C'est son anniversaire !</b><div class='muted'>"+CCLI.anniversaire.annees+" an"+(CCLI.anniversaire.annees>1?"s":"")+" que le compte existe : proposer la révision à "+eur(CCLI.anniversaire.prixCents)+".</div></div>":"");
@@ -160,6 +162,7 @@ function caisseHtml(){
     else h+="<div class='muted'>Aucun bon d'achat disponible pour l'instant.</div>";
     h+="</div>"}
   h+="</div>";
+  if(CREP&&CPOP&&CMODE==="acompte"&&FICHE)return h+acompteHtml(FICHE)+"</div>";
   h+="<div class='card'><div class='step'>Panier</div>";
   if(!PAN.length)h+="<div class='muted'>Panier vide. Ajoute un article ci-dessous.</div>";
   else h+="<table class='panier' style='width:100%;border-collapse:collapse'><tr><th style='text-align:left'>Article</th><th>Qté</th><th>Prix €</th><th></th></tr>"+PAN.map(function(l,i){return"<tr><td>"+esc(l.libelle)+((l.barcode||l.sku)?"<div class='muted' style='font-size:12px'>"+(l.barcode?"EAN "+esc(l.barcode):"")+(l.barcode&&l.sku?" · ":"")+(l.sku?"sku "+esc(l.sku):"")+"</div>":"")+(l.emplacement?"<div style='font-size:13px'><b>📍 "+esc(l.emplacement)+"</b></div>":"")+serieHtml(l,i)+"</td><td><input type='number' min='1' value='"+l.quantite+"' data-act='cQte' data-i='"+i+"'></td><td><input value='"+esc(l.prix)+"' data-act='cPrix' data-i='"+i+"'></td><td><button class='link' data-act='cDel' data-i='"+i+"'>Retirer</button></td></tr>"}).join("")+"</table>";

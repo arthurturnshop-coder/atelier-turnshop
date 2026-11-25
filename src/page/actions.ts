@@ -57,8 +57,9 @@ var ACTS={
       if(f.garde&&f.garde.fraisCents>0)PAN.push({libelle:"Gardiennage ("+f.garde.joursFrais+" jours x "+(f.garde.prixCents/100)+" EUR)",quantite:f.garde.joursFrais,prix:String(f.garde.prixCents/100).replace(".",","),type:"article",variantId:"",sku:""});
       CACO=f.acompte?f.acompte.resteCents:0;
       CCLI=d.client;CFID=d.fidelite;CUSE=false;CAVOFF=[];CREC=null;CHOPEN=0;CREP=f.id;CAFF=f.affaires||[];CRAFF=[];CPAY={carte:"",especes:"",virement:"",bon_achat:""};CMSG="";
-      CPOP=true;await chargeHisto()}catch(e){alert(e.message)}},
+      CMODE=b.dataset.m||"paiement";CPOP=true;await chargeHisto()}catch(e){alert(e.message)}},
   cpFerme:function(){var id=FICHE?FICHE.id:0;CPOP=false;if(!CREC){CREP=null;CAFF=[];CACO=0;PAN=[];CPAY={carte:"",especes:"",virement:"",bon_achat:""}}CREC=null;if(id)recharger(id);else render()},
+  cMode:function(b){CMODE=b.dataset.m;render()},
   acMoy:function(b){ACM=b.dataset.m;render()},
   acSolde:function(b){ACV=b.dataset.v;render()},
   rbMoy:function(b){RBM=b.dataset.m;render()},
