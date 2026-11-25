@@ -58,7 +58,7 @@ var ACTS={
   facturer:async function(b){
     if(PAN.length&&!confirm("Le panier de la caisse n'est pas vide : le remplacer par ce devis ?"))return;
     try{var f=FICHE;var d=await api("/caisse/client?id="+f.customerId);
-      PAN=f.devis.lignes.map(function(l){return{libelle:l.libelle,quantite:l.quantite,prix:String(l.prixCents/100).replace(".",","),type:l.type,variantId:l.variantId||"",sku:l.sku||""}});
+      PAN=f.devis.lignes.map(function(l){var sr=String(l.series||"").split(",").map(function(x){return x.trim()}).filter(Boolean);return{libelle:l.libelle,quantite:l.quantite,prix:String(l.prixCents/100).replace(".",","),type:l.type,variantId:l.variantId||"",sku:l.sku||"",trott:sr.length>0,series:sr}});
       if(f.garde&&f.garde.fraisCents>0)PAN.push({libelle:"Gardiennage ("+f.garde.joursFrais+" jours x "+(f.garde.prixCents/100)+" EUR)",quantite:f.garde.joursFrais,prix:String(f.garde.prixCents/100).replace(".",","),type:"article",variantId:"",sku:""});
       CACO=f.acompte?f.acompte.resteCents:0;
       CCLI=d.client;CFID=d.fidelite;CUSE=false;CAVOFF=[];CREC=null;CHOPEN=0;CREP=f.id;CAFF=f.affaires||[];CRAFF=[];CPAY={carte:"",especes:"",virement:"",bon_achat:""};CMSG="";

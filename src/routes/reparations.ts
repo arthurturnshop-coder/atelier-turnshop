@@ -10,10 +10,10 @@ import { GARDE, infosGarde } from "../garde";
 import { AppError, clean, exigeResponsable, magDe, signature } from "../util";
 
 export async function devisDe(repId: number) {
-  const lignes = (await sql`SELECT d.id, d.type, d.libelle, d.quantite, d.prix_unitaire_cents, d.shopify_variant_id, d.sku, d.barcode, d.marque, d.remise_client, (SELECT statut FROM commande_lignes cl WHERE cl.devis_ligne_id = d.id ORDER BY cl.id DESC LIMIT 1) AS cmd FROM devis_lignes d WHERE d.reparation_id = ${repId} ORDER BY d.type DESC, d.id`) as any[];
+  const lignes = (await sql`SELECT d.id, d.type, d.libelle, d.quantite, d.prix_unitaire_cents, d.shopify_variant_id, d.sku, d.barcode, d.marque, d.remise_client, d.series, (SELECT statut FROM commande_lignes cl WHERE cl.devis_ligne_id = d.id ORDER BY cl.id DESC LIMIT 1) AS cmd FROM devis_lignes d WHERE d.reparation_id = ${repId} ORDER BY d.type DESC, d.id`) as any[];
   const total = lignes.reduce((s, l) => s + l.quantite * l.prix_unitaire_cents, 0);
   const remiseMultiCents = await remiseMulti(lignes.map((l) => ({ type: l.type, quantite: l.quantite, libelle: l.libelle })), total);
-  return { remiseMultiCents, netCents: total - remiseMultiCents, lignes: lignes.map((l) => ({ id: l.id, type: l.type, libelle: l.libelle, quantite: l.quantite, prixCents: l.prix_unitaire_cents, variantId: l.shopify_variant_id ?? "", sku: l.sku ?? "", barcode: l.barcode ?? "", commande: l.cmd ?? "", remiseClient: !!l.remise_client })), totalCents: total };
+  return { remiseMultiCents, netCents: total - remiseMultiCents, lignes: lignes.map((l) => ({ id: l.id, type: l.type, libelle: l.libelle, quantite: l.quantite, prixCents: l.prix_unitaire_cents, variantId: l.shopify_variant_id ?? "", sku: l.sku ?? "", barcode: l.barcode ?? "", series: l.series ?? "", commande: l.cmd ?? "", remiseClient: !!l.remise_client })), totalCents: total };
 }
 
 await sql`ALTER TABLE reparations ADD COLUMN IF NOT EXISTS boite TEXT`;

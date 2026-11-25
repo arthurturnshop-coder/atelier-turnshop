@@ -7,13 +7,17 @@ import { AppError, clean } from "../util";
 await sql`CREATE TABLE IF NOT EXISTS devis_simples (id SERIAL PRIMARY KEY, client_id INT, nom TEXT NOT NULL DEFAULT '', telephone TEXT NOT NULL DEFAULT '', email TEXT NOT NULL DEFAULT '', trottinette TEXT NOT NULL DEFAULT '', objet TEXT NOT NULL DEFAULT '', magasin TEXT NOT NULL DEFAULT 'Amiens', cree_par TEXT NOT NULL DEFAULT '', reparation_id INT, supprime_le TIMESTAMPTZ, cree_le TIMESTAMPTZ NOT NULL DEFAULT now(), maj_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
 await sql`CREATE TABLE IF NOT EXISTS devis_simples_lignes (id SERIAL PRIMARY KEY, devis_id INT NOT NULL REFERENCES devis_simples(id), type TEXT NOT NULL DEFAULT 'piece', libelle TEXT NOT NULL, quantite INT NOT NULL DEFAULT 1, prix_unitaire_cents INT NOT NULL DEFAULT 0)`;
 
+await sql`ALTER TABLE devis_simples_lignes ADD COLUMN IF NOT EXISTS series TEXT NOT NULL DEFAULT ''`;
+await sql`ALTER TABLE devis_simples_lignes ADD COLUMN IF NOT EXISTS variant_id TEXT`;
+await sql`ALTER TABLE devis_simples_lignes ADD COLUMN IF NOT EXISTS sku TEXT`;
+await sql`ALTER TABLE devis_lignes ADD COLUMN IF NOT EXISTS series TEXT NOT NULL DEFAULT ''`;
 // Commande client : le dossier existe en coulisses (acompte, commande fournisseur) mais n'apparaît pas comme prise en charge tant qu'on ne le demande pas.
 await sql`ALTER TABLE reparations ADD COLUMN IF NOT EXISTS commande_client BOOLEAN NOT NULL DEFAULT false`;
 
 const vue = (d: any, lignes: any[], cc = false) => ({
   id: d.id, clientId: d.client_id, nom: d.nom, telephone: d.telephone, email: d.email, trottinette: d.trottinette, objet: d.objet, magasin: d.magasin, creePar: d.cree_par,
   reparationId: d.reparation_id, commandeClient: cc, date: d.cree_le,
-  lignes: lignes.map((l) => ({ type: l.type, libelle: l.libelle, quantite: l.quantite, prixCents: l.prix_unitaire_cents })),
+  lignes: lignes.map((l) => ({ type: l.type, libelle: l.libelle, quantite: l.quantite, prixCents: l.prix_unitaire_cents, series: l.series ?? "", variantId: l.variant_id ?? "", sku: l.sku ?? "" })),
   totalCents: lignes.reduce((t, l) => t + l.quantite * l.prix_unitaire_cents, 0),
 });
 
@@ -33,6 +37,7 @@ app.post("/api/devis-simples", async (c) => {
     type: l.type === "main_oeuvre" ? "main_oeuvre" : "piece", libelle: clean(l.libelle, 200),
     quantite: Math.max(1, Math.min(999, Math.round(Number(l.quantite) || 1))),
     prix: Math.max(0, Math.round((Number(String(l.prix ?? "0").replace(",", ".")) || 0) * 100)),
+    series: clean(String(l.series ?? ""), 300), variantId: clean(l.variantId, 80) || null, sku: clean(l.sku, 80) || null,
   })).filter((l: any) => l.libelle);
   if (!lignes.length) throw new AppError(400, "Ajoute au moins une ligne au devis.");
   const nom = clean(b.nom, 120);
@@ -63,7 +68,7 @@ app.post("/api/devis-simples", async (c) => {
   } else {
     [{ id }] = (await sql`INSERT INTO devis_simples (client_id, nom, telephone, email, trottinette, objet, magasin, cree_par) VALUES (${cid || null}, ${nom}, ${clean(b.telephone, 40)}, ${clean(b.email, 120)}, ${clean(b.trottinette, 120)}, ${clean(b.objet, 300)}, ${u?.magasin === "Rouen" ? "Rouen" : "Amiens"}, ${u?.prenom ?? ""}) RETURNING id`) as any[];
   }
-  for (const l of lignes) await sql`INSERT INTO devis_simples_lignes (devis_id, type, libelle, quantite, prix_unitaire_cents) VALUES (${id}, ${l.type}, ${l.libelle}, ${l.quantite}, ${l.prix})`;
+  for (const l of lignes) await sql`INSERT INTO devis_simples_lignes (devis_id, type, libelle, quantite, prix_unitaire_cents, series, variant_id, sku) VALUES (${id}, ${l.type}, ${l.libelle}, ${l.quantite}, ${l.prix}, ${l.series}, ${l.variantId}, ${l.sku})`;
   return c.json({ id, message: "Devis enregistré." });
 });
 
@@ -74,6 +79,23 @@ app.post("/api/devis-simples/supprimer", async (c) => {
 });
 
 // Le devis se concrétise : création de la prise en charge (client et trottinette si besoin) et copie des lignes.
+// N° de série saisis ligne par ligne (dans l'ordre des lignes du devis), y compris quand le devis est rattaché.
+app.post("/api/devis-simples/series", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const id = Number(b.id);
+  const [d] = (await sql`SELECT reparation_id FROM devis_simples WHERE id = ${id} AND supprime_le IS NULL`) as any[];
+  if (!d) throw new AppError(404, "Devis introuvable.");
+  const series: string[] = (Array.isArray(b.series) ? b.series : []).map((x: any) => clean(String(x ?? ""), 300));
+  const ls = (await sql`SELECT id FROM devis_simples_lignes WHERE devis_id = ${id} ORDER BY id`) as any[];
+  const lr = d.reparation_id ? ((await sql`SELECT id FROM devis_lignes WHERE reparation_id = ${d.reparation_id} ORDER BY id`) as any[]) : [];
+  for (let i = 0; i < ls.length; i++) {
+    const sr = series[i] ?? "";
+    await sql`UPDATE devis_simples_lignes SET series = ${sr} WHERE id = ${ls[i].id}`;
+    if (lr[i]) await sql`UPDATE devis_lignes SET series = ${sr} WHERE id = ${lr[i].id}`;
+  }
+  return c.json({ message: "Numéros de série enregistrés." });
+});
+
 app.post("/api/devis-simples/commande-client", async (c) => {
   const b = await c.req.json().catch(() => ({}));
   await sql`UPDATE reparations SET commande_client = ${b.valeur !== false} WHERE id = ${Number(b.repairId)}`;
@@ -98,7 +120,7 @@ app.post("/api/devis-simples/rattacher", async (c) => {
   const [t] = (await sql`INSERT INTO trottinettes (client_id, marque, modele, serie) VALUES (${clientId}, ${marque}, ${modele}, ${"NC-" + Date.now()}) RETURNING id`) as any[];
   const [r] = (await sql`INSERT INTO reparations (client_id, trottinette_id, panne, date_depot, en_magasin, magasin) VALUES (${clientId}, ${t.id}, ${"Devis DV-" + String(d.id).padStart(4, "0") + (d.objet ? " : " + d.objet : "")}, CURRENT_DATE, false, ${d.magasin}) RETURNING id`) as any[];
   const ls = (await sql`SELECT * FROM devis_simples_lignes WHERE devis_id = ${d.id} ORDER BY id`) as any[];
-  for (const l of ls) await sql`INSERT INTO devis_lignes (reparation_id, type, libelle, quantite, prix_unitaire_cents) VALUES (${r.id}, ${l.type}, ${l.libelle}, ${l.quantite}, ${l.prix_unitaire_cents})`;
+  for (const l of ls) await sql`INSERT INTO devis_lignes (reparation_id, type, libelle, quantite, prix_unitaire_cents, shopify_variant_id, sku, series) VALUES (${r.id}, ${l.type}, ${l.libelle}, ${l.quantite}, ${l.prix_unitaire_cents}, ${l.variant_id ?? null}, ${l.sku ?? null}, ${l.series ?? ""})`;
   await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${r.id}, 'statut', ${"Prise en charge créée à partir du devis DV-" + String(d.id).padStart(4, "0") + ", trottinette pas encore en magasin"})`;
   await sql`UPDATE devis_simples SET reparation_id = ${r.id}, client_id = ${clientId}, maj_le = now() WHERE id = ${d.id}`;
   return c.json({ reparationId: r.id, message: "Prise en charge créée avec les lignes du devis." });

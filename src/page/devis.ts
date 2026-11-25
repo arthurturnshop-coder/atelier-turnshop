@@ -18,17 +18,17 @@ function vDevisEd(){
   h+="<div class='muted'>Client : choisis un client existant ci-dessus, ou laisse vide (devis sans nom), ou renseigne nom + téléphone ou email (sa fiche client sera créée ou retrouvée).</div><div class='dl'><input id='dn' placeholder='Nom du client' value='"+esc(d.nom)+"'><input id='dt' placeholder='Téléphone' value='"+esc(d.telephone)+"'><input id='de' placeholder='Email' value='"+esc(d.email)+"'></div>"
     +"<div class='dl'><input id='dtr' placeholder='Trottinette (ex : Xiaomi M365)' value='"+esc(d.trottinette)+"'><input id='dob' placeholder='Objet du devis' value='"+esc(d.objet)+"'></div>"
     +""+dvPrestaBox()+"<div class='step' style='margin-top:10px'>Lignes (prix TTC)</div><div class='muted'>Une pièce du catalogue turnshop.fr ? Cherche-la ou scanne-la ici :</div>"+prodBox("dvs")+(DV.hint?"<div class='pmsg'>"+esc(DV.hint)+"</div>":"");
-  d.lignes.forEach(function(l,i){h+="<div class='dl'><input id='dl"+i+"' class='lb' placeholder='Pièce ou main d oeuvre' value='"+esc(l.libelle)+"'><input id='dq"+i+"' class='q' type='number' min='1' value='"+(l.quantite||1)+"'><input id='dp"+i+"' class='p' placeholder='Prix €' value='"+(l.prixCents?(l.prixCents/100).toFixed(2).replace(".",","):"")+"'><button class='link' data-act='dvDelL' data-i='"+i+"'>Suppr.</button></div>"});
+  d.lignes.forEach(function(l,i){h+="<div class='dl'><input id='dl"+i+"' class='lb' placeholder='Pièce ou main d oeuvre' value='"+esc(l.libelle)+"'><input id='dq"+i+"' class='q' type='number' min='1' value='"+(l.quantite||1)+"'><input id='dp"+i+"' class='p' placeholder='Prix €' value='"+(l.prixCents?(l.prixCents/100).toFixed(2).replace(".",","):"")+"'><button class='link' data-act='dvDelL' data-i='"+i+"'>Suppr.</button></div><div class='dl' style='margin:-4px 0 6px'><input id='ds"+i+"' class='lb' placeholder='🛴 N° de série (si trottinette ; plusieurs : sépare par une virgule)' value='"+esc(l.series||"")+"'></div>"});
   h+="<div class='actions'><button class='sec' data-act='dvAddL'>+ Ligne</button></div><div style='font-size:20px;margin:8px 0'><b>Total TTC : "+eur(dvTotal(d.lignes))+"</b></div>"
     +"<div class='actions'>"+(rat?"":"<button data-act='dvSave'>Enregistrer</button>")+(d.id?"<button class='sec' data-act='dvPrint'>Imprimer</button>":"")
-    +(d.id&&!rat?"<button data-act='dvFact'>Facturer (passer en caisse)</button><button class='sec' data-act='dvRatt'>Créer une prise en charge</button>":"")+(d.commandeClient?"<button class='sec' data-act='dvConvPC'>Créer une prise en charge</button>":rat?"<button class='sec' data-act='dvVoirPC'>Ouvrir "+pcn(d.reparationId)+"</button>":"")
+    +(d.id&&!rat?"<button data-act='dvFact'>Facturer (passer en caisse)</button><button class='sec' data-act='dvRatt'>Créer une prise en charge</button>":"")+(rat?"<button data-act='dvSerieSave'>Enregistrer les n° de série</button>":"")+(d.commandeClient?"<button class='sec' data-act='dvConvPC'>Créer une prise en charge</button>":rat?"<button class='sec' data-act='dvVoirPC'>Ouvrir "+pcn(d.reparationId)+"</button>":"")
     +(d.id&&!rat?"<button class='danger' data-act='dvSuppr'>Supprimer</button>":"")+"<button class='sec' data-act='dvRetour'>Retour à la liste</button></div></div>";
   app.innerHTML=h}
 function dvLire(){
   var d=DV.ed;if(!d||!document.getElementById("dn"))return;
   d.nom=v("dn");d.telephone=v("dt");d.email=v("de");d.trottinette=v("dtr");d.objet=v("dob");
-  d.lignes=d.lignes.map(function(l,i){var p=Number(String(v("dp"+i)).replace(",","."))||0;return{libelle:v("dl"+i),quantite:Math.max(1,Number(v("dq"+i))||1),prixCents:Math.round(p*100)}})}
-function dvPayload(){var d=DV.ed;return{id:d.id,clientId:d.clientId,nom:d.nom,telephone:d.telephone,email:d.email,trottinette:d.trottinette,objet:d.objet,lignes:d.lignes.map(function(l){return{libelle:l.libelle,quantite:l.quantite,prix:(l.prixCents/100).toFixed(2)}})}}
+  d.lignes=d.lignes.map(function(l,i){var p=Number(String(v("dp"+i)).replace(",","."))||0;return{libelle:v("dl"+i),quantite:Math.max(1,Number(v("dq"+i))||1),prixCents:Math.round(p*100),series:v("ds"+i),variantId:l.variantId||"",sku:l.sku||""}})}
+function dvPayload(){var d=DV.ed;return{id:d.id,clientId:d.clientId,nom:d.nom,telephone:d.telephone,email:d.email,trottinette:d.trottinette,objet:d.objet,lignes:d.lignes.map(function(l){return{libelle:l.libelle,quantite:l.quantite,prix:(l.prixCents/100).toFixed(2),series:l.series||"",variantId:l.variantId||"",sku:l.sku||""}})}}
 ACTS.dvNouveau=function(){DV.hint="";DV.ed=dvVide();DV.res=null;DV.msg="";FICHE=null;TAB="enc";ATSUB="devis";render()};
 ACTS.dvOuvre=function(b){DV.hint="";var d=DV.list[+b.dataset.i];DV.ed=JSON.parse(JSON.stringify(d));if(!DV.ed.lignes.length)DV.ed.lignes=dvVide().lignes;DV.res=null;DV.msg="";render()};
 ACTS.dvRetour=function(){DV.ed=null;DV.list=null;DV.msg="";render()};
@@ -69,7 +69,7 @@ ACTS.dvFact=async function(){
   if(PAN.length&&!confirm("Le panier de la caisse n'est pas vide : le remplacer par ce devis ?"))return;
   try{var s=await api("/devis-simples",dvPayload());DV.ed.id=s.id;var d=null;
     if(DV.ed.clientId)d=await api("/caisse/client?id="+DV.ed.clientId);
-    PAN=DV.ed.lignes.map(function(l){return{libelle:l.libelle,quantite:l.quantite,prix:String(l.prixCents/100).replace(".",","),type:"article",variantId:"",sku:""}});
+    PAN=DV.ed.lignes.map(function(l){var sr=String(l.series||"").split(",").map(function(x){return x.trim()}).filter(Boolean);return{libelle:l.libelle,quantite:l.quantite,prix:String(l.prixCents/100).replace(".",","),type:"article",variantId:l.variantId||"",sku:l.sku||"",trott:sr.length>0,series:sr}});
     CCLI=d?d.client:null;CFID=d?d.fidelite:null;CUSE=false;CAVOFF=[];CREC=null;CHOPEN=0;CREP=null;CACO=0;CPAY={carte:"",especes:"",virement:"",bon_achat:""};CMSG="";
     DV.ed=null;DV.list=null;FICHE=null;CUR=null;TAB="accueil";if(d)await chargeHisto();else render()}catch(e){alert(e.message)}};
 async function cartVersDevis(){
@@ -77,7 +77,7 @@ async function cartVersDevis(){
   var nom=CCLI?CCLI.name:(prompt("Nom du client ? (laisse vide pour un devis sans nom)")||"").trim();
   var tel=CCLI?(CCLI.phone||""):"";
   if(!CCLI&&nom){tel=(prompt("Téléphone du client (sa fiche client sera créée) ?")||"").trim();if(!tel)return null}
-  var r=await api("/devis-simples",{clientId:CCLI?CCLI.id:0,nom:nom,telephone:tel,email:CCLI?(CCLI.email||""):"",lignes:PAN.map(function(l){return{libelle:l.libelle,quantite:l.quantite,prix:l.prix}})});
+  var r=await api("/devis-simples",{clientId:CCLI?CCLI.id:0,nom:nom,telephone:tel,email:CCLI?(CCLI.email||""):"",lignes:PAN.map(function(l){return{libelle:l.libelle,quantite:l.quantite,prix:l.prix,variantId:l.variantId||"",sku:l.sku||"",series:(l.series||[]).filter(Boolean).join(",")}})});
   return r}
 function cartVide(){PAN=[];CPAY={carte:"",especes:"",virement:"",bon_achat:""};CMSG="";CCLI=null;CFID=null;CUSE=false;CAVOFF=[];CREP=null;CACO=0}
 ACTS.cEnDevis=async function(){
@@ -132,6 +132,7 @@ ACTS.cEnPec=async function(){
   if(!PAN.length){alert("Le panier est vide.");return}
   if(!confirm("Créer une prise en charge (réparation en boutique) avec ce panier ?"))return;
   try{var r=await cartVersDevis();if(!r)return;var p=await api("/devis-simples/rattacher",{id:r.id});cartVide();DV.list=null;await ouvrirFiche(p.reparationId)}catch(e){alert(e.message)}};
+ACTS.dvSerieSave=async function(b){dvLire();btnFlash(b,"Enregistrement…");try{var r=await api("/devis-simples/series",{id:DV.ed.id,series:DV.ed.lignes.map(function(l){return l.series||""})});DV.msg=r.message;DV.list=null;render()}catch(e){render();alert(e.message)}};
 ACTS.dvConvPC=async function(){try{await api("/devis-simples/commande-client",{repairId:DV.ed.reparationId,valeur:false});var id=DV.ed.reparationId;DV.list=null;DV.ed=null;await ouvrirFiche(id)}catch(e){alert(e.message)}};
 ACTS.dvVoirPC=function(){ouvrirFiche(DV.ed.reparationId)};
 ACTS.dvPrint=async function(b){
