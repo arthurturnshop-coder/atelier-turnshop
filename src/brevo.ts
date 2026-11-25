@@ -64,10 +64,10 @@ export function emailHtml(texte: string): string {
   return `<!doctype html><html><body style="margin:0;background:#f4f4f2;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#1a1a1a"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f2;padding:24px 10px"><tr><td align="center"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:14px;overflow:hidden"><tr><td style="background:#1c5a34;padding:22px 28px;color:#ffffff;font-size:22px;font-weight:800;letter-spacing:1px">TURN Shop</td></tr><tr><td style="padding:28px 28px 24px;font-size:15px">${corps}${secours}</td></tr><tr><td style="padding:16px 28px 22px;border-top:1px solid #eee;font-size:12px;color:#888;line-height:1.5">TURN SOCIETY · Boutiques Amiens et Rouen · turnshop.fr</td></tr></table></td></tr></table></body></html>`;
 }
 
-export async function envoiEmail(a: string, sujet: string, texte: string): Promise<string> {
+export async function envoiEmail(a: string, sujet: string, texte: string, pieces?: { name: string; content: string }[]): Promise<string> {
   const exp = Bun.env.BREVO_EMAIL_EXPEDITEUR;
   if (!exp) throw new Error("BREVO_EMAIL_EXPEDITEUR manquant (adresse expéditeur validée dans Brevo).");
-  return await appel("/smtp/email", { sender: { name: "TURN Shop", email: exp }, to: [{ email: a }], subject: sujet, htmlContent: emailHtml(texte), textContent: texte });
+  return await appel("/smtp/email", { sender: { name: "TURN Shop", email: exp }, to: [{ email: a }], subject: sujet, htmlContent: emailHtml(texte), textContent: texte, ...(pieces?.length ? { attachment: pieces } : {}) });
 }
 
 export async function envoiSms(num: string, texte: string) {

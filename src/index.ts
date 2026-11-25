@@ -33,6 +33,7 @@ import "./routes/acomptes";
 import "./routes/rdv";
 import "./routes/devis";
 import "./routes/depot";
+import "./routes/sauvegarde";
 import "./routes/caisse";
 import "./automatisations";
 import { HTML } from "./page";

@@ -163,4 +163,19 @@ function vCasiers(){
 ACTS.casiRef=function(){CASI=null;render()};
 ACTS.casiOpen=function(b){ouvrirFiche(Number(b.dataset.id))};
 ACTS.avisRec=async function(b){var id=+b.dataset.id;if(!confirm("Tu as vu l'avis Google posté par ce client ? La récompense sera notée comme offerte (une seule fois)."))return;try{await api("/clients/avis-recompense",{id:id});delete AVC[id];render()}catch(e){alert(e.message)}};
+function sauvParam(){
+  var d=SAUV||{email:"",derniere:null,dernierTelechargement:null};
+  var h="<div class='card'><div class='step'>Sauvegarde de la base</div><div class='muted'>Le logiciel n'est pas sauvegardé par Railway sur cette offre : cette sauvegarde est ta protection. Elle contient tout (clients, prises en charge, ventes, stock, compta).</div>";
+  h+="<div class='actions'><button data-act='sauvDl'>&#11015; Télécharger une sauvegarde maintenant</button></div>";
+  h+="<div class='muted'>"+(d.dernierTelechargement?"Dernier téléchargement : "+esc(dayHour(d.dernierTelechargement.date))+" par "+esc(d.dernierTelechargement.par):"Jamais téléchargée à la main.")+"</div></div>";
+  h+="<div class='card'><div class='step'>Sauvegarde automatique chaque nuit (3 h)</div><div class='muted'>Un email avec le fichier est envoyé à cette adresse. Garde ces emails : ils servent à tout restaurer.</div><div class='dl'><input id='sv-e' class='lb' placeholder='Email de réception' value='"+esc(d.email||"")+"'><button data-act='sauvSave'>Enregistrer</button><button class='sec' data-act='sauvEnv'>Envoyer maintenant</button></div>";
+  h+="<div class='muted'>"+(d.derniere?"Dernière sauvegarde auto : "+esc(dayHour(d.derniere.date))+" · "+(d.derniere.statut==="ok"?"✅ ":"⚠ ")+esc(d.derniere.message):"Aucune sauvegarde automatique envoyée pour l'instant.")+"</div><div class='muted'>"+esc(SAUVMSG)+"</div></div>";
+  return h}
+ACTS.sauvDl=function(){
+  var hd={};if(TOK)hd["x-atelier-token"]=TOK;else hd["x-atelier-password"]=PW;if(ACT&&ACT.code)hd["x-atelier-code"]=ACT.code;
+  SAUVMSG="Préparation du fichier…";render();
+  fetch("/api/sauvegarde",{headers:hd}).then(function(r){if(!r.ok)return r.json().then(function(j){throw new Error(j.error||"Erreur")});return r.blob()}).then(function(b){
+    var a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="sauvegarde-fs-"+today()+".json.gz";document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},500);SAUVMSG="Sauvegarde téléchargée ("+Math.round(b.size/1024)+" Ko).";SAUV=null;render()}).catch(function(e){SAUVMSG=e.message;render()})};
+ACTS.sauvSave=function(){api("/sauvegarde/reglage",{email:v("sv-e")}).then(function(d){SAUVMSG=d.message;SAUV=null;render()}).catch(function(e){SAUVMSG=e.message;render()})};
+ACTS.sauvEnv=function(){SAUVMSG="Envoi…";render();api("/sauvegarde/envoyer",{}).then(function(d){SAUVMSG=d.message;SAUV=null;render()}).catch(function(e){SAUVMSG=e.message;SAUV=null;render()})};
 `;
