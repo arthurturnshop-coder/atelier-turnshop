@@ -334,6 +334,7 @@ app.post("/api/caisse/encaisser", async (c) => {
   const pointsGagnes = Math.floor((totalCents + acompteDeduit) / 100 / p.eurosPourPalier);
   const [v] = (await sql`INSERT INTO ventes (client_id, reparation_id, magasin, vendeur, total_cents, remise_cents, points_gagnes, points_utilises, acompte_deduit_cents) VALUES (${clientId}, ${reparationId}, ${u.magasin ?? null}, ${vendeur}, ${totalCents}, ${remiseCents}, ${pointsGagnes}, ${remiseCents > 0 ? 1 : 0}, ${acompteDeduit}) RETURNING id`) as any[];
   await sql`UPDATE ventes SET numero_facture = 'F-' || to_char(now(), 'YYYY') || '-' || lpad(nextval('facture_seq')::text, 5, '0') WHERE id = ${v.id}`;
+  for (const l of nettoyees) { const m = /DV#(\d+)/.exec(String(l.libelle)); if (m) await (await import("./depot")).depotVendu(Number(m[1]), v.id, l.prixCents * l.quantite); }
   for (const l of nettoyees) {
     await sql`INSERT INTO vente_lignes (vente_id, libelle, quantite, prix_unitaire_cents, type, shopify_variant_id, sku, series) VALUES (${v.id}, ${l.libelle}, ${l.quantite}, ${l.prixCents}, ${l.type}, ${l.variantId}, ${l.sku}, ${JSON.stringify(l.series)}::text::jsonb)`;
     if (clientId) for (const serie of l.series as string[]) {

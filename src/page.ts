@@ -17,6 +17,7 @@ import { GARANTIE } from "./page/garantie";
 import { CREATION } from "./page/creation";
 import { CLIENT } from "./page/client";
 import { DEVIS } from "./page/devis";
+import { DEPOT } from "./page/depot";
 import { COMMANDES } from "./page/commandes";
 import { STOCK } from "./page/stock";
 import { COMPTA } from "./page/compta";
@@ -28,7 +29,7 @@ import { PROCESS } from "./page/process";
 
 // L'ordre compte : c'est l'ordre d'exécution du script dans le navigateur.
 export const HTML = [
-  SHELL, BASE, LOGIN, PROFIL, DASHBOARD, ATELIER, CAISSE, PARAMETRES, ACTIONS, RECHERCHE, COMMANDES, STOCK, COMPTA, MAITRES, PLANNING, IMPRESSION, STATS, RETOURS, GARANTIE, CREATION, CLIENT, DEVIS, CHAT, BANQUE, DEFI, PROCESS,
+  SHELL, BASE, LOGIN, PROFIL, DASHBOARD, ATELIER, CAISSE, PARAMETRES, ACTIONS, RECHERCHE, COMMANDES, STOCK, COMPTA, MAITRES, PLANNING, IMPRESSION, STATS, RETOURS, GARANTIE, CREATION, CLIENT, DEVIS, DEPOT, CHAT, BANQUE, DEFI, PROCESS,
   "viewRestore();render();viewRestoreOpen();",
   "</script></body></html>",
 ].join("\n");

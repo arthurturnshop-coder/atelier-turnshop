@@ -32,6 +32,7 @@ import "./routes/commandes";
 import "./routes/acomptes";
 import "./routes/rdv";
 import "./routes/devis";
+import "./routes/depot";
 import "./routes/caisse";
 import "./automatisations";
 import { HTML } from "./page";
