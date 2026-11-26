@@ -294,7 +294,7 @@ document.addEventListener("input",function(e){
 
 // ----- Étiquettes produits : nom, prix, code-barres -----
 var ETQ=[],ETQF=null,ETQSKIP=0;
-var ETQFORMATS={"50x30":{l:"Rouleau 50 × 30 mm",w:50,h:30},"40x25":{l:"Rouleau 40 × 25 mm",w:40,h:25},"62x29":{l:"Ruban Brother 62 × 40 mm",w:62,h:40},"a4":{l:"Planche A4 3 × 8 (70 × 37 mm)",w:70,h:37,page:"A4",cols:3,rows:8},"papier":{l:"Emplacements papier A4 2 × 4 (105 × 68 mm)",w:105,h:68,mt:12,page:"A4",cols:2,rows:4}};
+var ETQFORMATS={"50x30":{l:"Rouleau 50 × 30 mm",w:50,h:30},"40x25":{l:"Rouleau 40 × 25 mm",w:40,h:25},"62x29":{l:"Ruban Brother 62 × 40 mm",w:62,h:40},"a4":{l:"Planche A4 3 × 8 (70 × 37 mm)",w:70,h:37,page:"A4",cols:3,rows:8},"papier":{l:"Emplacements papier A4 2 × 4 (100 × 66 mm)",w:100,h:66,mt:14,ml:5,page:"A4",cols:2,rows:4}};
 function etqFormat(){
   if(!ETQF){try{ETQF=localStorage.getItem("etqf")||""}catch(e){ETQF=""}}
   if(!ETQFORMATS[ETQF])ETQF="62x29";return ETQF}
@@ -305,10 +305,10 @@ function etqBig(it,F){
   if(it.style==="simple"){
     var fs=Math.round(F.h*0.42*10)/10;
     return"<div class='etq' style='width:"+F.w+"mm;height:"+F.h+"mm;box-sizing:border-box;padding:1.2mm;font-family:Arial,Helvetica,sans-serif;color:#000;background:#fff'><div style='width:100%;height:100%;border:0.6mm solid #000;border-radius:2mm;display:flex;flex-direction:column;align-items:center;justify-content:center'><div style='flex:1;display:flex;align-items:center;justify-content:center;font-size:"+fs+"pt;font-weight:900;line-height:1'>"+t+"</div><div style='height:9mm;width:90%;flex:none;text-align:center'>"+bc+"</div></div></div>"}
-  return"<div class='etq' style='width:"+F.w+"mm;height:"+F.h+"mm;box-sizing:border-box;padding:3mm;font-family:Arial,Helvetica,sans-serif;background:#fff'><div style='width:100%;height:100%;border-radius:5mm;overflow:hidden;display:flex;flex-direction:column;background:#1e8449;color:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact'>"
-    +"<div style='padding:2.5mm 5mm;font-size:9pt;font-weight:800;letter-spacing:.25em;text-transform:uppercase;opacity:.95'>TURN Shop</div>"
-    +"<div style='flex:1;margin:0 4mm;background:#fff;color:#145c35;border-radius:3mm;display:flex;align-items:center;justify-content:center;font-size:"+Math.round(F.h*0.6)+"pt;font-weight:900;line-height:1;-webkit-print-color-adjust:exact;print-color-adjust:exact'>"+t+"</div>"
-    +"<div style='height:13mm;flex:none;margin:2mm 4mm 3mm;background:#fff;border-radius:2mm;padding:1mm 2mm;text-align:center;-webkit-print-color-adjust:exact;print-color-adjust:exact'>"+bc+"</div></div></div>"}
+  return"<div class='etq' style='width:"+F.w+"mm;height:"+F.h+"mm;box-sizing:border-box;padding:4mm;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#145c35'><div style='width:100%;height:100%;box-sizing:border-box;border:1.2mm solid #1e8449;border-radius:4mm;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:3mm 4mm 2.5mm'>"
+    +"<div style='font-size:8pt;font-weight:800;letter-spacing:.3em;text-transform:uppercase;color:#1e8449'>TURN Shop</div>"
+    +"<div style='font-size:"+Math.round(F.h*0.62)+"pt;font-weight:900;line-height:1;color:#145c35'>"+t+"</div>"
+    +"<div style='width:100%;text-align:center;border-top:0.4mm solid #1e8449;padding-top:1.5mm;color:#000'>"+bc+"</div></div></div>"}
 function etqLabel(it,F){
   if(it.big)return etqBig(it,F);
   var code=it.barcode||it.sku||"";
@@ -325,7 +325,7 @@ function etqLabel(it,F){
     +"</div></div>"}
 function etqToutes(){var out=[];ETQ.forEach(function(it){for(var i=0;i<(it.qte||1);i++)out.push(it)});return out}
 function etqCss(F){
-  if(F.page)return"@page{size:A4;margin:0}@media print{body>*:not(#impzone){display:none!important}#impzone{position:absolute;left:0;top:0;width:210mm}.etqgrid{display:grid;grid-template-columns:repeat("+F.cols+","+F.w+"mm);grid-auto-rows:"+F.h+"mm;margin-left:0;margin-top:"+(F.mt!==undefined?F.mt:5)+"mm}.etqempty{width:"+F.w+"mm;height:"+F.h+"mm}}";
+  if(F.page)return"@page{size:A4;margin:0}@media print{body>*:not(#impzone){display:none!important}#impzone{position:absolute;left:0;top:0;width:210mm}.etqgrid{display:grid;grid-template-columns:repeat("+F.cols+","+F.w+"mm);grid-auto-rows:"+F.h+"mm;margin-left:"+(F.ml||0)+"mm;margin-top:"+(F.mt!==undefined?F.mt:5)+"mm}.etqempty{width:"+F.w+"mm;height:"+F.h+"mm}}";
   return"@page{size:"+F.w+"mm "+F.h+"mm;margin:0}@media print{body>*:not(#impzone){display:none!important}#impzone{position:absolute;left:0;top:0;width:"+F.w+"mm}.etq{break-after:page;page-break-after:always}.etq:last-child{break-after:auto;page-break-after:auto}}"}
 function etqImprimer(items,fkey){
   var key=fkey||etqFormat(),F=ETQFORMATS[key],L=items||etqToutes();

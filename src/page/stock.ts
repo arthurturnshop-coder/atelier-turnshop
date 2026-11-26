@@ -149,7 +149,7 @@ ACTS.stCodesShopify=function(){
 function vCasiers(){
   if(!CASI){api("/casiers").then(function(d){CASI=d.casiers;render()}).catch(function(e){STMSG=e.message;CASI=[];render()});return"<div class='card'>Chargement…</div>"}
   var occ=CASI.filter(function(x){return!x.libre}).length;
-  var h="<div class='card'><div class='step'>Mes casiers</div><div class='muted'>"+occ+" occupé"+(occ>1?"s":"")+" sur "+CASI.length+" · clique une carte pour ouvrir la prise en charge</div><div class='actions'><button class='sec' data-act='casiRef'>Actualiser</button></div></div>";
+  var h="<div class='card'><div class='step'>Mes casiers</div><div class='muted'>"+occ+" occupé"+(occ>1?"s":"")+" sur "+CASI.length+" · clique une carte pour ouvrir la prise en charge</div><div class='actions'><button class='sec' data-act='casiRef'>Actualiser</button><button data-act='casiEtq'>Imprimer les étiquettes des casiers</button></div></div>";
   h+="<div style='display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px'>";
   CASI.forEach(function(x){
     var b="<div class='card' style='margin:0"+(x.libre?";opacity:.55":"")+"'><div style='display:flex;justify-content:space-between;align-items:center'><b style='font-size:20px'>"+esc(x.nom)+"</b>"+(x.libre?"<span class='tag'>Libre</span>":"<span class='tag warn'>Occupé</span>")+"</div>";
@@ -166,6 +166,7 @@ ACTS.casiPiece=async function(b){var id=Number(b.dataset.id)||0,nom=b.dataset.no
   var lib=prompt("Quelle pièce ranger dans "+nom+" ?");if(!lib||!lib.trim())return;
   var q=prompt("Quantité ?","1");if(q===null)return;
   try{var d=await api("/casiers/piece",{repairId:id,boite:nom,libelle:lib,quantite:Number(q)||1});CASI=null;PCR=null;STMSG=d.message;render()}catch(e){alert(e.message)}};
+ACTS.casiEtq=function(){var L=(CASI||[]).map(function(x){return{big:String(x.nom),style:"papier"}});if(!L.length){alert("Aucun casier.");return}ETQSKIP=0;etqImprimer(L,"papier")};
 ACTS.casiRef=function(){CASI=null;render()};
 ACTS.casiOpen=function(b){ouvrirFiche(Number(b.dataset.id))};
 ACTS.avisRec=async function(b){var id=+b.dataset.id;if(!confirm("Tu as vu l'avis Google posté par ce client ? La récompense sera notée comme offerte (une seule fois)."))return;try{await api("/clients/avis-recompense",{id:id});delete AVC[id];render()}catch(e){alert(e.message)}};
