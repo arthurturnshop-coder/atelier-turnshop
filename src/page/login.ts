@@ -13,7 +13,7 @@ export const LOGIN = `function vLogin(){
     else h+="<input id='pw' type='password' placeholder='Mot de passe' autocomplete='current-password'>";
     h+="<button data-act='connect'>Entrer</button><button class='sec' data-act='loginBackProf'>Retour</button>";
   }else if(l.step==="secours"){
-    h+="<div class='step'>Accès de secours · "+esc(l.magasin)+"</div><input id='ps' type='password' placeholder='Mot de passe équipe' autocomplete='current-password'><button data-act='secoursConnect'>Entrer</button><button class='sec' data-act='loginBackProf'>Retour</button>";
+    h+="<div class='step'>Accès de secours · "+esc(l.magasin)+"</div><input id='ps' type='password' placeholder='Mot de passe équipe' autocomplete='current-password'><button data-act='secoursConnect'>Entrer</button><div class='step' style='margin-top:12px'>Ou par email</div><button class='sec' data-act='secoursMail'>Recevoir un code par email</button><input id='sc' inputmode='numeric' maxlength='8' placeholder='Code à 8 chiffres reçu par email' autocomplete='one-time-code'><button data-act='secoursCode'>Entrer avec le code</button><button class='sec' data-act='loginBackProf'>Retour</button>";
   }
   h+="<div class='muted'>"+esc(MSG)+"</div></div>";
   app.innerHTML=h;nav.innerHTML=""}
@@ -46,6 +46,13 @@ async function secoursConnect(){
     var r=await fetch("/api/consignes",{headers:{"x-atelier-password":p}});
     if(!r.ok)throw new Error(r.status===401?"Mot de passe incorrect.":"Erreur, réessayer.");
     TOK="";PW=p;PRENOM="Secours";ROLE="admin";MAG="";LG={step:"mag"};saveSession();setActeur({code:"",prenom:"Secours",role:"admin"});render()
+  }catch(e){MSG=e.message;render()}}
+async function secoursMail(){MSG="Envoi…";render();try{var r=await fetch("/auth/secours-code",{method:"POST"});var d=await r.json().catch(function(){return{}});MSG=r.ok?d.message:(d.error||"Erreur.")}catch(e){MSG="Erreur réseau."}render()}
+async function secoursCode(){
+  var c=document.getElementById("sc").value;MSG="";
+  try{var r=await fetch("/auth/secours-verif",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code:c})});var d=await r.json().catch(function(){return{}});
+    if(!r.ok)throw new Error(d.error||"Code refusé.");
+    TOK=d.token;PW="";PRENOM="Secours";ROLE="admin";MAG="";LG={step:"mag"};saveSession();setActeur({code:"",prenom:"Secours",role:"admin"});render()
   }catch(e){MSG=e.message;render()}}
 async function logout(){
   if(TOK){try{await fetch("/auth/deconnexion",{method:"POST",headers:{"x-atelier-token":TOK}})}catch(e){}}

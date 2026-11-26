@@ -2,7 +2,8 @@ import { app } from "../app";
 import { BLOCAGE_MS, ESSAIS_MAX, MAGASINS, PASSWORD } from "../config";
 import { sql } from "../db";
 import { AppError, clean, magasinsDe, samePassword } from "../util";
-import { createHash } from "node:crypto";
+import { createHash, randomInt } from "node:crypto";
+import { envoiEmail, brevoConfigure } from "../brevo";
 // Même empreinte que caissier.ts (pas d'import : il enregistrerait ses routes avant ce contrôle d'accès).
 const hashCode = (code: string) => createHash("sha256").update("turn-caisse:" + code).digest("hex");
 
@@ -49,6 +50,43 @@ app.post("/auth/connexion", async (c) => {
   return c.json({ token, prenom: u.prenom, role: u.role, magasin });
 });
 
+// Accès de secours par email : un code à 8 chiffres, valable 10 min, envoyé aux gérants (SECOURS_EMAILS dans Railway pour changer les adresses).
+await sql`CREATE TABLE IF NOT EXISTS secours_codes (id SERIAL PRIMARY KEY, hash TEXT NOT NULL, expire TIMESTAMPTZ NOT NULL, essais INT NOT NULL DEFAULT 0, utilise BOOLEAN NOT NULL DEFAULT false, cree_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
+const SECOURS_DEST = () => (Bun.env.SECOURS_EMAILS || "arthurturnshop@gmail.com,antoineturnshop@gmail.com").split(",").map((x) => x.trim()).filter(Boolean);
+const hashSecours = (c: string) => createHash("sha256").update("turn-secours:" + c).digest("hex");
+
+app.post("/auth/secours-code", async (c) => {
+  if (!brevoConfigure()) throw new AppError(503, "L'envoi d'emails n'est pas branché (Brevo) : utilise le mot de passe équipe.");
+  const [r] = (await sql`SELECT count(*)::int AS h, count(*) FILTER (WHERE cree_le > now() - interval '60 seconds')::int AS m FROM secours_codes WHERE cree_le > now() - interval '1 hour'`) as any[];
+  if (r.m > 0) throw new AppError(429, "Un code vient d'être envoyé. Attends 1 minute avant d'en redemander un.");
+  if (r.h >= 5) throw new AppError(429, "Trop de demandes. Réessaie dans une heure.");
+  const code = String(randomInt(0, 100_000_000)).padStart(8, "0");
+  await sql`UPDATE secours_codes SET utilise = true WHERE utilise = false`;
+  await sql`INSERT INTO secours_codes (hash, expire) VALUES (${hashSecours(code)}, now() + interval '10 minutes')`;
+  const quand = new Date().toLocaleString("fr-FR", { timeZone: "Europe/Paris" });
+  const texte = `Code d'accès de secours à l'atelier TURN : ${code}\n\nValable 10 minutes, utilisable une seule fois. Demandé le ${quand}.\n\nSi personne de l'équipe n'a demandé ce code, ignore ce message.`;
+  let ok = 0;
+  for (const a of SECOURS_DEST()) { try { await envoiEmail(a, "Code d'accès de secours : " + code, texte); ok++; } catch { /* on tente les autres adresses */ } }
+  if (!ok) throw new AppError(502, "L'email n'a pas pu partir. Utilise le mot de passe équipe.");
+  return c.json({ message: "Code envoyé aux gérants par email (valable 10 min)." });
+});
+
+app.post("/auth/secours-verif", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const code = String(b.code ?? "").replace(/\D/g, "");
+  const [k] = (await sql`SELECT id, hash, essais FROM secours_codes WHERE utilise = false AND expire > now() ORDER BY id DESC LIMIT 1`) as any[];
+  if (!k) throw new AppError(403, "Aucun code valide : demande-en un nouveau.");
+  if (code.length !== 8 || hashSecours(code) !== k.hash) {
+    const n = k.essais + 1;
+    await sql`UPDATE secours_codes SET essais = ${n}, utilise = ${n >= 5} WHERE id = ${k.id}`;
+    throw new AppError(403, n >= 5 ? "Trop d'erreurs : demande un nouveau code." : "Code incorrect.");
+  }
+  await sql`UPDATE secours_codes SET utilise = true WHERE id = ${k.id}`;
+  const token = `${crypto.randomUUID()}${crypto.randomUUID()}`;
+  await sql`INSERT INTO sessions (token, utilisateur_id, magasin) VALUES (${token}, NULL, NULL)`;
+  return c.json({ token, prenom: "Secours", role: "admin", magasin: "" });
+});
+
 app.post("/auth/deconnexion", async (c) => {
   const tok = c.req.header("x-atelier-token") ?? "";
   if (tok) await sql`DELETE FROM sessions WHERE token = ${tok}`;
@@ -76,6 +114,10 @@ app.use("/api/*", async (c, next) => {
   if (tok) {
     const [s] = await sql`SELECT u.prenom, u.role, s.magasin FROM sessions s JOIN utilisateurs u ON u.id = s.utilisateur_id WHERE s.token = ${tok} AND u.actif = true AND s.cree_le > now() - interval '14 hours'`;
     if (s) base = { prenom: s.prenom, role: s.role, magasin: s.magasin, session: s.prenom };
+  }
+  if (!base && tok) {
+    const [x] = await sql`SELECT 1 AS ok FROM sessions WHERE token = ${tok} AND utilisateur_id IS NULL AND cree_le > now() - interval '14 hours'`;
+    if (x) base = { prenom: "Secours", role: "admin", magasin: null, secours: true, session: "Secours" };
   }
   if (!base && PASSWORD && samePassword(c.req.header("x-atelier-password") ?? "", PASSWORD)) base = { prenom: "Secours", role: "admin", magasin: null, secours: true };
   if (!base) return c.json({ error: "non autorisé" }, 401);
