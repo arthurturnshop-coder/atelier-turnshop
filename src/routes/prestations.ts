@@ -12,6 +12,23 @@ if (n === 0) await sql`INSERT INTO prestations (nom, prix_cents, avec_piece, pie
 
 // Prestations de la page « Tarifs de réparation » du site (création unique ; les prix à fourchette sont au plus bas, à ajuster au devis).
 {
+  const [tub] = (await sql`SELECT 1 FROM reglages WHERE cle = 'seed_tubeless_av_ar'`) as any[];
+  if (!tub) {
+    const [ex] = (await sql`SELECT id, prix_cents FROM prestations WHERE lower(nom) = 'pneu tubeless'`) as any[];
+    const prix = ex?.prix_cents ?? 3000;
+    if (ex) await sql`UPDATE prestations SET nom = 'Pneu tubeless (avant)' WHERE id = ${ex.id}`;
+    const noms: [string, number][] = [["Pneu tubeless (avant)", prix], ["Pneu tubeless (arrière)", prix], ["Pneu tubeless (avant + arrière)", prix * 2]];
+    for (const [nom, pr] of noms) {
+      const [e2] = (await sql`SELECT id FROM prestations WHERE lower(nom) = lower(${nom})`) as any[];
+      let id = e2?.id;
+      if (!id) [{ id }] = (await sql`INSERT INTO prestations (nom, prix_cents, avec_piece, piece_aide) VALUES (${nom}, ${pr}, true, 'le pneu tubeless') RETURNING id`) as any[];
+      if (!nom.includes("+")) {
+        const [o] = (await sql`SELECT 1 FROM prestation_options WHERE prestation_id = ${id} AND nom LIKE 'Faire aussi%'`) as any[];
+        if (!o) await sql`INSERT INTO prestation_options (prestation_id, nom, prix_cents, type) VALUES (${id}, ${nom.includes("avant)") ? "Faire aussi l'arrière (avant + arrière)" : "Faire aussi l'avant (avant + arrière)"}, ${prix}, 'main_oeuvre')`;
+      }
+    }
+    await sql`INSERT INTO reglages (cle, valeur) VALUES ('seed_tubeless_av_ar', '1') ON CONFLICT (cle) DO NOTHING`;
+  }
   const [dgn] = (await sql`SELECT 1 FROM prestations WHERE lower(nom) = 'diagnostic'`) as any[];
   if (!dgn) await sql`INSERT INTO prestations (nom, prix_cents, avec_piece, piece_aide) VALUES ('Diagnostic', 1500, false, '')`;
   const [dejaFait] = (await sql`SELECT 1 FROM reglages WHERE cle = 'seed_prestations_tarifs_site'`) as any[];
