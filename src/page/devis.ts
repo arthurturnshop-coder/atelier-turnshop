@@ -21,7 +21,7 @@ function vDevisEd(){
   d.lignes.forEach(function(l,i){h+="<div class='dl'><input id='dl"+i+"' class='lb' placeholder='Pièce ou main d oeuvre' value='"+esc(l.libelle)+"'><input id='dq"+i+"' class='q' type='number' min='1' value='"+(l.quantite||1)+"'><input id='dp"+i+"' class='p' placeholder='Prix €' value='"+(l.prixCents?(l.prixCents/100).toFixed(2).replace(".",","):"")+"'><button class='link' data-act='dvDelL' data-i='"+i+"'>Suppr.</button></div><div class='dl' style='margin:-4px 0 6px'><input id='ds"+i+"' class='lb' placeholder='🛴 N° de série (si trottinette ; plusieurs : sépare par une virgule)' value='"+esc(l.series||"")+"'></div>"});
   h+="<div class='actions'><button class='sec' data-act='dvAddL'>+ Ligne</button></div><div style='font-size:20px;margin:8px 0'><b>Total TTC : "+eur(dvTotal(d.lignes))+"</b></div>"
     +"<div class='actions'>"+(rat?"":"<button data-act='dvSave'>Enregistrer</button>")+(d.id?"<button class='sec' data-act='dvPrint'>Imprimer</button>":"")
-    +(d.id&&!rat?"<button data-act='dvFact'>Facturer (passer en caisse)</button><button class='sec' data-act='dvRatt'>Créer une prise en charge</button>":"")+(rat?"<button data-act='dvSerieSave'>Enregistrer les n° de série</button>":"")+(d.commandeClient?"<button class='sec' data-act='dvConvPC'>Créer une prise en charge</button>":rat?"<button class='sec' data-act='dvVoirPC'>Ouvrir "+pcn(d.reparationId)+"</button>":"")
+    +(d.id&&!rat?"<button data-act='dvFact'>Facturer (passer en caisse)</button><button class='sec' data-act='dvRatt'>Créer une prise en charge</button>":"")+(rat?"<button data-act='dvSerieSave'>Enregistrer les n° de série</button>":"")+(d.commandeClient?"<button data-act='dvFactCC'>💶 Facturer (encaisser le solde)</button>":"")+(d.commandeClient?"<button class='sec' data-act='dvConvPC'>Créer une prise en charge</button>":rat?"<button class='sec' data-act='dvVoirPC'>Ouvrir "+pcn(d.reparationId)+"</button>":"")
     +(d.id&&!rat?"<button class='danger' data-act='dvSuppr'>Supprimer</button>":"")+"<button class='sec' data-act='dvRetour'>Retour à la liste</button></div></div>";
   app.innerHTML=h}
 function dvLire(){
@@ -133,6 +133,7 @@ ACTS.cEnPec=async function(){
   if(!confirm("Créer une prise en charge (réparation en boutique) avec ce panier ?"))return;
   try{var r=await cartVersDevis();if(!r)return;var p=await api("/devis-simples/rattacher",{id:r.id});cartVide();DV.list=null;await ouvrirFiche(p.reparationId)}catch(e){alert(e.message)}};
 ACTS.dvSerieSave=async function(b){dvLire();btnFlash(b,"Enregistrement…");try{var r=await api("/devis-simples/series",{id:DV.ed.id,series:DV.ed.lignes.map(function(l){return l.series||""})});DV.msg=r.message;DV.list=null;render()}catch(e){render();alert(e.message)}};
+ACTS.dvFactCC=async function(){try{FICHE=await api("/reparation?id="+DV.ed.reparationId);await ACTS.facturer({dataset:{}})}catch(e){alert(e.message)}};
 ACTS.dvConvPC=async function(){try{await api("/devis-simples/commande-client",{repairId:DV.ed.reparationId,valeur:false});var id=DV.ed.reparationId;DV.list=null;DV.ed=null;await ouvrirFiche(id)}catch(e){alert(e.message)}};
 ACTS.dvVoirPC=function(){ouvrirFiche(DV.ed.reparationId)};
 ACTS.dvPrint=async function(b){
