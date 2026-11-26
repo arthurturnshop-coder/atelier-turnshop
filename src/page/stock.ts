@@ -9,6 +9,7 @@ function vStock(){
   if(STSUB==="inv"){app.innerHTML=h+vInv();stFocus(STINV.lieu?"iscan":"ilieu");return}
   if(!STK){app.innerHTML=h+"<div class='card'>Chargement…</div>";api("/stock?magasin="+encodeURIComponent(MAG||"")).then(function(d){STK=d;render()}).catch(function(e){STMSG=e.message;STK={produits:[],lieux:[],nb:0,valeurAchatHtCents:0};render()});return}
   h+="<div class='card'><div class='step'>Ajout rapide</div><div class='muted'>Scanne les produits : chaque scan s'ajoute à la liste ci-dessous (même produit = quantité +1). Modifie ce que tu veux dans la liste, puis clique sur « Ajouter au stock ». Sans code : tape le nom et Entrée (un EAN interne est créé, à étiqueter).</div>"
+    +"<div class='card' style='margin:8px 0;padding:10px;background:#f1f7f2'><b>📍 Emplacement en cours : <span style='font-size:22px'>"+esc(STLIEU||"—")+"</span></b><div class='muted'>Les produits scannés sont rangés ici. Change d'emplacement avec les boutons.</div><div class='actions'><button class='sec' data-act='lieuCase'>Case suivante (A11 → A12)</button><button class='sec' data-act='lieuEtage'>⬆ Étage suivant (A11 → A21)</button><button class='sec' data-act='lieuPanneau'>➡ Panneau suivant (A21 → B11)</button></div></div>"
     +"<div class='dl' style='margin-top:6px'><input id='sk' class='lb' placeholder='EAN-13 (scan) - vide = généré'><input id='sn' class='lb' placeholder='Nom du produit'><input id='sp' class='p' placeholder='Prix vente TTC'><input id='sa' class='p' placeholder='Achat HT'><input id='sq' class='q' type='number' min='1' value='1' title='Quantité'><input id='sm' class='q' type='number' min='0' placeholder='Min' title='Stock minimum : en dessous, une commande est suggérée'><input id='sl' class='q' placeholder='Empl.' value='"+esc(STLIEU)+"' title='Emplacement (A11…)'></div>"
     +""+stbHtml()+"<div class='actions'><button class='sec' data-act='stCodesFourn'>Récupérer les codes-barres fournisseurs (Ewheel)</button><button class='sec' data-act='stCodesShopify'>Créer des codes internes pour le reste</button></div></div>";
   h+="<div class='card'><div class='step'>Associer un code-barres fournisseur à un produit Shopify</div><div class='muted'>1) Scanne le code-barres du carton. 2) Cherche le produit (ex : pneu plein Xiaomi) et clique la bonne variante : le code est écrit dans Shopify.</div>"
@@ -40,6 +41,17 @@ function stbHtml(){
     h+="<tr><td>"+f("nom","lb","100%")+"<div class='muted'>"+(l.code?esc(l.code):"code interne généré")+(l.nouveau?" · nouveau":"")+"</div></td><td>"+f("prix","p","70px")+"</td><td>"+f("achat","p","70px")+"</td><td>"+f("qte","q","60px",1)+"</td><td>"+f("min","q","55px",1)+"</td><td>"+f("empl","q","60px")+"</td><td><button class='link' data-act='stbDel' data-i='"+i+"'>✕</button></td></tr>"});
   return h+"</table></div><div class='actions'><button data-act='stAdd'>Ajouter au stock ("+nb+")</button><button class='sec' data-act='stbVider'>Vider la liste</button></div>"}
 document.addEventListener("input",function(e){var t=e.target;if(!t||!t.classList||!t.classList.contains("stbf"))return;var l=STB[+t.dataset.i];if(l){l[t.dataset.k]=t.value;stbSave()}});
+function lieuDecoupe(l){var m=String(l||"").toUpperCase().replace(/\\s+/g,"").match(/^([A-Z]+)(\\d)(\\d+)$/);return m?{p:m[1],e:+m[2],c:+m[3]}:null}
+function lieuPanneauSuiv(p){var a=p.split(""),i=a.length-1;while(i>=0){if(a[i]==="Z"){a[i]="A";i--}else{a[i]=String.fromCharCode(a[i].charCodeAt(0)+1);return a.join("")}}return"A"+a.join("")}
+function lieuGo(mode){
+  var cur=(v("sl")||STLIEU||"").toUpperCase().replace(/\\s+/g,""),d=lieuDecoupe(cur);
+  if(!d){STMSG="Tape d'abord un emplacement de départ (ex : A11) dans la case Empl.";render();return}
+  var n=mode==="case"?d.p+d.e+(d.c+1):mode==="etage"?d.p+(d.e+1)+"1":lieuPanneauSuiv(d.p)+"11";
+  STLIEU=n;STMSG="Emplacement : "+n;render();stFocus("sk")}
+ACTS.lieuCase=function(){lieuGo("case")};
+ACTS.lieuEtage=function(){lieuGo("etage")};
+ACTS.lieuPanneau=function(){lieuGo("panneau")};
+document.addEventListener("input",function(e){if(e.target&&e.target.id==="sl")STLIEU=e.target.value.toUpperCase().replace(/\\s+/g,"")});
 ACTS.stbDel=function(b){STB.splice(+b.dataset.i,1);stbSave();render()};
 ACTS.stbVider=function(){if(!confirm("Vider la liste ?"))return;STB=[];stbSave();render()};
 ACTS.stLigne=function(){
