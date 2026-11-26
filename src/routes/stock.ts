@@ -469,3 +469,16 @@ async function codesAuto() {
 }
 setInterval(codesAuto, 30 * 60 * 1000);
 setTimeout(codesAuto, 2 * 60 * 1000);
+
+// Panier d'étiquettes enregistré sur le serveur (par magasin) : il reste tant qu'on ne le vide pas, utilisable depuis n'importe quel PC.
+await sql`CREATE TABLE IF NOT EXISTS etiquettes_panier (magasin TEXT PRIMARY KEY, data JSONB NOT NULL DEFAULT '[]', maj_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
+app.get("/api/etiquettes/panier", async (c) => {
+  const [r] = (await sql`SELECT data FROM etiquettes_panier WHERE magasin = ${mag(c)}`) as any[];
+  return c.json({ items: Array.isArray(r?.data) ? r.data : [] });
+});
+app.post("/api/etiquettes/panier", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const items = (Array.isArray(b.items) ? b.items : []).slice(0, 2000);
+  await sql`INSERT INTO etiquettes_panier (magasin, data, maj_le) VALUES (${mag(c, b)}, ${JSON.stringify(items)}::text::jsonb, now()) ON CONFLICT (magasin) DO UPDATE SET data = EXCLUDED.data, maj_le = now()`;
+  return c.json({ ok: true });
+});
