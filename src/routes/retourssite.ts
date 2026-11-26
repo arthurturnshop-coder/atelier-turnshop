@@ -48,6 +48,10 @@ app.post("/api/retours-site", async (c) => {
   if (type !== "fournisseur" && !nom && !email) throw new AppError(400, "Indique au moins le nom ou l'email du client.");
   if (type === "fournisseur" && !clean(b.fournisseur, 120)) throw new AppError(400, "Indique le fournisseur.");
   if (!clean(b.produit, 200)) throw new AppError(400, "Indique le produit ou la pièce concernée.");
+  if (type !== "fournisseur" && !b.forcer && (clean(b.commande, 40) || email)) {
+    const [d] = (await sql`SELECT id FROM retours_site WHERE type <> 'fournisseur' AND statut NOT IN ('rembourse','refuse','clos') AND ((${clean(b.commande, 40)} <> '' AND lower(commande) = lower(${clean(b.commande, 40)}) AND lower(produit) = lower(${clean(b.produit, 200)})) OR (${email} <> '' AND lower(email) = lower(${email}) AND lower(produit) = lower(${clean(b.produit, 200)}))) LIMIT 1`) as any[];
+    if (d) throw new AppError(409, "Un retour en cours existe déjà pour ce client et ce produit (R" + d.id + "). Ouvre-le plutôt que d'en créer un second.");
+  }
   const [r] = await sql`INSERT INTO retours_site (magasin, type, nom, email, telephone, commande, produit, motif, fournisseur, montant_cents, par) VALUES (${u?.magasin ?? ""}, ${type}, ${nom}, ${email}, ${clean(b.telephone, 40)}, ${clean(b.commande, 40)}, ${clean(b.produit, 200)}, ${clean(b.motif, 1000)}, ${clean(b.fournisseur, 120)}, ${Math.max(0, Math.round(Number(b.montantCents) || 0))}, ${u?.prenom ?? ""}) RETURNING id`;
   return c.json({ id: r.id, message: "Retour enregistré." });
 });
@@ -107,6 +111,10 @@ app.post("/pub/retour-formulaire", async (c) => {
   if (ref) {
     const [d] = (await sql`SELECT id FROM retours_site WHERE note LIKE ${"%[ref:" + ref + "]%"} LIMIT 1`) as any[];
     if (d) return c.json({ id: d.id, message: "Déjà reçu." });
+  }
+  if (email) {
+    const [d] = (await sql`SELECT id FROM retours_site WHERE type <> 'fournisseur' AND statut NOT IN ('rembourse','refuse','clos') AND lower(email) = lower(${email}) AND (${commande} = '' OR commande = '' OR lower(commande) = lower(${commande})) AND cree_le > now() - interval '14 days' LIMIT 1`) as any[];
+    if (d) return c.json({ id: d.id, message: "Un retour est déjà en cours pour ce client." });
   }
   const [cl] = email ? ((await sql`SELECT id FROM clients WHERE lower(email) = lower(${email}) LIMIT 1`) as any[]) : [];
   const [r] = await sql`INSERT INTO retours_site (type, nom, email, telephone, commande, produit, motif, client_id, par, note) VALUES ('retour', ${nom}, ${email}, ${clean(b.telephone, 40)}, ${commande}, ${clean(b.produit, 200) || "À préciser (formulaire du site)"}, ${motif}, ${cl?.id ?? null}, 'Formulaire du site', ${ref ? "[ref:" + ref + "]" : ""}) RETURNING id`;
