@@ -120,7 +120,9 @@ app.get("/api/stock", async (c) => {
   const tous = (await sql`SELECT produit_id, code FROM stock_codes WHERE produit_id = ANY(${rows.map((p) => p.id).concat([0])})`) as any[];
   const alias = new Map<number, string[]>();
   for (const x of tous) alias.set(x.produit_id, [...(alias.get(x.produit_id) ?? []), x.code]);
-  const f = rows.filter((p) => !q || `${p.nom} ${p.code} ${p.emplacement} ${(alias.get(p.id) ?? []).join(" ")}`.toLowerCase().includes(q)).slice(0, 300);
+  const qLieu = q.replace(/\s+/g, "").toUpperCase();
+  const estLieu = /^[A-Z]{1,2}\d{0,3}$/.test(qLieu) && rows.some((p) => String(p.emplacement ?? "").toUpperCase().startsWith(qLieu));
+  const f = estLieu ? rows.filter((p) => String(p.emplacement ?? "").toUpperCase().startsWith(qLieu)).slice(0, 300) : rows.filter((p) => !q || `${p.nom} ${p.code} ${p.emplacement} ${(alias.get(p.id) ?? []).join(" ")}`.toLowerCase().includes(q)).slice(0, 300);
   const lieux = [...new Set(rows.map((p) => p.emplacement).filter(Boolean))].sort();
   const valeur = rows.reduce((t, p) => t + (p.achat_ht_cents ?? 0) * p.qte, 0);
   const ac = f.length ? ((await sql`SELECT produit_id, code, fournisseur, denomination FROM stock_codes WHERE produit_id = ANY(${f.map((p) => p.id)}) ORDER BY id`) as any[]) : [];
