@@ -47,7 +47,7 @@ var ACTS={
   ouvrirFiche:function(b){ouvrirFiche(Number(b.dataset.id))},
   fermerFiche:function(){FICHE=null;render()},
   setStatut:async function(b){try{await api("/reparations/maj",{repairId:Number(b.dataset.id),statut:b.dataset.s});await recharger(Number(b.dataset.id))}catch(e){alert(e.message)}},
-  setGarantie:async function(b){try{await api("/reparations/maj",{repairId:Number(b.dataset.id),sousGarantie:b.checked});await recharger(Number(b.dataset.id))}catch(e){alert(e.message)}},
+  setGarantie:async function(b){try{await api("/reparations/maj",{repairId:Number(b.dataset.id),sousGarantie:b.dataset.v?b.dataset.v==="1":b.checked});await recharger(Number(b.dataset.id))}catch(e){alert(e.message)}},
   saveFiche:async function(b){try{await api("/reparations/maj",{repairId:Number(b.dataset.id),panne:v("fp"),commentaireInterne:v("fc")});await recharger(Number(b.dataset.id))}catch(e){alert(e.message)}},
   addNote:async function(b){var n=v("fn");if(!n)return;try{await api("/reparations/maj",{repairId:Number(b.dataset.id),note:n});await recharger(Number(b.dataset.id))}catch(e){alert(e.message)}},
   addLigne:async function(b){try{await api("/devis/ligne",{repairId:Number(b.dataset.id),type:v("lt"),libelle:v("ll"),quantite:v("lq"),prix:v("lp")});await recharger(Number(b.dataset.id))}catch(e){alert(e.message)}},
