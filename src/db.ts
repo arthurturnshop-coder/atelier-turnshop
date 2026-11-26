@@ -63,6 +63,8 @@ export const PROFILS_INITIAUX: [string, string, string][] = [
 for (const [prenom, role, magasins] of PROFILS_INITIAUX) {
   await sql`INSERT INTO utilisateurs (prenom, role, magasins) VALUES (${prenom}, ${role}, ${magasins}) ON CONFLICT (prenom) DO NOTHING`;
 }
+// Arthur et Antoine (gérants) sont toujours administrateurs.
+await sql`UPDATE utilisateurs SET role = 'admin' WHERE prenom IN ('Arthur', 'Antoine') AND role <> 'admin'`;
 // Un profil par magasin pour les admins (Arthur = Amiens, Antoine = Rouen). Ne s'applique qu'à l'ancienne valeur « Amiens,Rouen ».
 await sql`UPDATE utilisateurs SET magasins = 'Amiens' WHERE prenom = 'Arthur' AND magasins = 'Amiens,Rouen'`;
 await sql`UPDATE utilisateurs SET magasins = 'Rouen' WHERE prenom = 'Antoine' AND magasins = 'Amiens,Rouen'`;
