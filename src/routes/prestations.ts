@@ -12,6 +12,8 @@ if (n === 0) await sql`INSERT INTO prestations (nom, prix_cents, avec_piece, pie
 
 // Prestations de la page « Tarifs de réparation » du site (création unique ; les prix à fourchette sont au plus bas, à ajuster au devis).
 {
+  const [dgn] = (await sql`SELECT 1 FROM prestations WHERE lower(nom) = 'diagnostic'`) as any[];
+  if (!dgn) await sql`INSERT INTO prestations (nom, prix_cents, avec_piece, piece_aide) VALUES ('Diagnostic', 1500, false, '')`;
   const [dejaFait] = (await sql`SELECT 1 FROM reglages WHERE cle = 'seed_prestations_tarifs_site'`) as any[];
   if (!dejaFait) {
     const L: [string, number, string][] = [

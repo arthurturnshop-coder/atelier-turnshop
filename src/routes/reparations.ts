@@ -242,6 +242,18 @@ app.post("/api/devis/ligne/quantite", async (c) => {
   return c.json({ devis: await devisDe(l.reparation_id) });
 });
 
+app.post("/api/devis/ligne/prix", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const id = Number(b.id);
+  const [l] = await sql`SELECT reparation_id FROM devis_lignes WHERE id = ${id}`;
+  if (!l) throw new AppError(404, "Ligne introuvable.");
+  const p = Math.round(Number(String(b.prix ?? "").replace(/[^0-9,.-]/g, "").replace(",", ".")) * 100);
+  if (!(p >= 0 && p <= 10000000)) throw new AppError(400, "Prix invalide.");
+  await sql`UPDATE devis_lignes SET prix_unitaire_cents = ${p} WHERE id = ${id}`;
+  await sql`UPDATE reparations SET maj_le = now() WHERE id = ${l.reparation_id}`;
+  return c.json({ devis: await devisDe(l.reparation_id) });
+});
+
 app.post("/api/devis/ligne/supprimer", async (c) => {
   const b = await c.req.json().catch(() => ({}));
   const id = Number(b.id);
