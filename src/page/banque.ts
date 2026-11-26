@@ -77,14 +77,24 @@ document.addEventListener("change",function(e){
   var fr=new FileReader();BQ.msg="Import en cours…";render();
   fr.onload=function(){api("/banque/import",{texte:String(fr.result)}).then(function(d){BQ.msg=d.message;BQ.syn=null;BQ.pil=null;BQ.ops=null;render()}).catch(function(er){BQ.msg=er.message;render()})};
   fr.readAsText(t.files[0],"utf-8")});
-var SY={d:null,mois:"",msg:"",busy:false};
+var SY={d:null,mois:"",msg:"",busy:false},EXO={d:null,debut:0,busy:false};
+function exoCharge(){if(EXO.busy)return;EXO.busy=true;api("/compta/exercice"+(EXO.debut?"?debut="+EXO.debut:"")).then(function(d){EXO.d=d;EXO.debut=d.debut;EXO.busy=false;if(TAB==="compta")render()}).catch(function(e){EXO.d={debut:EXO.debut,libelle:"",lignes:[],total:{amiens:0,rouen:0,commun:0,ttc:0,ht:0}};EXO.busy=false;if(TAB==="compta")render()})}
+function exoHtml(){
+  if(!EXO.d){exoCharge();return"<div class='card muted'>Chargement de l'exercice…</div>"}
+  var e=EXO.d,cum=0;
+  var h="<div class='card'><div class='step'>CA de l'exercice : "+esc(e.libelle)+"</div><div class='actions'><button class='sec' data-act='exoNav' data-d='-1'>&larr; Exercice précédent</button><button class='sec' data-act='exoNav' data-d='1'>Exercice suivant &rarr;</button></div>"
+   +"<table class='tb' style='margin-top:8px'><tr><th>Mois</th><th class='n'>Amiens</th><th class='n'>Rouen</th><th class='n'>En ligne</th><th class='n'>CA TTC</th><th class='n'>CA HT</th><th class='n'>Cumul HT</th></tr>";
+  e.lignes.forEach(function(l){if(l.vide){h+="<tr><td>"+esc(bqMoisLib(l.mois))+"</td><td colspan='6' class='muted'>—</td></tr>";return}cum+=l.ht.total;h+="<tr><td>"+esc(bqMoisLib(l.mois))+"</td>"+syN(l.ttc.amiens)+syN(l.ttc.rouen)+syN(l.ttc.commun)+syN(l.ttc.amiens+l.ttc.rouen+l.ttc.commun,"font-weight:700")+syN(l.ht.total)+syN(cum)+"</tr>"});
+  h+="<tr style='font-weight:700'><td>Total exercice</td>"+syN(e.total.amiens)+syN(e.total.rouen)+syN(e.total.commun)+syN(e.total.ttc)+syN(e.total.ht)+"<td></td></tr></table><div class='muted'>Chaque mois : ventes du logiciel s'il y en a, sinon encaissements de la banque (comme la synthèse mensuelle).</div></div>";
+  return h}
+ACTS.exoNav=function(b){EXO.debut=(EXO.debut||new Date().getFullYear())+Number(b.dataset.d);EXO.d=null;render()};
 function syCharge(){if(SY.busy)return;SY.busy=true;api("/compta/synthese"+(SY.mois?"?mois="+SY.mois:"")).then(function(d){SY.d=d;SY.mois=d.mois;SY.busy=false;if(TAB==="compta")render()}).catch(function(e){SY.msg=e.message;SY.d={liste:[],mois:""};SY.busy=false;if(TAB==="compta")render()})}
 function syN(v,cls){return"<td class='n'"+(cls?" style='"+cls+"'":"")+">"+eur(v)+"</td>"}
 function syEcart(e){var a=Math.abs(e);var col=a<100?"#1c7a3f":a<5000?"#b9770e":"#c0392b";return"<td class='n' style='color:"+col+";font-weight:700'>"+(e>0?"+":"")+eur(e)+"</td>"}
 function vSynthese(){
   if(!SY.d){syCharge();return"<div class='card muted'>Chargement…</div>"}
   var d=SY.d;if(!d.mois)return"<div class='card muted'>"+esc(SY.msg||"Aucune donnée pour l'instant : importe un relevé ou fais des ventes.")+"</div>";
-  var h="<div class='card'><div class='step'>Mois</div><div class='actions' style='flex-wrap:wrap'>"+d.liste.slice(0,12).map(function(m){return"<button class='"+(m===d.mois?"":"sec")+"' data-act='syMois' data-m='"+m+"'>"+esc(bqMoisLib(m))+"</button>"}).join("")+"</div>"
+  var h=exoHtml()+"<div class='card'><div class='step'>Mois</div><div class='actions' style='flex-wrap:wrap'>"+d.liste.slice(0,12).map(function(m){return"<button class='"+(m===d.mois?"":"sec")+"' data-act='syMois' data-m='"+m+"'>"+esc(bqMoisLib(m))+"</button>"}).join("")+"</div>"
     +"<div class='muted' style='margin-top:6px'>CA retenu pour la marge : "+(d.source==="logiciel"?"<b>ventes du logiciel</b> ("+d.nbVentes+" ventes ce mois-ci)":"<b>encaissements de la banque</b> (aucune vente dans le logiciel ce mois-ci)")+"."+(d.releve?"":" ⚠ Relevé bancaire de ce mois pas importé : achats, charges et rapprochement sont à 0.")+"</div></div>";
   var L=d.caLogiciel,tot=function(k){return L.amiens[k]+L.rouen[k]+L.commun[k]};
   var AC=d.acomptes||{amiens:{ttc:0,nb:0},rouen:{ttc:0,nb:0},commun:{ttc:0,nb:0}},acT=AC.amiens.ttc+AC.rouen.ttc+AC.commun.ttc,acN=AC.amiens.nb+AC.rouen.nb+AC.commun.nb;

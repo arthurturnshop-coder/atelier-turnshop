@@ -109,6 +109,7 @@ app.get("/api/compta/synthese", async (c) => {
     acomptes: Object.fromEntries(ENT.map((e) => [e.toLowerCase(), { ttc: acs.filter((r) => entDe(r.mg) === e).reduce((a, r) => a + r.ttc, 0), nb: acs.filter((r) => entDe(r.mg) === e).reduce((a, r) => a + r.nb, 0) }])),
     caLogiciel: { amiens: { ttc: logTtc.Amiens, remb: logRemb.Amiens, nb: logNb.Amiens }, rouen: { ttc: logTtc.Rouen, remb: logRemb.Rouen, nb: logNb.Rouen }, commun: { ttc: logTtc.Commun, remb: logRemb.Commun, nb: logNb.Commun } },
     caBanque: { amiens: bCa.Amiens, rouen: bCa.Rouen, commun: bCa.Commun, retraitsEspeces: retraits },
+    caTtc: { amiens: caTtc.Amiens, rouen: caTtc.Rouen, commun: caTtc.Commun },
     rapprochement, tva,
     poles: poles.map((p) => ({ cle: p.cle, nom: p.nom, amiens: p.v.Amiens, rouen: p.v.Rouen, commun: p.v.Commun, total: somme(p.v) })),
     marges: { caHt: { amiens: caHt.Amiens, rouen: caHt.Rouen, commun: caHt.Commun, total: somme(caHt) }, margeBrute: { amiens: margeBrute.Amiens, rouen: margeBrute.Rouen, commun: margeBrute.Commun, total: somme(margeBrute), pct: pct(somme(margeBrute), somme(caHt)) }, charges: { amiens: charges.Amiens, rouen: charges.Rouen, commun: charges.Commun, total: somme(charges) }, net: { amiens: net.Amiens, rouen: net.Rouen, commun: net.Commun, total: somme(net), pct: pct(somme(net), somme(caHt)) } },
@@ -126,4 +127,24 @@ app.post("/api/compta/tva-deductible", async (c) => {
   if (!Number.isFinite(n) || n < 0) throw new AppError(400, "Montant invalide.");
   await sql`INSERT INTO tva_deductible_mois (mois, montant_cents) VALUES (${mois}, ${Math.round(n * 100)}) ON CONFLICT (mois) DO UPDATE SET montant_cents = EXCLUDED.montant_cents`;
   return c.json({ message: "TVA déductible du mois enregistrée." });
+});
+
+// ---------- CA de l'exercice : du 1er octobre au 30 septembre ----------
+app.get("/api/compta/exercice", async (c) => {
+  exigeAdmin(c);
+  const now = new Date();
+  const defaut = now.getUTCMonth() + 1 >= 10 ? now.getUTCFullYear() : now.getUTCFullYear() - 1;
+  const debut = Number(c.req.query("debut")) || defaut;
+  const mois: string[] = [];
+  for (let i = 0; i < 12; i++) { const m = ((9 + i) % 12) + 1; const a = debut + (9 + i >= 12 ? 1 : 0); mois.push(`${a}-${String(m).padStart(2, "0")}`); }
+  const lignes: any[] = [];
+  for (const m of mois) {
+    const r = await app.request(`/api/compta/synthese?mois=${m}`, { headers: c.req.raw.headers });
+    const d: any = await r.json().catch(() => ({}));
+    if (!d.marges) { lignes.push({ mois: m, vide: true }); continue; }
+    lignes.push({ mois: m, source: d.source, releve: d.releve, nbVentes: d.nbVentes, ttc: d.caTtc, ht: d.marges.caHt, marge: d.marges.margeBrute.total, net: d.marges.net?.total ?? null });
+  }
+  const tot = (k: "amiens" | "rouen" | "commun") => lignes.reduce((a, l) => a + (l.vide ? 0 : l.ttc[k]), 0);
+  const totHt = lignes.reduce((a, l) => a + (l.vide ? 0 : l.ht.total), 0);
+  return c.json({ debut, libelle: `1er oct. ${debut} → 30 sept. ${debut + 1}`, lignes, total: { amiens: tot("amiens"), rouen: tot("rouen"), commun: tot("commun"), ttc: tot("amiens") + tot("rouen") + tot("commun"), ht: totHt } });
 });
