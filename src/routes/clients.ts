@@ -261,10 +261,12 @@ app.post("/api/trottinettes/code", async (c) => {
 
 app.post("/api/trottinettes", async (c) => {
   const b = await c.req.json().catch(() => ({}));
-  const marque = clean(b.marque, 60), modele = clean(b.modele, 60), serie = clean(b.serie, 60);
-  if (!marque || !modele || !serie) throw new AppError(400, "Marque, modèle et numéro de série sont obligatoires.");
+  const marque = clean(b.marque, 60), modele = clean(b.modele, 60);
+  let serie = clean(b.serie, 60);
+  if (!marque || !modele) throw new AppError(400, "Marque et modèle sont obligatoires (le numéro de série est facultatif).");
   const clientId = Number(b.customerId);
   await fiche(clientId);
+  if (!serie) { const [n] = (await sql`SELECT count(*)::int AS n FROM trottinettes WHERE client_id = ${clientId} AND serie LIKE 'Sans n°%'`) as any[]; serie = `Sans n° de série #${(n?.n ?? 0) + 1}`; }
   let tid: any;
   try {
     [tid] = (await sql`INSERT INTO trottinettes (client_id, marque, modele, serie) VALUES (${clientId}, ${marque}, ${modele}, ${serie}) RETURNING id`) as any[];
