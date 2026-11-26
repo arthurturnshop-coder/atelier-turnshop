@@ -219,5 +219,6 @@ var ACTS={
   saveParam:async function(){try{var d=await api("/parametres",{eurosPourPalier:v("pe1"),remiseEuros:v("pr1")});PARAM=null;alert(d.message);render()}catch(e){var m=document.getElementById("parmsg");if(m)m.textContent=e.message}}
 };
 document.addEventListener("change",function(e){var t=e.target;if(t&&t.dataset&&t.dataset.act==="avType")ACTS.avType()});
+document.addEventListener("change",function(e){var t=e.target;if(t&&t.dataset&&t.dataset.act==="setGarantie")ACTS.setGarantie(t)});
 document.addEventListener("input",function(e){var t=e.target;if(!t||!t.dataset)return;if(t.dataset.act==="cQte"){PAN[+t.dataset.i].quantite=Math.max(1,Number(t.value)||1)}if(t.dataset.act==="cPrix"){PAN[+t.dataset.i].prix=t.value}if(t.dataset.act==="cSerie"){var sl=PAN[+t.dataset.i];sl.series=sl.series||[];sl.series[+t.dataset.k]=t.value}});
 `;
