@@ -278,3 +278,20 @@ app.get("/api/boites", async (c) => {
   const noms = [...BOITES, ...rows.map((r) => r.boite).filter((b) => !BOITES.includes(b))];
   return c.json({ boites: noms.map((nom) => { const r = rows.find((x) => x.boite === nom); return { nom, repairId: r?.id ?? null, client: r ? `${r.prenom} ${r.nom}`.trim() : "" }; }) });
 });
+
+// Pièce rangée à la main dans un casier (sans commande fournisseur) : toujours rattachée à une prise en charge, donc à un client.
+app.post("/api/casiers/piece", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const repId = Number(b.repairId);
+  const boite = clean(b.boite, 10);
+  const libelle = clean(b.libelle, 160);
+  const qte = Math.max(1, Math.min(99, Math.round(Number(b.quantite) || 1)));
+  if (!libelle) throw new AppError(400, "Indique le nom de la pièce.");
+  if (!boite) throw new AppError(400, "Casier manquant.");
+  const [r] = (await sql`SELECT id FROM reparations WHERE id = ${repId} AND supprime_le IS NULL AND statut <> 'récupéré'`) as any[];
+  if (!r) throw new AppError(404, "Prise en charge introuvable (ou déjà récupérée) : une pièce doit être rattachée à un client.");
+  let [f] = (await sql`SELECT id FROM fournisseurs WHERE nom = 'Ajout manuel (sans commande)' LIMIT 1`) as any[];
+  if (!f) [f] = (await sql`INSERT INTO fournisseurs (nom, actif) VALUES ('Ajout manuel (sans commande)', false) RETURNING id`) as any[];
+  await sql`INSERT INTO commande_lignes (fournisseur_id, libelle, quantite, reparation_id, statut, commandee_le, recue_le, boite) VALUES (${f.id}, ${libelle}, ${qte}, ${repId}, 'recue', now(), now(), ${boite})`;
+  return c.json({ message: `Pièce rangée dans ${boite} pour PC-${String(repId).padStart(4, "0")}.` });
+});

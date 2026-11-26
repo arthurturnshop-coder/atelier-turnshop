@@ -158,8 +158,14 @@ function vCasiers(){
       if(x.materiel)b+="<div class='muted'>Matériel rangé"+(x.statut?" · "+esc(x.statut):"")+(x.magasin?" · "+esc(x.magasin):"")+"</div>"+(x.panne?"<div class='muted'>"+esc(x.panne).slice(0,90)+"</div>":"");
       if(x.pieces.length)b+="<div style='margin-top:6px'><div class='muted'>Pièces rattachées :</div>"+x.pieces.map(function(p){return"<div>• "+esc(p.libelle)+(p.quantite>1?" x"+p.quantite:"")+"</div>"}).join("")+"</div>";
     }
+    b+="<div style='margin-top:8px'><button class='sec' data-act='casiPiece' data-nom='"+esc(x.nom)+"' data-id='"+(x.repairId||"")+"'>+ Pièce</button></div>";
     h+=b+"</div>"});
   return h+"</div>"}
+ACTS.casiPiece=async function(b){var id=Number(b.dataset.id)||0,nom=b.dataset.nom;
+  if(!id){var n=prompt("Casier "+nom+" libre. Numéro de la prise en charge du client (ex : 123 ou PC-0123) ?");if(!n)return;id=Number(String(n).replace(/\\D/g,""));if(!id){alert("Numéro invalide.");return}}
+  var lib=prompt("Quelle pièce ranger dans "+nom+" ?");if(!lib||!lib.trim())return;
+  var q=prompt("Quantité ?","1");if(q===null)return;
+  try{var d=await api("/casiers/piece",{repairId:id,boite:nom,libelle:lib,quantite:Number(q)||1});CASI=null;PCR=null;STMSG=d.message;render()}catch(e){alert(e.message)}};
 ACTS.casiRef=function(){CASI=null;render()};
 ACTS.casiOpen=function(b){ouvrirFiche(Number(b.dataset.id))};
 ACTS.avisRec=async function(b){var id=+b.dataset.id;if(!confirm("Tu as vu l'avis Google posté par ce client ? La récompense sera notée comme offerte (une seule fois)."))return;try{await api("/clients/avis-recompense",{id:id});delete AVC[id];render()}catch(e){alert(e.message)}};
