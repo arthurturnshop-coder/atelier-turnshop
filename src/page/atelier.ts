@@ -97,7 +97,7 @@ function prestaBox(f){
   return h}
 function vFiche(){
   var f=FICHE;
-  var h=subHtml()+"<button class='sec' data-act='fermerFiche' style='position:fixed;left:8px;bottom:70px;z-index:50;width:auto;max-width:150px;padding:12px 14px;font-weight:700;box-shadow:0 3px 10px rgba(0,0,0,.35);background:#fff'>← Retour à la liste</button>"
+  var h=subHtml()+"<button class='sec' data-act='fermerFiche' style='position:sticky;top:6px;z-index:50;width:auto;max-width:260px;white-space:nowrap;padding:10px 14px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.25);background:#fff'>← Retour à la liste</button>"
     +"<div class='card fiche'><div class='head'><div><div class='big'>"+pcn(f.id)+" · "+esc(f.client)+"</div><div>"+esc(f.trottinette)+"</div></div>"
     +"<div class='actions' style='margin:0'><button data-act='fichePlanif' data-id='"+f.id+"'>📅 Planifier</button><button class='sec' data-act='pecPrint' data-id='"+f.id+"'>Ticket de prise en charge</button>"+pecNbSelect(f.id)+"<button class='sec' data-act='docPrint' data-mode='devis' data-id='"+f.id+"'>Ticket devis</button><button class='sec' data-act='docPrint' data-mode='facture' data-id='"+f.id+"'>Ticket facture</button><button class='sec' data-act='pOpenCli' data-cid='"+f.customerId+"'>Voir le profil du client</button>"
     +(estResp()?"<button class='danger' data-act='supprFiche' data-id='"+f.id+"'>Supprimer</button>":"")+"</div></div>"
