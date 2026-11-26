@@ -46,7 +46,7 @@ document.addEventListener("input",function(e){if(e.target&&/^p[cevb]$/.test(e.ta
 function lirePay(){CPAY={carte:v("pc"),especes:v("pe"),virement:v("pv"),bon_achat:v("pb")}}
 function dateLongue(d){try{return new Date(d).toLocaleString("fr-FR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit",timeZone:"Europe/Paris"})}catch(e){return d||""}}
 function serieHtml(l,i){
-  if(l.trott){var q=Math.max(1,l.quantite|0),h="<div style='margin-top:6px'><b>🛴 N° de série (obligatoire)</b>";
+  if(l.trott){var q=Math.max(1,l.quantite|0),h="<div style='margin-top:6px'><b>🛴 N° de série (facultatif)</b>";
     for(var k=0;k<q;k++)h+="<input data-act='cSerie' data-i='"+i+"' data-k='"+k+"' value='"+esc((l.series||[])[k]||"")+"' placeholder='N° de série"+(q>1?" "+(k+1):"")+"' style='display:block;margin-top:4px;width:100%;max-width:260px'>";
     return h+"</div>"}
   return""}
