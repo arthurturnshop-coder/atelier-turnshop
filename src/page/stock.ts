@@ -43,6 +43,7 @@ function stbHtml(){
 document.addEventListener("input",function(e){var t=e.target;if(!t||!t.classList||!t.classList.contains("stbf"))return;var l=STB[+t.dataset.i];if(l){l[t.dataset.k]=t.value;stbSave()}});
 function lieuDecoupe(l){var m=String(l||"").toUpperCase().replace(/\\s+/g,"").match(/^([A-Z]+)(\\d)(\\d+)$/);return m?{p:m[1],e:+m[2],c:+m[3]}:null}
 function lieuPanneauSuiv(p){var a=p.split(""),i=a.length-1;while(i>=0){if(a[i]==="Z"){a[i]="A";i--}else{a[i]=String.fromCharCode(a[i].charCodeAt(0)+1);return a.join("")}}return"A"+a.join("")}
+function lieuLibre(){var cur=String(STLIEU||"").toUpperCase().replace(/\\s+/g,"");if(!cur)return"";if(STB.some(function(l){return String(l.empl||"").toUpperCase()===cur})){var d=lieuDecoupe(cur);if(d){cur=d.p+d.e+(d.c+1);STLIEU=cur}}return cur}
 function lieuGo(mode){
   var cur=(v("sl")||STLIEU||"").toUpperCase().replace(/\\s+/g,""),d=lieuDecoupe(cur);
   if(!d){STMSG="Tape d'abord un emplacement de départ (ex : A11) dans la case Empl.";render();return}
@@ -58,7 +59,7 @@ ACTS.stLigne=function(){
   var nom=v("sn"),code=v("sk");
   if(!nom&&!code)return;
   if(code&&!nom){ACTS.stCode();return}
-  stbPush({code:code,nom:nom,prix:v("sp"),achat:v("sa"),qte:v("sq")||1,min:v("sm"),empl:v("sl")||STLIEU});
+  stbPush({code:code,nom:nom,prix:v("sp"),achat:v("sa"),qte:v("sq")||1,min:v("sm"),empl:lieuLibre()});
   STLIEU=v("sl")||STLIEU;render();stFocus("sk")};
 ACTS.stAdd=async function(){
   if(v("sn"))ACTS.stLigne();
@@ -74,11 +75,10 @@ ACTS.stCode=function(){
   var c=v("sk");if(!c)return;
   var ex=STB.filter(function(l){return l.code===c})[0];
   if(ex){ex.qte=(Number(ex.qte)||0)+1;stbSave();bipOk();render();stFocus("sk");return}
-  var lieu=v("sl")||STLIEU;
   api("/stock/scan",{magasin:MAG||"",code:c}).then(function(d){var p=d.produit,sh=d.shopify;
-    if(p){bipOk();stbPush({code:p.code,nom:p.nom,prix:p.prixCents?(p.prixCents/100).toFixed(2):"",achat:p.achatHtCents==null?"":(p.achatHtCents/100).toFixed(2),qte:1,min:p.min||"",empl:p.emplacement||lieu})}
-    else if(sh){bipOk();stbPush({code:c,nom:sh.nom,prix:sh.prixCents?(sh.prixCents/100).toFixed(2):"",achat:sh.achatHtCents==null?"":(sh.achatHtCents/100).toFixed(2),qte:1,min:"",empl:lieu})}
-    else{bipKo();stbPush({code:c,nom:"",prix:"",achat:"",qte:1,min:"",empl:lieu,nouveau:1});STMSG="Code inconnu : tape son nom dans la ligne."}
+    if(p){bipOk();stbPush({code:p.code,nom:p.nom,prix:p.prixCents?(p.prixCents/100).toFixed(2):"",achat:p.achatHtCents==null?"":(p.achatHtCents/100).toFixed(2),qte:1,min:p.min||"",empl:p.emplacement||lieuLibre()})}
+    else if(sh){bipOk();stbPush({code:c,nom:sh.nom,prix:sh.prixCents?(sh.prixCents/100).toFixed(2):"",achat:sh.achatHtCents==null?"":(sh.achatHtCents/100).toFixed(2),qte:1,min:"",empl:lieuLibre()})}
+    else{bipKo();stbPush({code:c,nom:"",prix:"",achat:"",qte:1,min:"",empl:lieuLibre(),nouveau:1});STMSG="Code inconnu : tape son nom dans la ligne."}
     render();stFocus("sk")}).catch(function(){})};
 ACTS.stSearch=function(){STQ=v("stq");api("/stock?magasin="+encodeURIComponent(MAG||"")+"&q="+encodeURIComponent(STQ)).then(function(d){STK=d;var p=STQ;render();var e=document.getElementById("stq");if(e){e.focus();e.setSelectionRange(p.length,p.length)}}).catch(function(){})};
 ACTS.stDelta=function(b){stRun(api("/stock/maj",{id:+b.dataset.id,delta:+b.dataset.d}),"")};
