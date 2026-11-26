@@ -63,7 +63,8 @@ function renderWho(){
 var VIEWF=0,VIEWC=0;
 function viewSave(){
   if(!TOK&&!PW)return;
-  var js=JSON.stringify({t:TAB,a:ATSUB,v:VUE,f:(FICHE&&FICHE.id)||0,c:(CUR&&CUR.id)||0,k:{p:PAN,c:CCLI,u:CUSE,r:CREP,y:CPAY,o:CAVOFF}});
+  var xs={};try{if(typeof STSUB!=="undefined")xs.st=STSUB;if(typeof COMPSUB!=="undefined")xs.cp=COMPSUB;if(typeof ETQTAB!=="undefined")xs.eq=ETQTAB;if(typeof PTAB!=="undefined")xs.pt=PTAB;if(typeof PSEC!=="undefined")xs.ps=PSEC;if(typeof TTAB!=="undefined")xs.tt=TTAB;if(typeof SVF!=="undefined"&&SVF)xs.sv=SVF.id}catch(e){}
+  var js=JSON.stringify({x:xs,t:TAB,a:ATSUB,v:VUE,f:(FICHE&&FICHE.id)||0,c:(CUR&&CUR.id)||0,k:{p:PAN,c:CCLI,u:CUSE,r:CREP,y:CPAY,o:CAVOFF}});
   try{sessionStorage.setItem("atelierView",js)}catch(e){}
   try{localStorage.setItem("atelierViewL",js)}catch(e){}
   try{history.replaceState(null,"","#"+TAB+(TAB==="enc"?"/"+ATSUB:""))}catch(e){}}
@@ -78,9 +79,12 @@ function viewRestore(){
   if(ok)TAB=s.t;
   if(["liste","planning","creer","devis"].indexOf(s.a)>=0)ATSUB=s.a;
   if(s.v)VUE=s.v;
+  if(s.x){try{var x=s.x;if(x.st&&typeof STSUB!=="undefined")STSUB=x.st;if(x.cp&&typeof COMPSUB!=="undefined")COMPSUB=x.cp;if(x.eq&&typeof ETQTAB!=="undefined")ETQTAB=x.eq;if(x.pt&&typeof PTAB!=="undefined")PTAB=x.pt;if(typeof PSEC!=="undefined"&&x.ps!==undefined)PSEC=x.ps;if(x.tt&&typeof TTAB!=="undefined")TTAB=x.tt;if(x.sv)VIEWS=x.sv}catch(e){}}
   VIEWF=s.f||0;VIEWC=s.c||0;
   if(s.k){try{if(Array.isArray(s.k.p))PAN=s.k.p;if(s.k.c){CCLI=s.k.c;CUSE=!!s.k.u;api("/caisse/client?id="+s.k.c.id).then(function(d){CFID=d.fidelite;render()}).catch(function(){})}if(s.k.y)CPAY=s.k.y;if(Array.isArray(s.k.o))CAVOFF=s.k.o}catch(e){}}}
+var VIEWS=0;
 function viewRestoreOpen(){
+  if(VIEWS){var sv=VIEWS;VIEWS=0;SVF={id:sv,d:null,msg:""};FICHE=null;render();svLoad(sv);return}
   if(VIEWF){var f=VIEWF;VIEWF=0;VIEWC=0;ouvrirFiche(f);return}
   if(VIEWC){var c=VIEWC;VIEWC=0;rechOpen(c)}}
 var CMDP="";
@@ -117,4 +121,8 @@ function bipOk(){bip(1800,0.09,1)}
 function bipKo(){bip(300,0.22,2)}
 function toastKo(t){try{var d=document.createElement("div");d.textContent=t;d.style.cssText="position:fixed;top:14px;left:50%;transform:translateX(-50%);background:#c0392b;color:#fff;padding:10px 18px;border-radius:8px;font-weight:600;z-index:99999;box-shadow:0 4px 14px rgba(0,0,0,.3)";document.body.appendChild(d);setTimeout(function(){d.remove()},3500)}catch(e){}}
 function toastOk(t){try{var d=document.createElement("div");d.textContent="✓ "+t;d.style.cssText="position:fixed;top:14px;left:50%;transform:translate(-50%,-30px);opacity:0;transition:all .25s ease;background:#1e8449;color:#fff;padding:10px 18px;border-radius:8px;font-weight:600;z-index:99999;box-shadow:0 4px 14px rgba(0,0,0,.3)";document.body.appendChild(d);setTimeout(function(){d.style.opacity="1";d.style.transform="translate(-50%,0)"},20);setTimeout(function(){d.style.opacity="0";d.style.transform="translate(-50%,-30px)"},1800);setTimeout(function(){d.remove()},2200)}catch(e){}}
+document.addEventListener("click",function(){setTimeout(viewSave,500)});
+document.addEventListener("change",function(){setTimeout(viewSave,300)});
+window.addEventListener("beforeunload",function(){viewSave();try{var d=document.querySelector(".dright");sessionStorage.setItem("atelierScroll",JSON.stringify([window.scrollY,d?d.scrollTop:0,TAB]))}catch(e){}});
+setTimeout(function(){try{var sc=JSON.parse(sessionStorage.getItem("atelierScroll")||"null");if(sc&&sc[2]===TAB){window.scrollTo(0,sc[0]);var d=document.querySelector(".dright");if(d)d.scrollTop=sc[1]}}catch(e){}},900);
 `;
