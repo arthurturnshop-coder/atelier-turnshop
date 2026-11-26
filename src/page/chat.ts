@@ -1,6 +1,6 @@
 export const CHAT = `// ---------- Chat interne (équipe + messages privés) ----------
 var CH={conv:"equipe",msgs:null,eq:null,par:{},total:0,busy:false,err:""};
-function chatBadge(){var e=document.getElementById("chatb");if(!e)return;e.textContent=CH.total>0?String(CH.total):"";e.style.display=CH.total>0?"inline-block":"none"}
+function chatBadge(){var n=CH.total>0?CH.total:0;try{var t=document.title.replace(/^\\(\\d+\\) /,"");document.title=n?"("+n+") "+t:t}catch(x){}var e=document.getElementById("chatb");if(!e)return;e.textContent=n?String(n):"";e.style.display=n?"inline-block":"none";e.style.fontSize="14px";e.style.padding="2px 8px";e.style.top="-10px";e.style.right="-12px";e.style.minWidth="12px";e.style.textAlign="center";e.style.boxShadow="0 0 0 2px #fff"}
 function chatNonLus(){if(!TOK&&!PW)return Promise.resolve();return api("/chat/non-lus").then(function(d){CH.par=d.par||{};CH.total=d.total||0;chatBadge();if(TAB==="chat")chatChips()}).catch(function(){})}
 function chatHeure(t){try{var d=new Date(t),a=new Date();var h=d.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit",timeZone:"Europe/Paris"});return d.toDateString()===a.toDateString()?h:d.toLocaleDateString("fr-FR",{day:"2-digit",month:"2-digit",timeZone:"Europe/Paris"})+" "+h}catch(e){return""}}
 function chatChips(){
