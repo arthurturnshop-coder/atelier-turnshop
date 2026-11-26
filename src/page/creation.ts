@@ -25,7 +25,7 @@ function vCreer(){
   h+="<div class='cre-sec'><div class='cre-h'><span class='cre-n'>2</span>Trottinette</div>"+(m==="devis"?"<div class='cre-chips'><label><input id='cr-sv' type='checkbox'> Pas de trottinette (achat de pièces ou d accessoires)</label></div>":"");
   var ts=(CRE.cli&&CRE.cli.trottinettes)||[];
   if(ts.length)h+="<select id='ct-sel'>"+ts.map(function(t){return"<option value='"+t.id+"'>"+esc(t.marque+" "+t.modele)+(t.serie?" · "+esc(t.serie):"")+"</option>"}).join("")+"<option value='new'>Autre trottinette…</option></select>";
-  h+="<div id='ct-new'"+(ts.length?" style='display:none'":"")+"><div class='cre-2'><input id='ct-m' placeholder='Marque'><input id='ct-mo' placeholder='Modèle'></div><input id='ct-s' placeholder='N° de série (vide = inconnu)' style='margin-top:10px'></div>";
+  h+="<div id='ct-new'"+(ts.length?" style='display:none'":"")+"><div class='cre-2'><input id='ct-m' placeholder='Marque' list='dl-marques' autocomplete='off'>"+marqDL()+"<input id='ct-mo' placeholder='Modèle'></div><input id='ct-s' placeholder='N° de série (vide = inconnu)' style='margin-top:10px'></div>";
   h+="</div>";
   // 3. Panne
   h+="<div class='cre-sec cre-full'><div class='cre-h'><span class='cre-n'>3</span>"+(m==="devis"?"Objet du devis":"Panne décrite par le client")+"</div>"
@@ -72,4 +72,9 @@ ACTS.creOk=async function(){
     await ouvrirFiche(d.id);
     if(m==="prise"&&pec&&pec.checked&&!(abs&&abs.checked))await imprimerPEC(d.id,nbp)
   }catch(e){CRE.busy=false;CRE.msg=e.message;render()}};
+var MARQ_BASE=["Xiaomi","Ninebot","Segway","Dualtron","Minimotors","Kaabo","Inokim","Zero","Vsett","Kuickwheel","Joyor","Cecotec","Navee","Hiboy","Apollo","Emove","Urbanglide","Wattiz","Teverun","Speedway","Aprilia","Pure","Decathlon","Oxelo","Nami","Yadea","Mercane","Ewheel","Eskuta","Bird","Lime","Dott","Autre"];
+var MARQ=null,MARQBUSY=false;
+function marqLoad(){if(MARQ===null&&!MARQBUSY){MARQBUSY=true;api("/modeles").then(function(d){var l=(d.modeles||d||[]).map(function(m){return m.marque});MARQ=l;MARQBUSY=false;var e=document.getElementById("dl-marques");if(e)e.innerHTML=marqOpts()}).catch(function(){MARQ=[];MARQBUSY=false})}}
+function marqOpts(){var seen={},out=[];(MARQ||[]).concat(MARQ_BASE).forEach(function(m){var k=String(m||"").trim().toLowerCase();if(k&&!seen[k]){seen[k]=1;out.push(String(m).trim())}});out.sort(function(a,b){return a.localeCompare(b)});return out.map(function(m){return"<option value='"+esc(m)+"'>"}).join("")}
+function marqDL(){marqLoad();return"<datalist id='dl-marques'>"+marqOpts()+"</datalist>"}
 `;

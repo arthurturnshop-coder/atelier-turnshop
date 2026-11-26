@@ -45,7 +45,7 @@ function depForm(){
   }else{
     h+="<div><b>"+esc(DEP.cli.name)+"</b> <button class='link' data-act='depChange'>Changer</button></div>";
     if(DEP.ts.length)h+="<div class='muted' style='margin-top:6px'>Sa trottinette :</div><div class='seg'>"+DEP.ts.map(function(t){return"<button class='"+(DEP.ch===t.id?"on":"")+"' data-act='depTrott' data-id='"+t.id+"'>"+esc(t.marque+" "+t.modele)+"</button>"}).join("")+"<button class='"+(DEP.ch===0?"on":"")+"' data-act='depTrott' data-id='0'>Autre trottinette</button></div>";
-    if(!DEP.ts.length||DEP.ch===0)h+="<div class='dl'><input id='dn-ma' placeholder='Marque'><input id='dn-mo' placeholder='Modèle'></div>";
+    if(!DEP.ts.length||DEP.ch===0)h+="<div class='dl'><input id='dn-ma' placeholder='Marque' list='dl-marques' autocomplete='off'>"+marqDL()+"<input id='dn-mo' placeholder='Modèle'></div>";
     h+=depQuest();
     h+="<div class='dl'><input id='dn-an' placeholder='Année'><input id='dn-km' placeholder='Kilométrage'><input id='dn-px' placeholder='Prix de vente souhaité €'></div><div class='dl'><input id='dn-et' class='lb' placeholder='État (rayures, pièces usées…)'></div><div class='dl'><input id='dn-em' class='lb' placeholder='Emplacement en boutique (facultatif)'></div><div class='dl'><input id='dn-no' class='lb' placeholder='Note'></div>"
       +"<div class='muted'>Une prise en charge « révision + pièces critiques » est créée automatiquement.</div><div class='actions'><button data-act='depCree'>Enregistrer le dépôt</button><button class='sec' data-act='depNouv'>Annuler</button></div>"}

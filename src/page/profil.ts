@@ -101,7 +101,7 @@ function vProfil(){
   }
   h+="</div><div id='kpi' style='flex:0 0 auto;margin-left:auto'>"+kpiHtml()+"</div></div></div>";
   h+=fusionHtml();
-  if(ADDT)h+="<div class='card'><b>Ajouter une trottinette</b><input id='m' placeholder='Marque'><input id='mo' placeholder='Modèle'><input id='s' placeholder='Numéro de série'><button data-act='addT'>Associer</button><button class='sec' data-act='cancelAddT'>Annuler</button></div>";
+  if(ADDT)h+="<div class='card'><b>Ajouter une trottinette</b><input id='m' placeholder='Marque' list='dl-marques' autocomplete='off'>"+marqDL()+"<input id='mo' placeholder='Modèle'><input id='s' placeholder='Numéro de série'><button data-act='addT'>Associer</button><button class='sec' data-act='cancelAddT'>Annuler</button></div>";
   else h+="<button class='sec' data-act='showAddT'>+ Ajouter une trottinette</button>";
   var nbR=0;c.trottinettes.forEach(function(t){nbR+=t.reparations.length});
   h+="<div class='dl' style='margin-top:14px'><button class='"+(PTAB==="rep"?"":"sec")+"' data-act='pTab' data-t='rep'>🔧 Réparations ("+nbR+")</button><button class='"+(PTAB==="ach"?"":"sec")+"' data-act='pTab' data-t='ach'>🛒 Achats"+(PACH&&PACH.id===c.id?" ("+PACH.list.length+")":"")+"</button></div>";
