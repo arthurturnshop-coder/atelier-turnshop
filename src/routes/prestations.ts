@@ -30,6 +30,31 @@ if (n === 0) await sql`INSERT INTO prestations (nom, prix_cents, avec_piece, pie
     }
     await sql`INSERT INTO reglages (cle, valeur) VALUES ('seed_tubeless_av_ar', '1') ON CONFLICT (cle) DO NOTHING`;
   }
+  const [av2] = (await sql`SELECT 1 FROM reglages WHERE cle = 'seed_av_ar_pneus_freins'`) as any[];
+  if (!av2) {
+    // Pneus : une prestation avant, une arrière, une avant + arrière ; option "faire aussi l'autre".
+    for (const base of ["Pneu à chambre", "Pneu plein", "Chambre à air"]) {
+      const [ex] = (await sql`SELECT id, prix_cents, piece_aide FROM prestations WHERE lower(nom) = lower(${base})`) as any[];
+      if (!ex) continue;
+      const pr = ex.prix_cents, aide = ex.piece_aide ?? "";
+      await sql`UPDATE prestations SET nom = ${base + " (avant)"} WHERE id = ${ex.id}`;
+      const ids: Record<string, number> = { av: ex.id };
+      for (const [k, nom, prix] of [["ar", base + " (arrière)", pr], ["both", base + " (avant + arrière)", pr * 2]] as [string, string, number][]) {
+        const [e2] = (await sql`SELECT id FROM prestations WHERE lower(nom) = lower(${nom})`) as any[];
+        ids[k] = e2?.id ?? (await sql`INSERT INTO prestations (nom, prix_cents, avec_piece, piece_aide) VALUES (${nom}, ${prix}, true, ${aide}) RETURNING id`)[0].id;
+      }
+      await sql`INSERT INTO prestation_options (prestation_id, nom, prix_cents, type) VALUES (${ids.av}, ${"Faire aussi l'arrière (avant + arrière)"}, ${pr}, 'main_oeuvre'), (${ids.ar}, ${"Faire aussi l'avant (avant + arrière)"}, ${pr}, 'main_oeuvre')`;
+    }
+    // Freins : déjà « (avant ou arrière) » et « (avant + arrière) » : option = différence de prix.
+    const un = (await sql`SELECT id, nom, prix_cents FROM prestations WHERE nom LIKE '%(avant ou arrière)'`) as any[];
+    for (const u of un) {
+      const deux = (await sql`SELECT prix_cents FROM prestations WHERE nom = ${u.nom.replace("(avant ou arrière)", "(avant + arrière)")}`) as any[];
+      if (!deux.length) continue;
+      const diff = Math.max(0, deux[0].prix_cents - u.prix_cents);
+      await sql`INSERT INTO prestation_options (prestation_id, nom, prix_cents, type) VALUES (${u.id}, ${"Faire aussi l'autre (avant + arrière)"}, ${diff}, 'main_oeuvre')`;
+    }
+    await sql`INSERT INTO reglages (cle, valeur) VALUES ('seed_av_ar_pneus_freins', '1') ON CONFLICT (cle) DO NOTHING`;
+  }
   const [dgn] = (await sql`SELECT 1 FROM prestations WHERE lower(nom) = 'diagnostic'`) as any[];
   if (!dgn) await sql`INSERT INTO prestations (nom, prix_cents, avec_piece, piece_aide) VALUES ('Diagnostic', 1500, false, '')`;
   const [dejaFait] = (await sql`SELECT 1 FROM reglages WHERE cle = 'seed_prestations_tarifs_site'`) as any[];
