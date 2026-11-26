@@ -230,6 +230,18 @@ app.post("/api/devis/ligne", async (c) => {
   return c.json({ devis: await devisDe(repId), maitre: maitre ? { nom: maitre.nom, origine: libelle } : null });
 });
 
+app.post("/api/devis/ligne/quantite", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const id = Number(b.id);
+  const [l] = await sql`SELECT reparation_id FROM devis_lignes WHERE id = ${id}`;
+  if (!l) throw new AppError(404, "Ligne introuvable.");
+  const q = Math.round(Number(String(b.quantite ?? "").replace(",", ".")));
+  if (!(q >= 1 && q <= 999)) throw new AppError(400, "Quantité invalide (1 à 999).");
+  await sql`UPDATE devis_lignes SET quantite = ${q} WHERE id = ${id}`;
+  await sql`UPDATE reparations SET maj_le = now() WHERE id = ${l.reparation_id}`;
+  return c.json({ devis: await devisDe(l.reparation_id) });
+});
+
 app.post("/api/devis/ligne/supprimer", async (c) => {
   const b = await c.req.json().catch(() => ({}));
   const id = Number(b.id);

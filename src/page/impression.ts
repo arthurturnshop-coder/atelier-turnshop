@@ -294,7 +294,7 @@ document.addEventListener("input",function(e){
 
 // ----- Étiquettes produits : nom, prix, code-barres -----
 var ETQ=[],ETQF=null,ETQSKIP=0;
-var ETQFORMATS={"50x30":{l:"Rouleau 50 × 30 mm",w:50,h:30},"40x25":{l:"Rouleau 40 × 25 mm",w:40,h:25},"62x29":{l:"Ruban Brother 62 × 40 mm",w:62,h:40},"a4":{l:"Planche A4 3 × 8 (70 × 37 mm)",w:70,h:37,page:"A4",cols:3,rows:8},"papier":{l:"Emplacements papier A4 2 × 4 (100 × 66 mm)",w:100,h:66,mt:14,ml:5,page:"A4",cols:2,rows:4}};
+var ETQFORMATS={"50x30":{l:"Rouleau 50 × 30 mm",w:50,h:30},"40x25":{l:"Rouleau 40 × 25 mm",w:40,h:25},"62x29":{l:"Ruban Brother 62 × 40 mm",w:62,h:40},"a4":{l:"Planche A4 3 × 8 (70 × 37 mm)",w:70,h:37,page:"A4",cols:3,rows:8},"papier":{l:"Emplacements papier A4 2 × 4 (96 × 66 mm)",w:96,h:66,mt:14,ml:9,page:"A4",cols:2,rows:4}};
 function etqFormat(){
   if(!ETQF){try{ETQF=localStorage.getItem("etqf")||""}catch(e){ETQF=""}}
   if(!ETQFORMATS[ETQF])ETQF="62x29";return ETQF}
