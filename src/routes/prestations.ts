@@ -6,6 +6,7 @@ import { AppError, clean, exigeAdmin } from "../util";
 
 await sql`CREATE TABLE IF NOT EXISTS prestations (id SERIAL PRIMARY KEY, nom TEXT NOT NULL, prix_cents INT NOT NULL DEFAULT 0, avec_piece BOOLEAN NOT NULL DEFAULT false, piece_aide TEXT NOT NULL DEFAULT '', actif BOOLEAN NOT NULL DEFAULT true, cree_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
 await sql`ALTER TABLE prestations ADD COLUMN IF NOT EXISTS qte_seuil INT NOT NULL DEFAULT 0, ADD COLUMN IF NOT EXISTS qte_remise_cents INT NOT NULL DEFAULT 0`;
+await sql`ALTER TABLE prestations ADD COLUMN IF NOT EXISTS raccourci TEXT NOT NULL DEFAULT ''`;
 await sql`CREATE TABLE IF NOT EXISTS prestation_options (id SERIAL PRIMARY KEY, prestation_id INT NOT NULL REFERENCES prestations(id) ON DELETE CASCADE, nom TEXT NOT NULL, prix_cents INT NOT NULL DEFAULT 0, type TEXT NOT NULL DEFAULT 'piece' CHECK (type IN ('piece','main_oeuvre')), cree_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
 const [{ n }] = (await sql`SELECT count(*)::int AS n FROM prestations`) as any[];
 if (n === 0) await sql`INSERT INTO prestations (nom, prix_cents, avec_piece, piece_aide) VALUES ('Pneu + pose', 3000, true, 'pneu')`;
@@ -54,6 +55,26 @@ if (n === 0) await sql`INSERT INTO prestations (nom, prix_cents, avec_piece, pie
   }
 }
 
+// Raccourcis (F1, P2…) : lettre de la famille + numéro. Ne touche jamais un raccourci déjà donné.
+const famLettre = (nom: string) => { const n = nom.toLowerCase();
+  if (/frein|plaquette|disque|purge|levier/.test(n)) return "F";
+  if (/pneu|chambre|valve|roulement|roue/.test(n)) return "P";
+  if (/batterie|data|moteur|contr|gâchette|gachette|éclairage|eclairage|led/.test(n)) return "E";
+  if (/colonne|garde-boue|boue/.test(n)) return "M";
+  return "D"; };
+export async function attribuerRaccourcis() {
+  const rows = (await sql`SELECT id, nom, raccourci FROM prestations ORDER BY id`) as any[];
+  const pris = new Set(rows.map((r) => String(r.raccourci).toUpperCase()).filter(Boolean));
+  for (const r of rows) {
+    if (r.raccourci) continue;
+    const L = famLettre(r.nom);
+    let i = 1; while (pris.has(L + i)) i++;
+    pris.add(L + i);
+    await sql`UPDATE prestations SET raccourci = ${L + i} WHERE id = ${r.id}`;
+  }
+}
+await attribuerRaccourcis();
+
 // Remise "plusieurs prestations" : X € dès N prestations, jamais cumulée avec une offre.
 export async function lireMulti() {
   const rows = (await sql`SELECT cle, valeur FROM reglages WHERE cle IN ('multi_seuil', 'multi_remise_cents')`) as any[];
@@ -76,7 +97,7 @@ export async function remiseMulti(lignes: { type: string; quantite: number; libe
   return Math.min(best, brutCents);
 }
 
-const versPresta = (r: any) => ({ id: r.id, nom: r.nom, prixCents: r.prix_cents, avecPiece: r.avec_piece === true, qteSeuil: r.qte_seuil ?? 0, qteRemiseCents: r.qte_remise_cents ?? 0, pieceAide: r.piece_aide ?? "", actif: r.actif === true });
+const versPresta = (r: any) => ({ id: r.id, nom: r.nom, prixCents: r.prix_cents, avecPiece: r.avec_piece === true, qteSeuil: r.qte_seuil ?? 0, qteRemiseCents: r.qte_remise_cents ?? 0, pieceAide: r.piece_aide ?? "", raccourci: r.raccourci ?? "", actif: r.actif === true });
 
 app.get("/api/prestations", async (c) => {
   const rows = (await sql`SELECT * FROM prestations ORDER BY nom`) as any[];
@@ -97,8 +118,11 @@ app.post("/api/prestations", async (c) => {
   const qs = Math.max(0, Math.min(20, Math.round(Number(b.qteSeuil) || 0)));
   const qr = Math.max(0, Math.round((Number(String(b.qteRemise ?? "0").replace(",", ".")) || 0) * 100));
   const id = Number(b.id);
-  if (id > 0) await sql`UPDATE prestations SET nom = ${nom}, prix_cents = ${prix}, avec_piece = ${avecPiece}, piece_aide = ${aide}, qte_seuil = ${qs}, qte_remise_cents = ${qr} WHERE id = ${id}`;
-  else await sql`INSERT INTO prestations (nom, prix_cents, avec_piece, piece_aide, qte_seuil, qte_remise_cents) VALUES (${nom}, ${prix}, ${avecPiece}, ${aide}, ${qs}, ${qr})`;
+  const rac = clean(b.raccourci, 8).replace(/\s+/g, "").toUpperCase();
+  if (rac) { const [dj] = (await sql`SELECT id FROM prestations WHERE upper(raccourci) = ${rac} AND id <> ${id > 0 ? id : 0}`) as any[]; if (dj) throw new AppError(409, `Le raccourci ${rac} est déjà pris par une autre prestation.`); }
+  if (id > 0) await sql`UPDATE prestations SET nom = ${nom}, prix_cents = ${prix}, avec_piece = ${avecPiece}, piece_aide = ${aide}, qte_seuil = ${qs}, qte_remise_cents = ${qr}, raccourci = ${rac} WHERE id = ${id}`;
+  else await sql`INSERT INTO prestations (nom, prix_cents, avec_piece, piece_aide, qte_seuil, qte_remise_cents, raccourci) VALUES (${nom}, ${prix}, ${avecPiece}, ${aide}, ${qs}, ${qr}, ${rac})`;
+  await attribuerRaccourcis();
   return c.json({ message: "Prestation enregistrée." });
 });
 
