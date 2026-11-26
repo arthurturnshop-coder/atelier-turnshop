@@ -9,6 +9,7 @@ import { AppError, clean, exigeAdmin } from "../util";
 const vers = (r: any) => ({ reparationId: r.reparation_id ?? null, tel: r.telephone ?? "", client: r.client ?? "", trott: r.trott ?? "", recurrente: r.recurrente_id != null, prive: r.prive_pour != null, id: r.id, texte: r.texte, echeance: r.echeance ?? null, epingle: r.epingle === true, priorite: r.priorite === true, fait: r.fait === true, faitPar: r.fait_par ?? "", creePar: r.cree_par ?? "" });
 
 await sql`ALTER TABLE taches ADD COLUMN IF NOT EXISTS ligne_id INT`;
+await sql`ALTER TABLE taches ADD COLUMN IF NOT EXISTS retour_site_id INT`;
 // Tâches privées : visibles uniquement par la personne dont c'est le prénom (NULL = tâche partagée).
 await sql`ALTER TABLE taches ADD COLUMN IF NOT EXISTS prive_pour TEXT`;
 await sql`ALTER TABLE taches_rec ADD COLUMN IF NOT EXISTS prive_pour TEXT`;
@@ -29,6 +30,25 @@ async function genererCommandesEnRetard() {
     const texte = `Toujours pas arrivé : vérifier la commande « ${l.libelle} » (${l.fournisseur})${l.suivi ? ", suivi " + l.suivi : ""}${l.client ? " pour " + l.client : ""}`;
     await sql`INSERT INTO taches (texte, echeance, priorite, cree_par, reparation_id, ligne_id) VALUES (${texte}, ${auj}::date, true, 'Commande en retard', ${l.reparation_id}, ${l.id})`;
     await sql`UPDATE commande_lignes SET relance_le = now() WHERE id = ${l.id}`;
+  }
+}
+
+// Retours (site / fournisseur) qui traînent : une tâche « relancer » par retour (une seule ouverte à la fois, renouvelée si ça dure).
+async function genererRetoursEnRetard() {
+  const rows = (await sql`SELECT id, type, statut, produit, nom, fournisseur FROM retours_site r
+    WHERE statut NOT IN ('rembourse','refuse','clos')
+      AND ((statut = 'demande' AND cree_le < now() - interval '2 days')
+        OR (statut = 'attente' AND COALESCE(mail_le, cree_le) < now() - interval '10 days')
+        OR (statut = 'recu' AND COALESCE(recu_le, cree_le) < now() - interval '3 days')
+        OR (statut = 'ok' AND COALESCE(teste_le, cree_le) < now() - interval '2 days')
+        OR (statut = 'ko' AND COALESCE(teste_le, cree_le) < now() - interval '3 days')
+        OR (statut = 'fournisseur' AND cree_le < now() - interval '7 days'))
+      AND NOT EXISTS (SELECT 1 FROM taches k WHERE k.retour_site_id = r.id AND (k.fait = false OR k.cree_le > now() - interval '7 days'))`) as any[];
+  const auj = await AUJ();
+  const quoi: Record<string, string> = { demande: "envoyer le mail d'instructions", attente: "colis toujours pas reçu, relancer le client", recu: "colis reçu, à tester", ok: "testé OK, à rembourser dans Shopify", ko: "défaut constaté, à envoyer au fournisseur", fournisseur: "relancer le fournisseur (avoir ou remplacement)" };
+  for (const r of rows) {
+    const texte = `Retour R${r.id} (${r.produit}${r.nom ? ", " + r.nom : ""}${r.fournisseur ? ", " + r.fournisseur : ""}) : ${quoi[r.statut] ?? "à traiter"}`;
+    await sql`INSERT INTO taches (texte, echeance, priorite, cree_par, retour_site_id) VALUES (${texte}, ${auj}::date, true, 'Retours', ${r.id})`;
   }
 }
 
@@ -139,6 +159,7 @@ app.get("/api/taches", async (c) => {
   await genererRecurrentes();
   await genererRappels();
   await genererCommandesEnRetard();
+  try { await genererRetoursEnRetard(); } catch { /* table pas encore créée */ }
   await genererRelancesGarantie();
   const rows = (await sql`SELECT k.id, k.recurrente_id, k.reparation_id, k.texte, to_char(k.echeance, 'YYYY-MM-DD') AS echeance, k.epingle, k.priorite, k.fait, k.fait_par, k.cree_par, k.prive_pour,
       cl.telephone, trim(cl.prenom || ' ' || cl.nom) AS client, t.marque || ' ' || t.modele AS trott

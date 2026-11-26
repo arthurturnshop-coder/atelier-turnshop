@@ -1,7 +1,7 @@
 export const RETOURSSITE = `// ---------- Retours : clients du site, SAV garantie, pièces renvoyées aux fournisseurs ----------
 var RS={d:null,msg:"",nouv:false,filtre:"tous",type:"retour",modele:false};
 var RSTAT={demande:"Demande reçue",attente:"Colis attendu",recu:"Colis reçu",ok:"Testé OK",ko:"Testé : défaut",rembourse:"Remboursé",fournisseur:"Chez le fournisseur",refuse:"Refusé",clos:"Clôturé"};
-function rsLoad(){api("/retours-site").then(function(d){RS.d=d;if(TAB==="rsite")render()}).catch(function(e){RS.msg=e.message;RS.d=RS.d||{retours:[],modele:""};if(TAB==="rsite")render()})}
+function rsLoad(){api("/sav/dossiers").then(function(x){SAV=x.dossiers}).catch(function(){});api("/retours-site").then(function(d){RS.d=d;if(TAB==="rsite")render()}).catch(function(e){RS.msg=e.message;RS.d=RS.d||{retours:[],modele:""};if(TAB==="rsite")render()})}
 function rsFerme(r){return r.statut==="rembourse"||r.statut==="refuse"||r.statut==="clos"}
 function rsBtn(id,etat,txt,cls){return"<button class='"+(cls||"")+"' data-act='rsEtat' data-id='"+id+"' data-etat='"+etat+"'>"+txt+"</button>"}
 function rsCarte(r){
@@ -43,6 +43,7 @@ function vRsite(){
     +"<div class='dl'><input id='rs-prod' class='lb' placeholder='"+(fo?"Pièce à renvoyer":"Produit concerné")+"'>"+(fo?"<input id='rs-mt' class='lb' placeholder='Montant attendu (€)'>":"")+"</div>"
     +"<textarea id='rs-motif' rows='3' style='width:100%' placeholder='"+(fo?"Motif (défectueuse, mauvaise référence, erreur de commande...)":"Motif indiqué par le client (formulaire du site)")+"'></textarea>"
     +"<div class='actions'><button data-act='rsCree'>Enregistrer</button></div></div>"}
+  if(RS.filtre!=="fournisseur"&&SAV&&SAV.length)h+=blocGaranties(true);
   h+="<div class='step' style='margin-top:12px'>À traiter ("+ouv.length+")</div>"+(ouv.length?ouv.map(rsCarte).join(""):"<div class='card muted'>Aucun retour en cours.</div>");
   if(fer.length)h+="<div class='step' style='margin-top:12px'>Terminés ("+fer.length+")</div>"+fer.slice(0,20).map(rsCarte).join("");
   app.innerHTML=h+"</div>"}
