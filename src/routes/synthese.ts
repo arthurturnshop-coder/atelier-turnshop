@@ -37,6 +37,7 @@ app.get("/api/compta/synthese", async (c) => {
 
   // --- Logiciel (ventes FS) ---
   const vts = (await sql`SELECT COALESCE(magasin, 'Commun') AS mg, sum(total_cents + acompte_deduit_cents)::int AS ttc, count(*)::int AS nb FROM ventes WHERE type = 'vente' AND to_char(cree_le AT TIME ZONE 'Europe/Paris', 'YYYY-MM') = ${mois} GROUP BY 1`) as any[];
+  const acs = (await sql`SELECT COALESCE(magasin, 'Commun') AS mg, COALESCE(sum(total_cents), 0)::int AS ttc, count(*)::int AS nb FROM ventes WHERE type = 'acompte' AND to_char(cree_le AT TIME ZONE 'Europe/Paris', 'YYYY-MM') = ${mois} GROUP BY 1`) as any[];
   const rbs = (await sql`SELECT COALESCE(r.magasin, rep.magasin, 'Commun') AS mg, sum(r.montant_cents)::int AS n FROM remboursements r LEFT JOIN reparations rep ON rep.id = r.reparation_id WHERE r.vente_id IS NOT NULL AND to_char(r.cree_le AT TIME ZONE 'Europe/Paris', 'YYYY-MM') = ${mois} GROUP BY 1`) as any[];
   const pay = (await sql`SELECT COALESCE(v.magasin, 'Commun') AS mg, p.moyen, sum(p.montant_cents)::int AS n FROM vente_paiements p JOIN ventes v ON v.id = p.vente_id WHERE to_char(v.cree_le AT TIME ZONE 'Europe/Paris', 'YYYY-MM') = ${mois} GROUP BY 1, 2`) as any[];
   const mvc = (await sql`SELECT magasin AS mg, sens, sum(montant_cents)::int AS n FROM mouvements_cash WHERE to_char(cree_le AT TIME ZONE 'Europe/Paris', 'YYYY-MM') = ${mois} AND motif NOT LIKE 'Reversement dépôt-vente DV-%' GROUP BY 1, 2`) as any[];
@@ -105,6 +106,7 @@ app.get("/api/compta/synthese", async (c) => {
   const pct = (n: number, d: number) => (d > 0 ? Math.round((n * 1000) / d) / 10 : null);
   return c.json({
     liste: lm, mois, releve, source, nbVentes: nbLog,
+    acomptes: Object.fromEntries(ENT.map((e) => [e.toLowerCase(), { ttc: acs.filter((r) => entDe(r.mg) === e).reduce((a, r) => a + r.ttc, 0), nb: acs.filter((r) => entDe(r.mg) === e).reduce((a, r) => a + r.nb, 0) }])),
     caLogiciel: { amiens: { ttc: logTtc.Amiens, remb: logRemb.Amiens, nb: logNb.Amiens }, rouen: { ttc: logTtc.Rouen, remb: logRemb.Rouen, nb: logNb.Rouen }, commun: { ttc: logTtc.Commun, remb: logRemb.Commun, nb: logNb.Commun } },
     caBanque: { amiens: bCa.Amiens, rouen: bCa.Rouen, commun: bCa.Commun, retraitsEspeces: retraits },
     rapprochement, tva,

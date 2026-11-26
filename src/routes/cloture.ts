@@ -28,7 +28,7 @@ async function calcul(m: string, de: Date | string, a: Date | string | null) {
     WHERE v.magasin = ${m} AND v.cree_le >= ${de} AND v.cree_le <= ${fin} GROUP BY p.moyen`) as any[];
   const [nb] = (await sql`SELECT count(*)::int AS n, COALESCE(sum(total_cents), 0)::int AS total FROM ventes
     WHERE magasin = ${m} AND COALESCE(type, '') <> 'acompte' AND cree_le >= ${de} AND cree_le <= ${fin}`) as any[];
-  const [ac] = (await sql`SELECT count(*)::int AS n FROM ventes WHERE magasin = ${m} AND type = 'acompte' AND cree_le >= ${de} AND cree_le <= ${fin}`) as any[];
+  const [ac] = (await sql`SELECT count(*)::int AS n, COALESCE(sum(total_cents), 0)::int AS total FROM ventes WHERE magasin = ${m} AND type = 'acompte' AND cree_le >= ${de} AND cree_le <= ${fin}`) as any[];
   const remb = (await sql`SELECT rb.moyen, sum(rb.montant_cents)::int AS n FROM remboursements rb LEFT JOIN reparations r ON r.id = rb.reparation_id
     WHERE COALESCE(rb.magasin, r.magasin) = ${m} AND rb.cree_le >= ${de} AND rb.cree_le <= ${fin} GROUP BY rb.moyen`) as any[];
   const mv = (await sql`SELECT sens, montant_cents, motif, par, cree_le FROM mouvements_cash WHERE magasin = ${m} AND cree_le >= ${de} AND cree_le <= ${fin} ORDER BY id`) as any[];
@@ -42,7 +42,7 @@ async function calcul(m: string, de: Date | string, a: Date | string | null) {
   const tr = (await sql`SELECT v.numero_facture, vl.libelle, vl.series, trim(cl.prenom || ' ' || cl.nom) AS client FROM vente_lignes vl JOIN ventes v ON v.id = vl.vente_id LEFT JOIN clients cl ON cl.id = v.client_id
     WHERE v.magasin = ${m} AND v.cree_le >= ${de} AND v.cree_le <= ${fin} AND jsonb_array_length(vl.series) > 0 ORDER BY v.id`) as any[];
   const trottinettes = tr.flatMap((r: any) => (r.series as string[]).map((serie) => ({ facture: r.numero_facture ?? "", libelle: r.libelle, serie, client: r.client ?? "" })));
-  return { trottinettes, encaisse: par, rembourse: rem, nbVentes: nb.n, nbAcomptes: ac.n, caCents: nb.total, especesNettes: par.especes - (rem.especes ?? 0) + entrees - sorties, entreesCash: entrees, sortiesCash: sorties, mouvements };
+  return { trottinettes, encaisse: par, rembourse: rem, nbVentes: nb.n, nbAcomptes: ac.n, acomptesCents: ac.total, caCents: nb.total, especesNettes: par.especes - (rem.especes ?? 0) + entrees - sorties, entreesCash: entrees, sortiesCash: sorties, mouvements };
 }
 
 const vue = (s: any) => s && ({
@@ -177,7 +177,7 @@ app.post("/api/caisse/ajouter-vente", async (c) => {
   const t = parse(s.totaux) ?? { encaisse: { carte: 0, especes: 0, virement: 0, en_ligne: 0 }, rembourse: {}, nbVentes: 0, nbAcomptes: 0, caCents: 0, especesNettes: 0 };
   let esp = 0;
   for (const p of pay) { t.encaisse[p.moyen] = (t.encaisse[p.moyen] ?? 0) + p.n; if (p.moyen === "especes") esp += p.n; }
-  if (v.type === "acompte") t.nbAcomptes = (t.nbAcomptes ?? 0) + 1; else { t.nbVentes += 1; t.caCents += v.total_cents; }
+  if (v.type === "acompte") { t.nbAcomptes = (t.nbAcomptes ?? 0) + 1; t.acomptesCents = (t.acomptesCents ?? 0) + v.total_cents; } else { t.nbVentes += 1; t.caCents += v.total_cents; }
   t.especesNettes = (t.especesNettes ?? 0) + esp;
   const attendu = (s.especes_attendues_cents ?? 0) + esp;
   const [{ le }] = (await sql`SELECT now() AS le`) as any[];
