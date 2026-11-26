@@ -349,7 +349,8 @@ function etqEmpl(){
 function vEtq(){etqEmpl();
   var F=ETQFORMATS[etqFormat()],nb=etqToutes().length;
   if(ETQTAB==="empl")return vEmpl();
-  var h=etqTabs()+"<div class='card'><div class='step'>Étiquettes produits</div><div class='muted'>Cherche un produit, ajoute-le, choisis le nombre d'étiquettes puis imprime. Chaque étiquette : nom, prix et code-barres.</div>"+prodBox("etq")+"</div>";
+  var h=etqTabs()+"<div class='card'><div class='step'>Étiquettes produits</div><div class='muted'>Cherche un produit, ajoute-le, choisis le nombre d'étiquettes puis imprime. Chaque étiquette : nom, prix et code-barres.</div>"+prodBox("etq")+"</div>"
+    +"<div class='card'><div class='step'>Tout un emplacement ou un panneau</div><div class='muted'>Tape A (panneau), A1 (étage) ou A11 (case) : tous les produits rangés là sont ajoutés, une étiquette chacun.</div><div class='dl' style='margin-top:6px'><input id='etq-lieu' class='lb' placeholder='Ex : A, A1, A11' autocomplete='off' style='text-transform:uppercase'><button data-act='etqLieu'>Ajouter ces produits</button></div></div>";
   h+="<div class='card'><div class='step'>Imprimer sur</div><div class='actions'><button class='"+(F.page?"":"sec")+"' data-act='etqMode' data-f='a4'>🖨 Imprimante A4 (feuille à découper)</button><button class='"+(F.page?"sec":"")+"' data-act='etqMode' data-f='62x29'>🏷 Brother (rouleau)</button></div><div class='muted' style='margin-top:6px'>Autres formats :</div><select id='etqf' data-act='etqFormat'>"+Object.keys(ETQFORMATS).map(function(k){return"<option value='"+k+"'"+(k===etqFormat()?" selected":"")+">"+esc(ETQFORMATS[k].l)+"</option>"}).join("")+"</select>"
     +(F.page?"<div class='muted' style='margin-top:6px'>Étiquettes déjà utilisées sur la planche (à sauter)</div><input id='etqskip' type='number' min='0' max='"+(F.cols*F.rows-1)+"' value='"+ETQSKIP+"' data-act='etqSkip'>":"")
     +"<div class='muted' style='margin-top:6px'>Dans la fenêtre d'impression : choisis ton imprimante d'étiquettes, mets les marges sur « Aucune » et l'échelle à 100 %.</div></div>";
@@ -391,6 +392,14 @@ ACTS.etqFormat=function(b){ETQF=b.value;try{localStorage.setItem("etqf",ETQF)}ca
 ACTS.etqSkip=function(b){ETQSKIP=Math.max(0,Number(b.value)||0)};
 ACTS.etqQte=function(b){var it=ETQ[+b.dataset.i];if(it){it.qte=Math.max(1,Math.min(200,Number(b.value)||1))}};
 ACTS.etqSuppr=function(b){ETQ.splice(+b.dataset.i,1);render()};
+ACTS.etqLieu=async function(){
+  var l=(v("etq-lieu")||"").toUpperCase().replace(/\\s+/g,"");if(!l){return}
+  try{var d=await api("/stock?magasin="+encodeURIComponent(MAG||"")+"&q="+encodeURIComponent(l));
+    var L=(d.produits||[]).filter(function(p){return String(p.emplacement||"").toUpperCase().indexOf(l)===0});
+    if(!L.length){alert("Aucun produit rangé en "+l+".");return}
+    var n=0;L.forEach(function(p){if(ETQ.some(function(x){return x.barcode&&x.barcode===p.code}))return;ETQ.push({empl:p.emplacement||"",titre:p.nom,prix:(p.prixCents/100).toFixed(2),barcode:p.code,sku:"",qte:1});n++});
+    toastOk(n+" produit"+(n>1?"s":"")+" ajouté"+(n>1?"s":"")+" ("+l+")");render()}catch(e){alert(e.message)}};
+document.addEventListener("keydown",function(e){if(e.key==="Enter"&&e.target&&e.target.id==="etq-lieu"){e.preventDefault();ACTS.etqLieu()}});
 ACTS.etqVider=function(){ETQ=[];render()};
 ACTS.etqPrint=function(){etqImprimer()};
 document.addEventListener("change",function(e){var t=e.target;if(!t||!t.dataset||!t.dataset.act)return;if(t.tagName==="SELECT"||t.tagName==="INPUT"){var f=ACTS[t.dataset.act];if(f&&t.dataset.act.indexOf("etq")===0)f(t)}});
