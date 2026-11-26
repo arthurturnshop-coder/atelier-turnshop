@@ -27,15 +27,21 @@ function multiRem(brut){
 var MOY={carte:"Carte",especes:"Espèces",virement:"Virement",bon_achat:"Bon d achat",en_ligne:"En ligne"};
 function pxCents(s){return Math.round(Number(String(s).replace(",","."))*100)||0}
 function panierTotal(){return PAN.reduce(function(s,l){return s+l.quantite*pxCents(l.prix)},0)}
+function basePieces(){return PAN.filter(function(l){return l.type==="piece"&&!l.trott&&!/^Livraison à domicile/i.test(l.libelle)}).reduce(function(s,l){return s+l.quantite*pxCents(l.prix)},0)}
 function avApplicable(a,brut){
   if(brut<=0)return false;
+  if(a.clientRequis&&!CCLI)return false;
+  if(a.portee==="pieces"&&basePieces()<=0)return false;
   if(a.declencheur==="cumul")return !!(CCLI&&CFID)&&(CFID.recus||[]).indexOf(a.id)<0&&(CFID.depenseCents||0)+brut>=a.seuilCents;
   return brut>=a.seuilCents}
-function avRemise(a,brut){if(a.effet==="euros")return Math.round(a.valeur*100);if(a.effet==="pourcent")return Math.round(brut*a.valeur/100);return 0}
+function avRemise(a,brut){if(a.effet==="euros")return Math.round(a.valeur*100);if(a.effet==="pourcent")return Math.round((a.portee==="pieces"?basePieces():brut)*a.valeur/100);return 0}
 function avChoisis(brut){return(CAV||[]).filter(function(a){return avApplicable(a,brut)&&CAVOFF.indexOf(a.id)<0})}
 function avRemTotal(brut){var reste=brut,s=0;avChoisis(brut).forEach(function(a){var c=Math.min(avRemise(a,brut),reste);reste-=c;s+=c});return s+multiRem(brut)}
 function avLabel(a){return a.effet==="euros"?"-"+a.valeur+" €":a.effet==="pourcent"?"-"+a.valeur+" %":"cadeau offert"}
 function avCondition(a){
+  var pre=(a.portee==="pieces"?"pièces et accessoires uniquement · ":"")+(a.clientRequis?"client identifié (carte) · ":"");
+  return pre+avCondition0(a)}
+function avCondition0(a){
   if(a.declencheur==="cumul")return"dès "+(a.seuilCents/100)+" € dépensés au total (une seule fois par client)";
   if(a.declencheur==="achat")return"dès "+(a.seuilCents/100)+" € d'achat";
   return"du "+day(a.dateDebut)+" au "+day(a.dateFin)+(a.seuilCents>0?" dès "+(a.seuilCents/100)+" € d'achat":"")}

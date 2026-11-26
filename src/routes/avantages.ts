@@ -10,6 +10,7 @@ export type Avantage = {
   id: number; libelle: string; declencheur: "cumul" | "achat" | "date";
   seuilCents: number; dateDebut: string | null; dateFin: string | null;
   effet: "cadeau" | "euros" | "pourcent"; valeur: number; actif: boolean;
+  portee: "tout" | "pieces"; clientRequis: boolean;
 };
 
 const AUJOURDHUI = sql`(now() AT TIME ZONE 'Europe/Paris')::date`;
@@ -19,12 +20,13 @@ function versAvantage(r: any): Avantage {
     id: r.id, libelle: r.libelle, declencheur: r.declencheur, seuilCents: r.seuil_cents,
     dateDebut: r.date_debut ?? null, dateFin: r.date_fin ?? null,
     effet: r.effet, valeur: Number(r.valeur), actif: r.actif === true,
+    portee: r.portee === "pieces" ? "pieces" : "tout", clientRequis: r.client_requis === true,
   };
 }
 
 // Avantages actifs et valables aujourd'hui (utilisés par la caisse).
 export async function avantagesActifs(): Promise<Avantage[]> {
-  const rows = (await sql`SELECT id, libelle, declencheur, seuil_cents, to_char(date_debut, 'YYYY-MM-DD') AS date_debut, to_char(date_fin, 'YYYY-MM-DD') AS date_fin, effet, valeur, actif
+  const rows = (await sql`SELECT id, libelle, declencheur, seuil_cents, to_char(date_debut, 'YYYY-MM-DD') AS date_debut, to_char(date_fin, 'YYYY-MM-DD') AS date_fin, effet, valeur, actif, portee, client_requis
     FROM avantages
     WHERE actif = true
       AND (date_debut IS NULL OR date_debut <= (now() AT TIME ZONE 'Europe/Paris')::date)
@@ -40,12 +42,15 @@ export async function contexteClient(clientId: number) {
   return { depenseCents: dep.n as number, recus: recus.map((r) => r.avantage_id as number) };
 }
 
-export function estApplicable(a: Avantage, brutCents: number, ctx: { depenseCents: number; recus: number[] } | null): boolean {
+export function estApplicable(a: Avantage, brutCents: number, ctx: { depenseCents: number; recus: number[] } | null, baseCents: number = brutCents, clientId: number | null = null): boolean {
+  if (a.clientRequis && !(clientId && clientId > 0)) return false;
+  if (a.portee === "pieces" && baseCents <= 0) return false;
   if (a.declencheur === "cumul") return !!ctx && !ctx.recus.includes(a.id) && ctx.depenseCents + brutCents >= a.seuilCents;
   return brutCents >= a.seuilCents;
 }
 
-export function remiseDe(a: Avantage, brutCents: number): number {
+export function remiseDe(a: Avantage, brutCents: number, baseCents: number = brutCents): number {
+  if (a.portee === "pieces") brutCents = baseCents;
   if (a.effet === "euros") return Math.round(a.valeur * 100);
   if (a.effet === "pourcent") return Math.round((brutCents * a.valeur) / 100);
   return 0;
@@ -56,7 +61,7 @@ app.get("/api/caisse/avantages", async (c) => c.json(await avantagesActifs()));
 // ---------- Réglages (admins) ----------
 app.get("/api/avantages", async (c) => {
   exigeAdmin(c);
-  const rows = (await sql`SELECT id, libelle, declencheur, seuil_cents, to_char(date_debut, 'YYYY-MM-DD') AS date_debut, to_char(date_fin, 'YYYY-MM-DD') AS date_fin, effet, valeur, actif FROM avantages ORDER BY id`) as any[];
+  const rows = (await sql`SELECT id, libelle, declencheur, seuil_cents, to_char(date_debut, 'YYYY-MM-DD') AS date_debut, to_char(date_fin, 'YYYY-MM-DD') AS date_fin, effet, valeur, actif, portee, client_requis FROM avantages ORDER BY id`) as any[];
   return c.json(rows.map(versAvantage));
 });
 
@@ -90,6 +95,7 @@ app.post("/api/avantages", async (c) => {
     if (effet === "pourcent" && valeur > 100) throw new AppError(400, "Une remise ne peut pas dépasser 100 %.");
   }
   await sql`INSERT INTO avantages (libelle, declencheur, seuil_cents, date_debut, date_fin, effet, valeur) VALUES (${libelle}, ${declencheur}, ${seuilCents}, ${debut}, ${fin}, ${effet}, ${valeur})`;
+  await sql`UPDATE avantages SET portee = ${b.portee === "pieces" ? "pieces" : "tout"}, client_requis = ${b.clientRequis === true} WHERE id = (SELECT max(id) FROM avantages)`;
   return c.json({ message: "Avantage ajouté." });
 });
 
@@ -112,3 +118,12 @@ app.post("/api/avantages/supprimer", async (c) => {
   await sql`DELETE FROM avantages WHERE id = ${id}`;
   return c.json({ message: "Avantage supprimé (les ventes passées gardent leur historique)." });
 });
+
+// Offre Black Friday 2026 : -20 % sur pièces détachées et accessoires pour les clients avec la carte du magasin (jusqu'au samedi 28/11).
+{
+  const [dej] = (await sql`SELECT 1 FROM reglages WHERE cle = 'seed_black_friday_2026'`) as any[];
+  if (!dej) {
+    await sql`INSERT INTO avantages (libelle, declencheur, seuil_cents, date_debut, date_fin, effet, valeur, portee, client_requis) VALUES ('Black Friday : -20 % pièces et accessoires (carte du magasin)', 'date', 0, '2026-11-26', '2026-11-28', 'pourcent', 20, 'pieces', true)`;
+    await sql`INSERT INTO reglages (cle, valeur) VALUES ('seed_black_friday_2026', '1') ON CONFLICT (cle) DO NOTHING`;
+  }
+}

@@ -29,6 +29,7 @@ function avForm(){
   h+="<label class='muted'>"+(d==="date"?"Achat minimum (€, facultatif)":d==="cumul"?"Total dépensé à atteindre (€)":"Montant d'achat à atteindre (€)")+"</label><input id='avs' value='"+esc(f.seuil)+"' placeholder='ex : 100'>"
     +"<label class='muted'>Récompense</label><select id='ave' data-act='avType'>"+sel("cadeau",f.effet,"Un cadeau (à remettre au client)")+sel("euros",f.effet,"Une remise en euros")+sel("pourcent",f.effet,"Une remise en pourcentage")+"</select>";
   if(f.effet!=="cadeau")h+="<label class='muted'>"+(f.effet==="euros"?"Montant de la remise (€)":"Pourcentage de remise (%)")+"</label><input id='avv' value='"+esc(f.valeur)+"'>";
+  h+="<label class='muted'>S'applique sur</label><select id='avp'><option value='tout'>Tout l'achat</option><option value='pieces'>Pièces détachées et accessoires seulement</option></select><label class='muted'><input type='checkbox' id='avc'> Seulement si le client est identifié (carte du magasin)</label>";
   return h+"<button data-act='avSave'>Ajouter</button><div class='muted'>"+esc(AVMSG)+"</div></div>"}
 var MODS=null,MODBUSY=false,MODOPEN=0,MODMSG="";
 function modLoad(){if(MODS===null&&!MODBUSY){MODBUSY=true;api("/modeles").then(function(d){MODS=d.modeles;MODBUSY=false;render()}).catch(function(){MODS=[];MODBUSY=false;render()})}}

@@ -280,6 +280,7 @@ app.post("/api/caisse/encaisser", async (c) => {
   const liv = { adresse: clean(src.adresse, 200), cp: clean(src.cp, 10), ville: clean(src.ville, 80) };
   if (livLigne && (!liv.adresse || !liv.cp || !liv.ville)) throw new AppError(400, "Livraison : indique l'adresse, le code postal et la ville.");
   const brut = nettoyees.reduce((s: number, l: any) => s + l.quantite * l.prixCents, 0);
+  const basePieces = nettoyees.filter((l: any) => l.type === "piece" && !l.trott && !/^Livraison à domicile/i.test(String(l.libelle))).reduce((s: number, l: any) => s + l.quantite * l.prixCents, 0);
 
   // Trottinettes : un numéro de série par unité, et un client (la garantie est liée à son compte).
   const auto = await variantesTrott(nettoyees.map((l: any) => l.variantId));
@@ -310,8 +311,8 @@ app.post("/api/caisse/encaisser", async (c) => {
     let reste = brut;
     for (const id of ids) {
       const a = actifs.find((x) => x.id === id);
-      if (!a || !estApplicable(a, brut, ctx)) continue;
-      const cents = Math.min(remiseDe(a, brut), reste);
+      if (!a || !estApplicable(a, brut, ctx, basePieces, clientId)) continue;
+      const cents = Math.min(remiseDe(a, brut, basePieces), reste);
       reste -= cents;
       appliques.push({ id: a.id, libelle: a.libelle, effet: a.effet, cents });
     }

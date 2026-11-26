@@ -46,6 +46,8 @@ await sql`ALTER TABLE vente_lignes ADD COLUMN IF NOT EXISTS shopify_variant_id T
 await sql`ALTER TABLE vente_lignes ADD COLUMN IF NOT EXISTS series JSONB NOT NULL DEFAULT '[]'`;
 await sql`ALTER TABLE vente_lignes ADD COLUMN IF NOT EXISTS sku TEXT`;
 await sql`CREATE TABLE IF NOT EXISTS avantages (id SERIAL PRIMARY KEY, libelle TEXT NOT NULL, declencheur TEXT NOT NULL CHECK (declencheur IN ('cumul','achat','date')), seuil_cents INT NOT NULL DEFAULT 0, date_debut DATE, date_fin DATE, effet TEXT NOT NULL CHECK (effet IN ('cadeau','euros','pourcent')), valeur NUMERIC NOT NULL DEFAULT 0, actif BOOLEAN NOT NULL DEFAULT true, cree_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
+await sql`ALTER TABLE avantages ADD COLUMN IF NOT EXISTS portee TEXT NOT NULL DEFAULT 'tout'`;
+await sql`ALTER TABLE avantages ADD COLUMN IF NOT EXISTS client_requis BOOLEAN NOT NULL DEFAULT false`;
 await sql`CREATE TABLE IF NOT EXISTS vente_avantages (id SERIAL PRIMARY KEY, vente_id INT NOT NULL REFERENCES ventes(id), avantage_id INT, libelle TEXT NOT NULL, effet TEXT NOT NULL, remise_cents INT NOT NULL DEFAULT 0)`;
 await sql`CREATE TABLE IF NOT EXISTS parametres (cle TEXT PRIMARY KEY, valeur TEXT NOT NULL DEFAULT '', maj_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
 await sql`INSERT INTO parametres (cle, valeur) VALUES ('fidelite_euros_pour_palier', '100'), ('fidelite_remise_euros', '5') ON CONFLICT (cle) DO NOTHING`;

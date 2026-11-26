@@ -209,7 +209,7 @@ var ACTS={
     try{await api("/devis/ligne",{repairId:FICHE.id,type:o.type,libelle:o.nom,quantite:1,prix:String(o.prixCents/100).replace(".",",")});await recharger(FICHE.id)}catch(e){alert(e.message)}},
   psSuppr:async function(b){if(!confirm("Supprimer cette prestation ?"))return;try{await api("/prestations/supprimer",{id:+b.dataset.id});PRESTA=null;render()}catch(e){alert(e.message)}},
   multiSave:async function(){try{var d=await api("/reglages/multi",{seuil:v("mu-n"),remise:v("mu-e")});PSMSG=d.message;PRESTA=null;render()}catch(e){PSMSG=e.message;render()}},
-  avSave:async function(){var dec=v("avd");try{var d=await api("/avantages",{libelle:v("avl"),declencheur:dec,seuil:v("avs"),dateDebut:v("avdd"),dateFin:v("avdf"),effet:v("ave"),valeur:v("avv")});AVL=null;AVMSG=d.message||"Avantage ajouté.";CAV=null;render()}catch(e){AVMSG=e.message;render()}},
+  avSave:async function(){var dec=v("avd");try{var d=await api("/avantages",{libelle:v("avl"),declencheur:dec,seuil:v("avs"),dateDebut:v("avdd"),dateFin:v("avdf"),effet:v("ave"),valeur:v("avv"),portee:v("avp"),clientRequis:!!(document.getElementById("avc")&&document.getElementById("avc").checked)});AVL=null;AVMSG=d.message||"Avantage ajouté.";CAV=null;render()}catch(e){AVMSG=e.message;render()}},
   avEtat:async function(b){try{await api("/avantages/etat",{id:+b.dataset.id,actif:b.dataset.v==="1"});AVL=null;CAV=null;render()}catch(e){alert(e.message)}},
   avSuppr:async function(b){if(!confirm("Supprimer cet avantage ?"))return;try{await api("/avantages/supprimer",{id:+b.dataset.id});AVL=null;CAV=null;render()}catch(e){alert(e.message)}},
   avType:function(){AVDEC=v("avd");AVF={libelle:v("avl"),seuil:v("avs"),dd:v("avdd"),df:v("avdf"),effet:v("ave"),valeur:v("avv")};render()},
