@@ -41,7 +41,7 @@ var ACTS={
   arrivee:async function(b){try{var d=await api("/reparations/arrivee",{repairId:Number(b.dataset.id)});if(b.dataset.fiche)await recharger(Number(b.dataset.id));else if(TAB==="enc")loadEnc();else await refresh();alert(d.message)}catch(e){alert(e.message)}},
   avisOui:async function(b){try{var d=await api("/reparations/avis",{repairId:Number(b.dataset.id),choix:"programme"});alert(d.message);await refresh()}catch(e){alert(e.message)}},
   avisNon:async function(b){try{var d=await api("/reparations/avis",{repairId:Number(b.dataset.id),choix:"refuse"});alert(d.message);await refresh()}catch(e){alert(e.message)}},
-  vue:function(b){SVF=null;VUE=b.dataset.vue;loadEnc()},
+  vue:function(b){SVF=null;VUE=b.dataset.vue;viewSave();loadEnc()},
   ouvrirFiche:function(b){ouvrirFiche(Number(b.dataset.id))},
   fermerFiche:function(){FICHE=null;render()},
   setStatut:async function(b){try{await api("/reparations/maj",{repairId:Number(b.dataset.id),statut:b.dataset.s});await recharger(Number(b.dataset.id))}catch(e){alert(e.message)}},
