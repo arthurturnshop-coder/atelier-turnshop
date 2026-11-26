@@ -8,9 +8,9 @@ function vStock(){
   if(STSUB==="cas"){app.innerHTML=h+vCasiers();return}
   if(STSUB==="inv"){app.innerHTML=h+vInv();stFocus(STINV.lieu?"iscan":"ilieu");return}
   if(!STK){app.innerHTML=h+"<div class='card'>Chargement…</div>";api("/stock?magasin="+encodeURIComponent(MAG||"")).then(function(d){STK=d;render()}).catch(function(e){STMSG=e.message;STK={produits:[],lieux:[],nb:0,valeurAchatHtCents:0};render()});return}
-  h+="<div class='card'><div class='step'>Ajout rapide</div><div class='muted'>Scanne l'EAN-13 (ou laisse vide : un EAN-13 interne commençant par 200 est créé, à étiqueter), tape le nom et le prix, Entrée. Si le code existe déjà, la quantité s'ajoute.</div>"
+  h+="<div class='card'><div class='step'>Ajout rapide</div><div class='muted'>Scanne les produits : chaque scan s'ajoute à la liste ci-dessous (même produit = quantité +1). Modifie ce que tu veux dans la liste, puis clique sur « Ajouter au stock ». Sans code : tape le nom et Entrée (un EAN interne est créé, à étiqueter).</div>"
     +"<div class='dl' style='margin-top:6px'><input id='sk' class='lb' placeholder='EAN-13 (scan) - vide = généré'><input id='sn' class='lb' placeholder='Nom du produit'><input id='sp' class='p' placeholder='Prix vente TTC'><input id='sa' class='p' placeholder='Achat HT'><input id='sq' class='q' type='number' min='1' value='1' title='Quantité'><input id='sm' class='q' type='number' min='0' placeholder='Min' title='Stock minimum : en dessous, une commande est suggérée'><input id='sl' class='q' placeholder='Empl.' value='"+esc(STLIEU)+"' title='Emplacement (A11…)'></div>"
-    +"<div class='actions'><button data-act='stAdd'>Ajouter au stock</button><button class='sec' data-act='stCodesFourn'>Récupérer les codes-barres fournisseurs (Ewheel)</button><button class='sec' data-act='stCodesShopify'>Créer des codes internes pour le reste</button></div></div>";
+    +""+stbHtml()+"<div class='actions'><button class='sec' data-act='stCodesFourn'>Récupérer les codes-barres fournisseurs (Ewheel)</button><button class='sec' data-act='stCodesShopify'>Créer des codes internes pour le reste</button></div></div>";
   h+="<div class='card'><div class='step'>Associer un code-barres fournisseur à un produit Shopify</div><div class='muted'>1) Scanne le code-barres du carton. 2) Cherche le produit (ex : pneu plein Xiaomi) et clique la bonne variante : le code est écrit dans Shopify.</div>"
     +"<div class='dl' style='margin-top:6px'><input id='asc' class='lb' placeholder='Scanne le code-barres du fournisseur' value='"+esc(STAS)+"'></div>"+prodBox("assoc")+"</div>";
   h+="<div class='card'><div class='head'><div class='step'>Stock "+esc(STK.magasin||"")+" : "+STK.nb+" produit"+(STK.nb>1?"s":"")+" en stock"+(STK.valeurAchatHtCents?" · valeur d'achat HT "+eur(STK.valeurAchatHtCents):"")+"</div><input id='stq' class='lb' placeholder='Chercher (nom, code, emplacement)' value='"+esc(STQ)+"'></div>";
@@ -25,12 +25,49 @@ function vStock(){
 function stProd(id){return(STK&&STK.produits||[]).filter(function(p){return p.id===id})[0]}
 function stRun(p,msg){return p.then(function(d){STMSG=(d&&d.message)||msg||"";STK=null;render()}).catch(function(e){STMSG=e.message;render()})}
 ACTS.stSub=function(b){STSUB=b.dataset.s;CASI=null;STMSG="";STAP=null;render()};
-ACTS.stAdd=function(){
-  stRun(api("/stock/rapide",{magasin:MAG||"",code:v("sk"),nom:v("sn"),prix:v("sp"),achat:v("sa"),qte:v("sq")||1,min:v("sm"),emplacement:v("sl")}).then(function(d){STLIEU=v("sl")||STLIEU;return d}));
-  };
+var STB=[];try{STB=JSON.parse(localStorage.getItem("atelierStockLot")||"[]")||[]}catch(e){STB=[]}
+function stbSave(){try{localStorage.setItem("atelierStockLot",JSON.stringify(STB))}catch(e){}}
+function stbPush(o){
+  var ex=o.code?STB.filter(function(l){return l.code===o.code})[0]:null;
+  if(ex){ex.qte=(Number(ex.qte)||0)+(Number(o.qte)||1)}else STB.unshift(o);
+  stbSave()}
+function stbHtml(){
+  if(!STB.length)return"<div class='muted' style='margin-top:8px'>Scanne un produit : il s'ajoute ici. Tu peux tout modifier dans la liste, puis clique sur « Ajouter au stock ».</div>";
+  var nb=STB.reduce(function(s,l){return s+(Number(l.qte)||0)},0);
+  var h="<div class='step' style='margin-top:10px'>À ajouter au stock : "+STB.length+" ligne"+(STB.length>1?"s":"")+" · "+nb+" pièce"+(nb>1?"s":"")+"</div><div class='scrollx'><table><tr><th>Produit</th><th>Prix TTC</th><th>Achat HT</th><th>Qté</th><th>Min</th><th>Empl.</th><th></th></tr>";
+  STB.forEach(function(l,i){
+    var f=function(k,c,w,t){return"<input class='stbf "+c+"' data-i='"+i+"' data-k='"+k+"' value='"+esc(l[k]==null?"":l[k])+"'"+(t?" type='number' min='0'":"")+" style='width:"+w+"'>"};
+    h+="<tr><td>"+f("nom","lb","100%")+"<div class='muted'>"+(l.code?esc(l.code):"code interne généré")+(l.nouveau?" · nouveau":"")+"</div></td><td>"+f("prix","p","70px")+"</td><td>"+f("achat","p","70px")+"</td><td>"+f("qte","q","60px",1)+"</td><td>"+f("min","q","55px",1)+"</td><td>"+f("empl","q","60px")+"</td><td><button class='link' data-act='stbDel' data-i='"+i+"'>✕</button></td></tr>"});
+  return h+"</table></div><div class='actions'><button data-act='stAdd'>Ajouter au stock ("+nb+")</button><button class='sec' data-act='stbVider'>Vider la liste</button></div>"}
+document.addEventListener("input",function(e){var t=e.target;if(!t||!t.classList||!t.classList.contains("stbf"))return;var l=STB[+t.dataset.i];if(l){l[t.dataset.k]=t.value;stbSave()}});
+ACTS.stbDel=function(b){STB.splice(+b.dataset.i,1);stbSave();render()};
+ACTS.stbVider=function(){if(!confirm("Vider la liste ?"))return;STB=[];stbSave();render()};
+ACTS.stLigne=function(){
+  var nom=v("sn"),code=v("sk");
+  if(!nom&&!code)return;
+  if(code&&!nom){ACTS.stCode();return}
+  stbPush({code:code,nom:nom,prix:v("sp"),achat:v("sa"),qte:v("sq")||1,min:v("sm"),empl:v("sl")||STLIEU});
+  STLIEU=v("sl")||STLIEU;render();stFocus("sk")};
+ACTS.stAdd=async function(){
+  if(v("sn"))ACTS.stLigne();
+  if(!STB.length)return;
+  var ok=0,ko=[],rest=[];
+  for(var i=0;i<STB.length;i++){var l=STB[i];
+    try{await api("/stock/rapide",{magasin:MAG||"",code:l.code,nom:l.nom,prix:l.prix,achat:l.achat,qte:l.qte||1,min:l.min,emplacement:l.empl});ok++}
+    catch(e){ko.push((l.nom||l.code)+" : "+e.message);rest.push(l)}}
+  STB=rest;stbSave();
+  STMSG=ok+" ligne"+(ok>1?"s":"")+" ajoutée"+(ok>1?"s":"")+" au stock."+(ko.length?" Non ajoutées : "+ko.join(" · "):"");
+  STK=null;render()};
 ACTS.stCode=function(){
   var c=v("sk");if(!c)return;
-  api("/stock/scan",{magasin:MAG||"",code:c}).then(function(d){var p=d.produit,sh=d.shopify;if(p||sh)bipOk();else bipKo();if(!p&&sh){document.getElementById("sn").value=sh.nom;document.getElementById("sp").value=sh.prixCents?(sh.prixCents/100).toFixed(2):"";document.getElementById("sa").value=sh.achatHtCents==null?"":(sh.achatHtCents/100).toFixed(2);STMSG="Trouvé dans le catalogue Shopify : "+sh.nom+". Indique la quantité et l'emplacement.";var m2=document.querySelector(".pmsg");if(m2)m2.textContent=STMSG;stFocus("sq");return}if(p){document.getElementById("sn").value=p.nom;document.getElementById("sp").value=p.prixCents?(p.prixCents/100).toFixed(2):"";document.getElementById("sa").value=p.achatHtCents==null?"":(p.achatHtCents/100).toFixed(2);if(p.emplacement)document.getElementById("sl").value=p.emplacement;if(p.min)document.getElementById("sm").value=p.min;STMSG="Déjà en stock : "+p.nom+" ("+p.qte+"). La quantité saisie s'ajoutera.";var m=document.querySelector(".pmsg");if(m)m.textContent=STMSG;stFocus("sq")}else stFocus("sn")}).catch(function(){})};
+  var ex=STB.filter(function(l){return l.code===c})[0];
+  if(ex){ex.qte=(Number(ex.qte)||0)+1;stbSave();bipOk();render();stFocus("sk");return}
+  var lieu=v("sl")||STLIEU;
+  api("/stock/scan",{magasin:MAG||"",code:c}).then(function(d){var p=d.produit,sh=d.shopify;
+    if(p){bipOk();stbPush({code:p.code,nom:p.nom,prix:p.prixCents?(p.prixCents/100).toFixed(2):"",achat:p.achatHtCents==null?"":(p.achatHtCents/100).toFixed(2),qte:1,min:p.min||"",empl:p.emplacement||lieu})}
+    else if(sh){bipOk();stbPush({code:c,nom:sh.nom,prix:sh.prixCents?(sh.prixCents/100).toFixed(2):"",achat:sh.achatHtCents==null?"":(sh.achatHtCents/100).toFixed(2),qte:1,min:"",empl:lieu})}
+    else{bipKo();stbPush({code:c,nom:"",prix:"",achat:"",qte:1,min:"",empl:lieu,nouveau:1});STMSG="Code inconnu : tape son nom dans la ligne."}
+    render();stFocus("sk")}).catch(function(){})};
 ACTS.stSearch=function(){STQ=v("stq");api("/stock?magasin="+encodeURIComponent(MAG||"")+"&q="+encodeURIComponent(STQ)).then(function(d){STK=d;var p=STQ;render();var e=document.getElementById("stq");if(e){e.focus();e.setSelectionRange(p.length,p.length)}}).catch(function(){})};
 ACTS.stDelta=function(b){stRun(api("/stock/maj",{id:+b.dataset.id,delta:+b.dataset.d}),"")};
 ACTS.stDel=function(b){var p=stProd(+b.dataset.id);if(p&&confirm("Retirer "+p.nom+" du stock ? (récupérable en le rescannant)"))stRun(api("/stock/archiver",{id:p.id}))};
@@ -127,7 +164,7 @@ document.addEventListener("keydown",function(e){
   if(t.id==="iscan"){e.preventDefault();ACTS.iScan();return}
   if(t.id==="ilieu"){e.preventDefault();ACTS.iLieu();stFocus("iscan");return}
   if(t.id==="sk"){e.preventDefault();ACTS.stCode();return}
-  if(t.id==="sn"||t.id==="sp"||t.id==="sa"||t.id==="sq"||t.id==="sm"||t.id==="sl"){e.preventDefault();ACTS.stAdd()}});
+  if(t.id==="sn"||t.id==="sp"||t.id==="sa"||t.id==="sq"||t.id==="sm"||t.id==="sl"){e.preventDefault();ACTS.stLigne()}});
 document.addEventListener("input",function(e){var t=e.target;if(t&&t.id==="stq"&&TAB==="stock"){clearTimeout(window.__stt);window.__stt=setTimeout(ACTS.stSearch,250)}});
 document.addEventListener("input",function(e){if(e.target&&e.target.id==="asc")STAS=e.target.value.trim()});
 document.addEventListener("keydown",function(e){if(e.target&&e.target.id==="asc"&&e.key==="Enter"){e.preventDefault();var b=document.querySelector("[data-ps=assoc]");if(b)b.focus()}});
