@@ -19,7 +19,7 @@ export async function lireAuto(): Promise<Record<Quand, Canal>> {
   const m: Record<string, string> = {};
   for (const r of rows) m[r.cle] = r.valeur;
   const out: any = {};
-  for (const q of QUAND) out[q] = ["email", "sms", "both"].includes(m["brevo_" + q]) ? "email" : "off"; // SMS désactivés pour l'instant : tout réglage actif = email
+  for (const q of QUAND) out[q] = ["email", "sms", "both"].includes(m["brevo_" + q]) ? m["brevo_" + q] : "off";
   return out;
 }
 
@@ -100,7 +100,7 @@ export async function notifier(quand: MsgType, c: Ctx): Promise<string> {
     }
     const envois: [string, string, () => Promise<unknown>][] = [];
     const mail = String(cl.email ?? "").trim();
-    const sms = numeroSms(cl.telephone); // inutilisé tant que les SMS sont désactivés (lireAuto ne renvoie que off ou email)
+    const sms = numeroSms(cl.telephone); 
     if ((canal === "email" || canal === "both") && mail) envois.push(["email", mail, () => envoiEmail(mail, c.sujet, c.texte)]);
     if ((canal === "sms" || canal === "both") && sms) envois.push(["sms", sms, () => envoiSms(sms, c.texte)]);
     let ok = false;

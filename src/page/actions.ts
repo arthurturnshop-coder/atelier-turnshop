@@ -168,7 +168,7 @@ var ACTS={
   brvSave:async function(){try{var d=await api("/brevo",{avis:v("bv-avis"),rdv:v("bv-rdv"),piece:v("bv-piece"),pret:v("bv-pret"),garde:v("bv-garde"),anniv:v("bv-anniv"),bonexp:v("bv-bonexp")});BRVMSG=d.message;BRV=null;render()}catch(e){BRVMSG=e.message;render()}},
   actLock:function(){actLock()},
   vueTous:function(){VTOUS=!VTOUS;try{sessionStorage.setItem("atelierTous",VTOUS?"1":"0")}catch(e){}viewSave();location.reload()},
-  brvTest:async function(){var em=v("bv-te");BRVTE=em;BRVMSG="Envoi…";render();try{var d=await api("/brevo/test",{email:em});BRVMSG=d.message}catch(e){BRVMSG=e.message}render()},
+  brvTest:async function(){var em=v("bv-te");BRVTE=em;BRVMSG="Envoi…";render();try{var d=await api("/brevo/test",{email:em,tel:v("bv-tt")});BRVMSG=d.message}catch(e){BRVMSG=e.message}render()},
   tTab:function(b){TTAB=b.dataset.v;TACH=null;TREC=null;TRECP=null;render()},
   rcSave:async function(){try{var f=v("rc-f"),b={id:RCEDIT,texte:v("rc-txt"),priorite:!!document.getElementById("rc-p").checked};
       if(f.charAt(0)==="j"){b.unite="jours";b.intervalle=+f.slice(1)}

@@ -8,7 +8,7 @@ import { AppError, clean, exigeAdmin } from "../util";
 app.get("/api/brevo", async (c) => {
   exigeAdmin(c);
   const messages = (await sql`SELECT m.type, m.canal, m.destinataire, m.statut, m.erreur, m.cree_le, trim(c.prenom || ' ' || c.nom) AS client FROM messages_envoyes m LEFT JOIN clients c ON c.id = m.client_id ORDER BY m.id DESC LIMIT 15`) as any[];
-  return c.json({ configure: brevoConfigure(), expediteurEmail: !!Bun.env.BREVO_EMAIL_EXPEDITEUR, auto: await lireAuto(), messages });
+  return c.json({ configure: brevoConfigure(), expediteurEmail: !!Bun.env.BREVO_EMAIL_EXPEDITEUR, smsExpediteur: (Bun.env.BREVO_SMS_EXPEDITEUR || "TURNSHOP").slice(0, 11), auto: await lireAuto(), messages });
 });
 
 app.post("/api/brevo", async (c) => {
@@ -27,7 +27,7 @@ app.post("/api/brevo/test", async (c) => {
   if (!brevoConfigure()) throw new AppError(400, "BREVO_API_KEY n'est pas renseignée dans Railway.");
   const b = await c.req.json().catch(() => ({}));
   const mail = clean(b.email, 120), tel = numeroSms(clean(b.tel, 40));
-  if (!mail && !tel) throw new AppError(400, "Tape ton email pour le test.");
+  if (!mail && !tel) throw new AppError(400, "Tape ton email ou ton portable pour le test.");
   let rep = "";
   try {
     if (mail) rep = await envoiEmail(mail, "Test TURN Shop", "Ceci est un test d'envoi depuis l'Atelier TURN.");
@@ -35,5 +35,5 @@ app.post("/api/brevo/test", async (c) => {
   } catch (e: any) {
     throw new AppError(502, String(e?.message ?? e));
   }
-  return c.json({ message: "Brevo a accepté l'envoi" + (rep ? " (réponse : " + rep + " depuis " + (Bun.env.BREVO_EMAIL_EXPEDITEUR ?? "?") + ")" : "") + ". Vérifie ta boîte mail (et les spams)." });
+  return c.json({ message: "Brevo a accepté l'envoi" + (rep ? " (réponse : " + rep + " depuis " + (Bun.env.BREVO_EMAIL_EXPEDITEUR ?? "?") + ")" : "") + (tel ? ". SMS envoyé au " + tel : "") + (mail ? ". Vérifie ta boîte mail (et les spams)." : ".") });
 });
