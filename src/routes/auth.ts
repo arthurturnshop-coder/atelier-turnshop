@@ -3,7 +3,6 @@ import { BLOCAGE_MS, ESSAIS_MAX, MAGASINS, PASSWORD } from "../config";
 import { sql } from "../db";
 import { AppError, clean, magasinsDe, samePassword } from "../util";
 import { createHash, randomInt } from "node:crypto";
-import { envoiEmail, brevoConfigure } from "../brevo";
 // Même empreinte que caissier.ts (pas d'import : il enregistrerait ses routes avant ce contrôle d'accès).
 const hashCode = (code: string) => createHash("sha256").update("turn-caisse:" + code).digest("hex");
 
@@ -51,11 +50,11 @@ app.post("/auth/connexion", async (c) => {
 });
 
 // Accès de secours par email : un code à 8 chiffres, valable 10 min, envoyé aux gérants (SECOURS_EMAILS dans Railway pour changer les adresses).
-await sql`CREATE TABLE IF NOT EXISTS secours_codes (id SERIAL PRIMARY KEY, hash TEXT NOT NULL, expire TIMESTAMPTZ NOT NULL, essais INT NOT NULL DEFAULT 0, utilise BOOLEAN NOT NULL DEFAULT false, cree_le TIMESTAMPTZ NOT NULL DEFAULT now())`;
 const SECOURS_DEST = () => (Bun.env.SECOURS_EMAILS || "arthurturnshop@gmail.com,antoineturnshop@gmail.com").split(",").map((x) => x.trim()).filter(Boolean);
 const hashSecours = (c: string) => createHash("sha256").update("turn-secours:" + c).digest("hex");
 
 app.post("/auth/secours-code", async (c) => {
+  const { envoiEmail, brevoConfigure } = await import("../brevo"); // import différé : un import statique retarderait ce module après les autres routes
   if (!brevoConfigure()) throw new AppError(503, "L'envoi d'emails n'est pas branché (Brevo) : utilise le mot de passe équipe.");
   const [r] = (await sql`SELECT count(*)::int AS h, count(*) FILTER (WHERE cree_le > now() - interval '60 seconds')::int AS m FROM secours_codes WHERE cree_le > now() - interval '1 hour'`) as any[];
   if (r.m > 0) throw new AppError(429, "Un code vient d'être envoyé. Attends 1 minute avant d'en redemander un.");
@@ -140,3 +139,6 @@ app.post("/api/acteur", async (c) => {
   const u = c.get("user") as any;
   return c.json({ prenom: u.prenom, role: u.role, magasin: u.magasin });
 });
+
+// Doit rester tout en bas : un await au sommet retarde l'enregistrement du middleware d'authentification pour les autres modules.
+await sql`CREATE TABLE IF NOT EXISTS secours_codes (id SERIAL PRIMARY KEY, hash TEXT NOT NULL, expire TIMESTAMPTZ NOT NULL, essais INT NOT NULL DEFAULT 0, utilise BOOLEAN NOT NULL DEFAULT false, cree_le TIMESTAMPTZ NOT NULL DEFAULT now())`;

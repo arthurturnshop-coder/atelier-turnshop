@@ -60,4 +60,15 @@ app.get("/favori", (c) => {
 </body>`);
 });
 
+// Garde-fou de sécurité : aucune route /api ne doit être enregistrée AVANT le contrôle d'accès (sinon elle serait publique).
+{
+  const rs = (app as any).routes as { method: string; path: string }[];
+  const mw = rs.findIndex((r) => r.path === "/api/*" && r.method === "ALL");
+  const avant = rs.slice(0, mw < 0 ? rs.length : mw).filter((r) => r.path.startsWith("/api/") && r.path !== "/api/*");
+  if (mw < 0 || avant.length) {
+    console.error("ERREUR SÉCURITÉ : routes /api enregistrées avant l'authentification :", avant.map((r) => r.method + " " + r.path).slice(0, 10));
+    process.exit(1);
+  }
+}
+
 export default { port: Number(Bun.env.PORT ?? 3000), fetch: app.fetch };
