@@ -29,13 +29,13 @@ function vProcess(){
       +(prcPeut()?"<div class='actions'><button class='sec' data-act='prcEdit' data-id='"+sel.id+"'>✏️ Modifier</button></div>":"")+"</div>";
     return app.innerHTML=h+"</div>"}
   var q=PRC.q.toLowerCase(),L=PRC.pages.filter(function(p){return!q||(p.titre+" "+p.categorie+" "+p.contenu).toLowerCase().indexOf(q)>=0});
-  h+="<div class='card'><div class='dl'><input id='pr-q' class='lb' placeholder='Chercher un process (ex : garantie, clôture, devis)' value='"+esc(PRC.q)+"'>"+(prcPeut()?"<button data-act='prcNew'>+ Nouvelle page</button>":"")+"</div><div class='muted'>"+esc(PRC.msg)+"</div></div>";
+  h+="<div class='card'><div class='dl'><input id='prc-q' class='lb' placeholder='Chercher un process (ex : garantie, clôture, devis)' value='"+esc(PRC.q)+"'>"+(prcPeut()?"<button data-act='prcNew'>+ Nouvelle page</button>":"")+"</div><div class='muted'>"+esc(PRC.msg)+"</div></div>";
   var cats=[];L.forEach(function(p){if(cats.indexOf(p.categorie)<0)cats.push(p.categorie)});
   if(!L.length)h+="<div class='card muted'>Aucun process trouvé.</div>";
   cats.forEach(function(c){h+="<div class='card'><div class='step'>"+esc(c)+"</div>"+L.filter(function(p){return p.categorie===c}).map(function(p){return"<button class='sec hrow' data-act='prcOpen' data-id='"+p.id+"'><b>"+esc(p.titre)+"</b></button>"}).join("")+"</div>"});
   app.innerHTML=h+"</div>"}
 function prcCats(){var c=[];(PRC.pages||[]).forEach(function(p){if(c.indexOf(p.categorie)<0)c.push(p.categorie)});return c}
-document.addEventListener("input",function(e){if(e.target&&e.target.id==="pr-q"){PRC.q=e.target.value;var p=e.target.selectionStart;vProcess();var n=document.getElementById("pr-q");if(n){n.focus();try{n.setSelectionRange(p,p)}catch(x){}}}});
+document.addEventListener("input",function(e){if(e.target&&e.target.id==="prc-q"){PRC.q=e.target.value;var p=e.target.selectionStart;vProcess();var n=document.getElementById("prc-q");if(n){n.focus();try{n.setSelectionRange(p,p)}catch(x){}}}});
 ACTS.prcOpen=function(b){PRC.sel=+b.dataset.id;PRC.msg="";render();window.scrollTo(0,0)};
 ACTS.prcBack=function(){PRC.sel=0;PRC.ed=null;render()};
 ACTS.prcNew=function(){PRC.ed={id:0,titre:"",categorie:"",contenu:""};PRC.msg="";render()};
