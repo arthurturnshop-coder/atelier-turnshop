@@ -42,6 +42,13 @@ function actLock(){verrouille()}
 setInterval(function(){if(!TOK&&!PW)return;if(LOCKED)return;if(!ACT||ACT.until<Date.now())verrouille();else actPersist()},4000);
 (function(){if(!TOK&&!PW)return;var a=null;try{a=JSON.parse(sessionStorage.getItem("atelierAct")||"null")}catch(e){}
   if(a&&a.until>Date.now()){ACT=a;PRENOM=a.prenom;ROLE=a.role}else{ACT=null;setTimeout(function(){verrouille()},0)}})();
+var ROLECHK=0;
+function roleSync(force){
+  if(!TOK&&!PW)return;if(LOCKED)return;
+  if(!force&&Date.now()-ROLECHK<30000)return;ROLECHK=Date.now();
+  var b=(ACT&&ACT.code&&/^[0-9]{3}$/.test(ACT.code))?{mdpCaissier:ACT.code}:{};
+  api("/acteur",b).then(function(d){if(d&&d.role&&(d.role!==ROLE||(d.prenom&&d.prenom!==PRENOM))){ROLE=d.role;if(d.prenom)PRENOM=d.prenom;if(ACT){ACT.role=d.role;if(d.prenom)ACT.prenom=d.prenom;actPersist()}if(typeof renderWho==="function")renderWho();render()}}).catch(function(){})}
+setTimeout(function(){roleSync(true)},1500);
 async function api(path,body){
   var h={"Content-Type":"application/json"};if(TOK)h["x-atelier-token"]=TOK;else h["x-atelier-password"]=PW;
   if(body!==undefined&&body.mdpCaissier&&/^[0-9]{3}$/.test(String(body.mdpCaissier))){h["x-atelier-code"]=String(body.mdpCaissier)}

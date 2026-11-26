@@ -46,7 +46,7 @@ function modCard(){
   h+="<div class='step' style='margin-top:10px'>Import CSV (marque;modele;categorie;sku;libelle)</div><textarea id='mod-csv' rows='4' placeholder='Xiaomi;M365;pneu;SKU-123;Pneu 8.5 pouces'></textarea><button class='sec' data-act='modImport'>Importer</button><div class='muted'>"+esc(MODMSG)+"</div></div>";
   return h}
 function vParam(){
-  if(ROLE!=="admin"){app.innerHTML="<div class='card'>Réservé aux administrateurs.</div>";return}
+  if(ROLE!=="admin"){roleSync(true);app.innerHTML="<div class='card'>Réservé aux administrateurs. <span class='muted'>(connecté : "+esc(PRENOM)+", rôle "+esc(ROLE||"?")+")</span> <button data-act='actLock'>Verrouiller et changer de code</button></div>";return}
   if(SHOPCMD===null){SHOPCMD=undefined;api("/reglages/commandes").then(function(d){SHOPCMD=d.actif;render()}).catch(function(){SHOPCMD=false;render()})}
   if(TICK===null){TICK=undefined;api("/reglages/ticket").then(function(d){TICK=d;render()}).catch(function(){TICK={entete:"",avisAmiens:"",avisRouen:""};render()})}
   if(!PARAM||!AVL){
