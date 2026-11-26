@@ -29,6 +29,11 @@ async function liste() {
   return ms.map((m) => ({ id: m.id, marque: m.marque, modele: m.modele, actif: m.actif === true, pieces: ps.filter((p) => p.modele_id === m.id).map((p) => ({ id: p.id, libelle: p.libelle, sku: p.sku, variantId: p.variant_id, categorie: p.categorie })) }));
 }
 
+// Marques de trottinettes classées par fréquence (nombre de trottinettes enregistrées + prises en charge).
+app.get("/api/marques", async (c) => {
+  const rows = (await sql`SELECT min(t.marque) AS marque, count(DISTINCT t.id)::int + count(r.id)::int AS n FROM trottinettes t LEFT JOIN reparations r ON r.trottinette_id = t.id WHERE trim(t.marque) <> '' GROUP BY lower(trim(t.marque)) ORDER BY n DESC, 1`) as any[];
+  return c.json({ marques: rows.map((r) => ({ marque: String(r.marque).trim(), n: r.n })) });
+});
 app.get("/api/modeles", async (c) => c.json({ modeles: await liste() }));
 
 app.post("/api/modeles", async (c) => {

@@ -74,7 +74,7 @@ ACTS.creOk=async function(){
   }catch(e){CRE.busy=false;CRE.msg=e.message;render()}};
 var MARQ_BASE=["Xiaomi","Ninebot","Segway","Dualtron","Minimotors","Kaabo","Inokim","Zero","Vsett","Kuickwheel","Joyor","Cecotec","Navee","Hiboy","Apollo","Emove","Urbanglide","Wattiz","Teverun","Speedway","Aprilia","Pure","Decathlon","Oxelo","Nami","Yadea","Mercane","Ewheel","Eskuta","Bird","Lime","Dott","Autre"];
 var MARQ=null,MARQBUSY=false;
-function marqLoad(){if(MARQ===null&&!MARQBUSY){MARQBUSY=true;api("/modeles").then(function(d){var l=(d.modeles||d||[]).map(function(m){return m.marque});MARQ=l;MARQBUSY=false;var e=document.getElementById("dl-marques");if(e)e.innerHTML=marqOpts()}).catch(function(){MARQ=[];MARQBUSY=false})}}
-function marqOpts(){var seen={},out=[];(MARQ||[]).concat(MARQ_BASE).forEach(function(m){var k=String(m||"").trim().toLowerCase();if(k&&!seen[k]){seen[k]=1;out.push(String(m).trim())}});out.sort(function(a,b){return a.localeCompare(b)});return out.map(function(m){return"<option value='"+esc(m)+"'>"}).join("")}
+function marqLoad(){if(MARQ===null&&!MARQBUSY){MARQBUSY=true;api("/marques").then(function(d){MARQ=(d.marques||[]).map(function(m){return m.marque});MARQBUSY=false;var e=document.getElementById("dl-marques");if(e)e.innerHTML=marqOpts()}).catch(function(){MARQ=[];MARQBUSY=false})}}
+function marqOpts(){var seen={},out=[];(MARQ||[]).concat(MARQ_BASE).forEach(function(m){var k=String(m||"").trim().toLowerCase();if(k&&!seen[k]){seen[k]=1;out.push(String(m).trim())}});return out.map(function(m){return"<option value='"+esc(m)+"'>"}).join("")}
 function marqDL(){marqLoad();return"<datalist id='dl-marques'>"+marqOpts()+"</datalist>"}
 `;
