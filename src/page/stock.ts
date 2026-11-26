@@ -2,7 +2,7 @@ export const STOCK = `// ---------- Stock maison + inventaire par emplacement --
 var CASI=null,STAS="",STK=null,STMSG="",STSUB="liste",STQ="",STLIEU="",STINV={lieu:"",cur:"",scans:[],noms:{},info:{},alerte:null,ok:""},STAP=null;
 function stPanneau(){return/^[A-Z]+$/.test(STINV.lieu)}
 function stSuiv(c,d){var m=String(c).match(/^([A-Z]+)([0-9]+)$/);if(!m)return c;var n=Math.max(1,Number(m[2])+d);return m[1]+n}
-function stFocus(id){setTimeout(function(){var e=document.getElementById(id);if(e)e.focus()},30)}
+function stFocus(id){setTimeout(function(){var e=document.getElementById(id);if(e)e.focus({preventScroll:true})},30)}
 function vStock(){
   var h="<div class='pmsg'>"+esc(STMSG)+"</div><div class='actions'><button class='"+(STSUB==="liste"?"":"sec")+"' data-act='stSub' data-s='liste'>Stock</button><button class='"+(STSUB==="inv"?"":"sec")+"' data-act='stSub' data-s='inv'>Inventaire d'un emplacement</button><button class='"+(STSUB==="cas"?"":"sec")+"' data-act='stSub' data-s='cas'>Mes casiers</button></div>";
   if(STSUB==="cas"){app.innerHTML=h+vCasiers();return}
