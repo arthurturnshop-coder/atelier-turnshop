@@ -1,3 +1,4 @@
+import { tagPrixManuel } from "../shopify";
 import { app } from "../app";
 import { AVIS_DELAI_HEURES, STATUTS } from "../config";
 import { lireTicket } from "./ticket";
@@ -245,11 +246,14 @@ app.post("/api/devis/ligne/quantite", async (c) => {
 app.post("/api/devis/ligne/prix", async (c) => {
   const b = await c.req.json().catch(() => ({}));
   const id = Number(b.id);
-  const [l] = await sql`SELECT reparation_id, prix_unitaire_cents FROM devis_lignes WHERE id = ${id}`;
+  const [l] = await sql`SELECT reparation_id, prix_unitaire_cents, shopify_variant_id, type FROM devis_lignes WHERE id = ${id}`;
   if (!l) throw new AppError(404, "Ligne introuvable.");
   const p = Math.round(Number(String(b.prix ?? "").replace(/[^0-9,.-]/g, "").replace(",", ".")) * 100);
   if (!(p >= 0 && p <= 10000000)) throw new AppError(400, "Prix invalide.");
-  if (p !== l.prix_unitaire_cents) await sql`UPDATE devis_lignes SET prix_unitaire_cents = ${p}, prix_manuel = true WHERE id = ${id}`;
+  if (p !== l.prix_unitaire_cents) {
+    await sql`UPDATE devis_lignes SET prix_unitaire_cents = ${p}, prix_manuel = true WHERE id = ${id}`;
+    if (l.type === "piece") void tagPrixManuel(l.shopify_variant_id);
+  }
   await sql`UPDATE reparations SET maj_le = now() WHERE id = ${l.reparation_id}`;
   return c.json({ devis: await devisDe(l.reparation_id) });
 });

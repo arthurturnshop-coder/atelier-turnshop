@@ -271,6 +271,7 @@ app.post("/api/caisse/encaisser", async (c) => {
     variantId: clean(l.variantId, 80) || null,
     sku: clean(l.sku, 80) || null,
     trott: l.trott === true,
+    manuel: l.prix0 !== undefined && l.prix0 !== null && Math.round((Number(String(l.prix0).replace(",", ".")) || 0) * 100) !== Math.round((Number(String(l.prix ?? "0").replace(",", ".")) || 0) * 100),
     series: (Array.isArray(l.series) ? l.series : []).map((x: any) => clean(x, 60).replace(/\s+/g, " ")),
   }));
   if (nettoyees.some((l: any) => !l.libelle)) throw new AppError(400, "Chaque ligne doit avoir un libellé.");
@@ -371,6 +372,7 @@ app.post("/api/caisse/encaisser", async (c) => {
   }
   await sql`UPDATE ventes SET numero_facture = 'F-' || to_char(now(), 'YYYY') || '-' || lpad(nextval('facture_seq')::text, 5, '0') WHERE id = ${v.id}`;
   for (const l of nettoyees) { const m = /DV#(\d+)/.exec(String(l.libelle)); if (m) await (await import("./depot")).depotVendu(Number(m[1]), v.id, l.prixCents * l.quantite); }
+  for (const l of nettoyees) if ((l as any).manuel && l.variantId) void (await import("../shopify")).tagPrixManuel(l.variantId);
   for (const l of nettoyees) {
     await sql`INSERT INTO vente_lignes (vente_id, libelle, quantite, prix_unitaire_cents, type, shopify_variant_id, sku, series) VALUES (${v.id}, ${l.libelle}, ${l.quantite}, ${l.prixCents}, ${l.type}, ${l.variantId}, ${l.sku}, ${JSON.stringify(l.series)}::text::jsonb)`;
     if (clientId) for (const serie of l.series as string[]) {

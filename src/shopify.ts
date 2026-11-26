@@ -59,3 +59,16 @@ export async function shopifyMutate(query: string, variables: Record<string, unk
 
 // Même recherche, avec le stock détaillé par emplacement (demande le droit read_locations).
 export const PRODUITS_QUERY_LIEUX = `query($q: String!) { products(first: 12, query: $q) { nodes { id title vendor variants(first: 5) { nodes { id title sku barcode price inventoryQuantity inventoryItem { inventoryLevels(first: 10) { nodes { location { name } quantities(names: ["available"]) { quantity } } } } } } } } }`;
+
+// Tag « Prix manuel » sur le produit Shopify quand un prix a été changé à la main dans le logiciel
+// (sert à ne pas écraser ce prix lors des synchronisations fournisseur, ex. Ewheel). Best effort, jamais bloquant.
+export async function tagPrixManuel(variantId: string | null | undefined): Promise<void> {
+  try {
+    if (!variantId) return;
+    const id = String(variantId).startsWith("gid://") ? String(variantId) : `gid://shopify/ProductVariant/${variantId}`;
+    const r: any = await shopifyRead(`query($id:ID!){productVariant(id:$id){product{id}}}`, { id });
+    const pid = r?.productVariant?.product?.id;
+    if (!pid) return;
+    await shopifyMutate(`mutation($id:ID!,$tags:[String!]!){tagsAdd(id:$id,tags:$tags){userErrors{message}}}`, { id: pid, tags: ["Prix manuel"] });
+  } catch (e) { console.error("tagPrixManuel", (e as Error).message); }
+}
