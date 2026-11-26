@@ -4,11 +4,16 @@ var RSTAT={demande:"Demande reçue",attente:"Colis attendu",recu:"Colis reçu",o
 function rsLoad(){api("/sav/dossiers").then(function(x){SAV=x.dossiers}).catch(function(){});api("/retours-site").then(function(d){RS.d=d;if(TAB==="rsite")render()}).catch(function(e){RS.msg=e.message;RS.d=RS.d||{retours:[],modele:""};if(TAB==="rsite")render()})}
 function rsFerme(r){return r.statut==="rembourse"||r.statut==="refuse"||r.statut==="clos"}
 function rsBtn(id,etat,txt,cls){return"<button class='"+(cls||"")+"' data-act='rsEtat' data-id='"+id+"' data-etat='"+etat+"'>"+txt+"</button>"}
+function rsDelai(r){
+  if(!r.livre)return rsFerme(r)?"":"<div class='actions'><span class='muted'>Livré le :</span><input type='date' id='rs-l"+r.id+"'><button class='sec' data-act='rsLiv' data-id='"+r.id+"'>Enregistrer (délai de rétractation 14 j)</button></div>";
+  var j=r.joursRestants,t=j>=0?"Rétractation : il reste "+j+" jour"+(j>1?"s":"")+" (livré le "+r.livre.split("-").reverse().join("/")+")":"Hors délai de rétractation : dépassé de "+(-j)+" jour"+(j<-1?"s":"")+" (livré le "+r.livre.split("-").reverse().join("/")+")";
+  return "<div style='margin-top:4px'><span class='tag"+(j<0?" warn":"")+"'>"+esc(t)+"</span></div>"}
 function rsCarte(r){
   var h="<div class='card'><div style='display:flex;gap:8px;align-items:center;flex-wrap:wrap'><b>R"+r.id+"</b> <span class='tag"+(r.type==="garantie"?" warn":"")+"'>"+(r.type==="garantie"?"SAV garantie":r.type==="fournisseur"?"Fournisseur":"Retour client")+"</span> <span class='tag'>"+esc(r.type==="fournisseur"?({demande:"À renvoyer",fournisseur:"Renvoyé, en attente",rembourse:"Avoir / remboursement reçu",clos:"Terminé",refuse:"Annulé"}[r.statut]||r.statut):(RSTAT[r.statut]||r.statut))+"</span><span class='muted'>"+esc(dateLongue(r.cree))+(r.par?" · "+esc(r.par):"")+"</span></div>"
     +"<div style='margin-top:4px'><b>"+esc(r.produit)+"</b>"+(r.commande?" · commande "+esc(r.commande):"")+"</div>"
     +((r.nom||r.email||r.telephone)?"<div class='muted'>"+esc(r.nom)+(r.email?" · "+esc(r.email):"")+(r.telephone?" · "+esc(r.telephone):"")+"</div>":"")
     +(r.motif?"<div class='muted'>Motif : "+esc(r.motif)+"</div>":"")
+    +(r.type==="fournisseur"?"":rsDelai(r))
     +(r.mail?"<div class='muted'>Mail d instructions envoyé le "+esc(dateLongue(r.mail))+"</div>":"")
     +(r.fournisseur?"<div class='muted'>Fournisseur : "+esc(r.fournisseur)+"</div>":"")
     +(r.montantCents?"<div class='muted'>Montant : "+eur(r.montantCents)+"</div>":"");
@@ -40,18 +45,19 @@ function vRsite(){
   if(RS.nouv){var fo=RS.type==="fournisseur";h+="<div class='card'><div class='step'>Nouveau retour</div><div class='muted'>Achat en boutique avec ticket : la garantie et le retour se font depuis le ticket du client, pas ici.</div>"
     +"<div class='actions'><button data-act='rsType' data-t='retour' class='"+(RS.type==="retour"?"":"sec")+"'>Client (site)</button><button data-act='rsType' data-t='fournisseur' class='"+(fo?"":"sec")+"'>Pièce au fournisseur</button></div>"
     +(fo?"<div class='dl'><input id='rs-fou' class='lb' placeholder='Fournisseur (ex : eWheel)'><input id='rs-cmd' class='lb' placeholder='N° de commande ou BL fournisseur'></div>":"<div class='dl'><input id='rs-nom' class='lb' placeholder='Nom du client'><input id='rs-em' class='lb' placeholder='Email'></div><div class='dl'><input id='rs-tel' class='lb' placeholder='Téléphone'><input id='rs-cmd' class='lb' placeholder='N° de commande (#1234)'></div>")
-    +"<div class='dl'><input id='rs-prod' class='lb' placeholder='"+(fo?"Pièce à renvoyer":"Produit concerné")+"'>"+(fo?"<input id='rs-mt' class='lb' placeholder='Montant attendu (€)'>":"")+"</div>"
+    +"<div class='dl'><input id='rs-prod' class='lb' placeholder='"+(fo?"Pièce à renvoyer":"Produit concerné")+"'>"+(fo?"":"<span class='muted'>Livré le</span><input id='rs-liv' type='date'>")+(fo?"<input id='rs-mt' class='lb' placeholder='Montant attendu (€)'>":"")+"</div>"
     +"<textarea id='rs-motif' rows='3' style='width:100%' placeholder='"+(fo?"Motif (défectueuse, mauvaise référence, erreur de commande...)":"Motif indiqué par le client (formulaire du site)")+"'></textarea>"
     +"<div class='actions'><button data-act='rsCree'>Enregistrer</button></div></div>"}
   if(RS.filtre!=="fournisseur"&&SAV&&SAV.length)h+=blocGaranties(true);
   h+="<div class='step' style='margin-top:12px'>À traiter ("+ouv.length+")</div>"+(ouv.length?ouv.map(rsCarte).join(""):"<div class='card muted'>Aucun retour en cours.</div>");
   if(fer.length)h+="<div class='step' style='margin-top:12px'>Terminés ("+fer.length+")</div>"+fer.slice(0,20).map(rsCarte).join("");
   app.innerHTML=h+"</div>"}
+ACTS.rsLiv=async function(b){var id=Number(b.dataset.id),d=v('rs-l'+id);if(!d){alert('Choisis la date de livraison.');return}try{await api('/retours-site/maj',{id:id,livreLe:d});RS.d=null;render()}catch(e){alert(e.message)}};
 ACTS.rsNouv=function(){RS.nouv=!RS.nouv;RS.type="retour";render()};
 ACTS.rsModele=function(){RS.modele=!RS.modele;render()};
 ACTS.rsType=function(b){RS.type=b.dataset.t;render()};
 ACTS.rsFiltre=function(b){RS.filtre=b.dataset.f;render()};
-ACTS.rsCree=async function(){try{var d=await api("/retours-site",{type:RS.type||"retour",nom:v("rs-nom"),email:v("rs-em"),telephone:v("rs-tel"),commande:v("rs-cmd"),produit:v("rs-prod"),motif:v("rs-motif"),fournisseur:RS.type==="fournisseur"?v("rs-fou"):"",montantCents:RS.type==="fournisseur"?Math.round(parseFloat((v("rs-mt")||"0").replace(",","."))*100)||0:0});RS.msg=d.message;RS.nouv=false;RS.d=null;render()}catch(e){alert(e.message)}};
+ACTS.rsCree=async function(){try{var d=await api("/retours-site",{type:RS.type||"retour",nom:v("rs-nom"),email:v("rs-em"),telephone:v("rs-tel"),commande:v("rs-cmd"),produit:v("rs-prod"),motif:v("rs-motif"),livreLe:RS.type==="fournisseur"?"":v("rs-liv"),fournisseur:RS.type==="fournisseur"?v("rs-fou"):"",montantCents:RS.type==="fournisseur"?Math.round(parseFloat((v("rs-mt")||"0").replace(",","."))*100)||0:0});RS.msg=d.message;RS.nouv=false;RS.d=null;render()}catch(e){alert(e.message)}};
 ACTS.rsModeleSave=async function(){try{var d=await api("/retours-site/modele",{texte:v("rs-modele")});RS.msg=d.message;RS.modele=false;RS.d=null;render()}catch(e){alert(e.message)}};
 ACTS.rsMail=async function(b){try{var d=await api("/retours-site/mail",{id:Number(b.dataset.id)});RS.msg=d.message;RS.d=null;render()}catch(e){alert(e.message)}};
 ACTS.rsNote=async function(b){try{await api("/retours-site/maj",{id:Number(b.dataset.id),note:v("rs-n"+b.dataset.id)});RS.msg="Note enregistrée.";RS.d=null;render()}catch(e){alert(e.message)}};

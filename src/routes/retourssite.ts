@@ -5,13 +5,15 @@ import { AppError, clean, exigeResponsable, magDe } from "../util";
 import { envoiEmail, brevoConfigure } from "../brevo";
 
 // Retours et SAV garantie des commandes du site (turnshop.fr) : demande -> mail d'instructions -> colis reçu -> test -> remboursement (fait dans Shopify) ou envoi fournisseur.
+await sql`ALTER TABLE IF EXISTS retours_site ADD COLUMN IF NOT EXISTS livre_le DATE`.catch(() => {});
 await sql`CREATE TABLE IF NOT EXISTS retours_site (
   id SERIAL PRIMARY KEY, magasin TEXT NOT NULL DEFAULT '', type TEXT NOT NULL DEFAULT 'retour', statut TEXT NOT NULL DEFAULT 'demande',
   nom TEXT NOT NULL DEFAULT '', email TEXT NOT NULL DEFAULT '', telephone TEXT NOT NULL DEFAULT '', commande TEXT NOT NULL DEFAULT '',
   produit TEXT NOT NULL DEFAULT '', motif TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '', fournisseur TEXT NOT NULL DEFAULT '',
   montant_cents INT NOT NULL DEFAULT 0, client_id INT, par TEXT NOT NULL DEFAULT '', cree_le TIMESTAMPTZ NOT NULL DEFAULT now(),
-  mail_le TIMESTAMPTZ, recu_le TIMESTAMPTZ, teste_le TIMESTAMPTZ, clos_le TIMESTAMPTZ)`;
+  livre_le DATE, mail_le TIMESTAMPTZ, recu_le TIMESTAMPTZ, teste_le TIMESTAMPTZ, clos_le TIMESTAMPTZ)`;
 
+await sql`ALTER TABLE retours_site ADD COLUMN IF NOT EXISTS livre_le DATE`;
 const STATUTS = ["demande", "attente", "recu", "ok", "ko", "rembourse", "fournisseur", "refuse", "clos"];
 const FERMES = ["rembourse", "refuse", "clos"];
 
@@ -32,11 +34,11 @@ async function modele(): Promise<string> {
   return r?.valeur || MODELE_DEFAUT;
 }
 
-const vue = (r: any) => ({ id: r.id, type: r.type, statut: r.statut, nom: r.nom, email: r.email, telephone: r.telephone, commande: r.commande, produit: r.produit, motif: r.motif, note: r.note, fournisseur: r.fournisseur, montantCents: r.montant_cents, par: r.par, magasin: r.magasin, cree: r.cree_le, mail: r.mail_le, recu: r.recu_le, teste: r.teste_le, clos: r.clos_le });
+const vue = (r: any) => ({ id: r.id, type: r.type, statut: r.statut, nom: r.nom, email: r.email, telephone: r.telephone, commande: r.commande, produit: r.produit, motif: r.motif, note: r.note, fournisseur: r.fournisseur, montantCents: r.montant_cents, par: r.par, magasin: r.magasin, cree: r.cree_le, mail: r.mail_le, livre: r.livre ?? null, joursRestants: r.jours_restants ?? null, recu: r.recu_le, teste: r.teste_le, clos: r.clos_le });
 
 app.get("/api/retours-site", async (c) => {
   const mag = magDe(c);
-  const rows = (await sql`SELECT * FROM retours_site WHERE (${mag}::text IS NULL OR magasin = ${mag}::text OR magasin = '') ORDER BY (statut IN ('rembourse','refuse','clos')), id DESC LIMIT 300`) as any[];
+  const rows = (await sql`SELECT *, to_char(livre_le, 'YYYY-MM-DD') AS livre, (livre_le + 14 - (now() AT TIME ZONE 'Europe/Paris')::date)::int AS jours_restants FROM retours_site WHERE (${mag}::text IS NULL OR magasin = ${mag}::text OR magasin = '') ORDER BY (statut IN ('rembourse','refuse','clos')), id DESC LIMIT 300`) as any[];
   return c.json({ retours: rows.map(vue), modele: await modele(), emailOk: brevoConfigure() });
 });
 
@@ -44,6 +46,7 @@ app.post("/api/retours-site", async (c) => {
   const b = await c.req.json().catch(() => ({}));
   const u = c.get("user") as any;
   const nom = clean(b.nom, 120), email = clean(b.email, 120);
+  const livre = /^\d{4}-\d{2}-\d{2}$/.test(String(b.livreLe ?? "")) ? String(b.livreLe) : null;
   const type = b.type === "garantie" ? "garantie" : b.type === "fournisseur" ? "fournisseur" : "retour";
   if (type !== "fournisseur" && !nom && !email) throw new AppError(400, "Indique au moins le nom ou l'email du client.");
   if (type === "fournisseur" && !clean(b.fournisseur, 120)) throw new AppError(400, "Indique le fournisseur.");
@@ -52,7 +55,7 @@ app.post("/api/retours-site", async (c) => {
     const [d] = (await sql`SELECT id FROM retours_site WHERE type <> 'fournisseur' AND statut NOT IN ('rembourse','refuse','clos') AND ((${clean(b.commande, 40)} <> '' AND lower(commande) = lower(${clean(b.commande, 40)}) AND lower(produit) = lower(${clean(b.produit, 200)})) OR (${email} <> '' AND lower(email) = lower(${email}) AND lower(produit) = lower(${clean(b.produit, 200)}))) LIMIT 1`) as any[];
     if (d) throw new AppError(409, "Un retour en cours existe déjà pour ce client et ce produit (R" + d.id + "). Ouvre-le plutôt que d'en créer un second.");
   }
-  const [r] = await sql`INSERT INTO retours_site (magasin, type, nom, email, telephone, commande, produit, motif, fournisseur, montant_cents, par) VALUES (${u?.magasin ?? ""}, ${type}, ${nom}, ${email}, ${clean(b.telephone, 40)}, ${clean(b.commande, 40)}, ${clean(b.produit, 200)}, ${clean(b.motif, 1000)}, ${clean(b.fournisseur, 120)}, ${Math.max(0, Math.round(Number(b.montantCents) || 0))}, ${u?.prenom ?? ""}) RETURNING id`;
+  const [r] = await sql`INSERT INTO retours_site (magasin, type, nom, email, telephone, commande, produit, motif, fournisseur, montant_cents, livre_le, par) VALUES (${u?.magasin ?? ""}, ${type}, ${nom}, ${email}, ${clean(b.telephone, 40)}, ${clean(b.commande, 40)}, ${clean(b.produit, 200)}, ${clean(b.motif, 1000)}, ${clean(b.fournisseur, 120)}, ${Math.max(0, Math.round(Number(b.montantCents) || 0))}, ${livre}, ${u?.prenom ?? ""}) RETURNING id`;
   return c.json({ id: r.id, message: "Retour enregistré." });
 });
 
@@ -67,6 +70,7 @@ app.post("/api/retours-site/maj", async (c) => {
   const fournisseur = b.fournisseur === undefined ? r.fournisseur : clean(b.fournisseur, 120);
   const montant = b.montantCents === undefined ? r.montant_cents : Math.max(0, Math.round(Number(b.montantCents) || 0));
   if (statut === "fournisseur" && !fournisseur) throw new AppError(400, "Indique le fournisseur.");
+  if (b.livreLe !== undefined) await sql`UPDATE retours_site SET livre_le = ${/^\d{4}-\d{2}-\d{2}$/.test(String(b.livreLe)) ? String(b.livreLe) : null} WHERE id = ${id}`;
   await sql`UPDATE retours_site SET statut = ${statut}, note = ${note}, fournisseur = ${fournisseur}, montant_cents = ${montant},
     recu_le = CASE WHEN ${statut} = 'recu' AND recu_le IS NULL THEN now() ELSE recu_le END,
     teste_le = CASE WHEN ${statut} IN ('ok','ko') THEN now() ELSE teste_le END,
