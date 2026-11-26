@@ -14,7 +14,7 @@ function vStock(){
     +""+stbHtml()+"<div class='actions'><button class='sec' data-act='stCodesFourn'>Récupérer les codes-barres fournisseurs (Ewheel)</button><button class='sec' data-act='stCodesShopify'>Créer des codes internes pour le reste</button></div></div>";
   h+="<div class='card'><div class='step'>Associer un code-barres fournisseur à un produit Shopify</div><div class='muted'>1) Scanne le code-barres du carton. 2) Cherche le produit (ex : pneu plein Xiaomi) et clique la bonne variante : le code est écrit dans Shopify.</div>"
     +"<div class='dl' style='margin-top:6px'><input id='asc' class='lb' placeholder='Scanne le code-barres du fournisseur' value='"+esc(STAS)+"'></div>"+prodBox("assoc")+"</div>";
-  h+="<div class='card'><div class='head'><div class='step'>Stock "+esc(STK.magasin||"")+" : "+STK.nb+" produit"+(STK.nb>1?"s":"")+" en stock"+(STK.valeurAchatHtCents?" · valeur d'achat HT "+eur(STK.valeurAchatHtCents):"")+"</div><input id='stq' class='lb' placeholder='Chercher (nom, code, emplacement)' value='"+esc(STQ)+"'></div>";
+  h+="<div class='card'><div class='head'><div class='step'>Stock "+esc(STK.magasin||"")+" : "+STK.nb+" produit"+(STK.nb>1?"s":"")+" en stock"+(STK.valeurAchatHtCents?" · valeur d'achat HT "+eur(STK.valeurAchatHtCents):"")+"</div><input id='stq' class='lb' placeholder='Chercher (nom, code, emplacement)' value='"+esc(STQ)+"'></div>"+(STK.produits.length&&/^[a-zA-Z]{1,2}[0-9]{0,3}$/.test(STQ.trim())&&STK.produits.every(function(p){return String(p.emplacement||"").toUpperCase().indexOf(STQ.trim().toUpperCase())===0})?"<div class='actions' style='margin:6px 0'><button data-act='stEtqTous'>🏷 Mettre les "+STK.produits.length+" produits de « "+esc(STQ.trim().toUpperCase())+" » dans le panier d'étiquettes</button></div>":"");
   if(!STK.produits.length)h+="<div class='muted'>Aucun produit.</div>";
   else h+="<table class='devis' style='width:100%'><tr><th>Produit</th><th>Empl.</th><th class='n'>Achat HT</th><th class='n'>Vente</th><th class='n'>Qté</th><th class='n'>Min</th><th></th></tr>"+STK.produits.map(function(p){
     if(p.id===STEDIT)return stEditRow(p);
@@ -84,6 +84,7 @@ ACTS.stSearch=function(){STQ=v("stq");api("/stock?magasin="+encodeURIComponent(M
 ACTS.stDelta=function(b){stRun(api("/stock/maj",{id:+b.dataset.id,delta:+b.dataset.d}),"")};
 ACTS.stDel=function(b){var p=stProd(+b.dataset.id);if(p&&confirm("Retirer "+p.nom+" du stock ? (récupérable en le rescannant)"))stRun(api("/stock/archiver",{id:p.id}))};
 ACTS.stEtq=function(b){var p=stProd(+b.dataset.id);if(!p)return;ETQ.push({empl:p.emplacement||"",titre:p.nom,prix:(p.prixCents/100).toFixed(2),barcode:p.code,sku:"",qte:Math.max(1,p.qte)});btnFlash(b,"✓ Ajoutée");toastOk("Étiquette ajoutée au panier d étiquettes ("+ETQ.length+")")};
+ACTS.stEtqTous=function(){var n=0;(STK&&STK.produits||[]).forEach(function(p){ETQ.push({empl:p.emplacement||"",titre:p.nom,prix:(p.prixCents/100).toFixed(2),barcode:p.code,sku:"",qte:1});n++});toastOk(n+" produits ajoutés au panier d étiquettes ("+ETQ.length+" au total). Va dans l'onglet Étiquettes pour imprimer.")};
 var STEDIT=0;
 function stEditRow(p){
   return"<tr class='editrow'><td><input id='e_nom' class='lb' style='width:100%' value='"+esc(p.nom)+"' placeholder='Nom'><div class='muted'>"+esc(p.code)+"</div></td>"
