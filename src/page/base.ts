@@ -16,7 +16,7 @@ function today(){return new Date().toISOString().slice(0,10)}
 function initiales(c){var s=((c.prenom||"").charAt(0)+(c.nom||"").charAt(0)).toUpperCase();return s||"?"}
 function estResp(){return ROLE==="admin"||ROLE==="responsable"}
 function saveSession(){if(!ACT){OWNP=PRENOM;OWNR=ROLE}var m={atelierToken:TOK,atelierPrenom:OWNP,atelierRole:OWNR,atelierMagasin:MAG,atelierPw:PW};Object.keys(m).forEach(function(k){if(m[k])sessionStorage.setItem(k,m[k]);else sessionStorage.removeItem(k)})}
-function clearSession(){ACT=null;OWNP="";OWNR="";try{sessionStorage.removeItem("atelierAct")}catch(e){}VTOUS=false;try{sessionStorage.removeItem("atelierTous")}catch(e){}try{sessionStorage.removeItem("atelierView")}catch(e){}TOK="";PW="";PRENOM="";ROLE="";MAG="";CUR=null;RES=[];SEARCHED=false;CONS=null;CHIF=null;TAB="accueil";ADDT=false;RECEP=null;EDITCLI=false;FID=null;EDITCONS=false;NEWCLI=false;ATSUB="liste";VUE="tout";LST=null;FICHE=null;PJOUR="";PMAG="";PLAN=null;PSEL=null;PPEND=null;PMSG="";saveSession()}
+function clearSession(){try{localStorage.removeItem("atelierViewL")}catch(e){}ACT=null;OWNP="";OWNR="";try{sessionStorage.removeItem("atelierAct")}catch(e){}VTOUS=false;try{sessionStorage.removeItem("atelierTous")}catch(e){}try{sessionStorage.removeItem("atelierView")}catch(e){}TOK="";PW="";PRENOM="";ROLE="";MAG="";CUR=null;RES=[];SEARCHED=false;CONS=null;CHIF=null;TAB="accueil";ADDT=false;RECEP=null;EDITCLI=false;FID=null;EDITCONS=false;NEWCLI=false;ATSUB="liste";VUE="tout";LST=null;FICHE=null;PJOUR="";PMAG="";PLAN=null;PSEL=null;PPEND=null;PMSG="";saveSession()}
 var VTOUS=false;try{VTOUS=sessionStorage.getItem("atelierTous")==="1"}catch(e){}
 var ACT=null,ACTLOCK=5*60*1000,LOCKED=false,OWNP=sessionStorage.getItem("atelierPrenom")||"",OWNR=sessionStorage.getItem("atelierRole")||"";
 function actActif(){return !!(ACT&&ACT.until>Date.now())}
@@ -63,10 +63,16 @@ function renderWho(){
 var VIEWF=0,VIEWC=0;
 function viewSave(){
   if(!TOK&&!PW)return;
-  try{sessionStorage.setItem("atelierView",JSON.stringify({t:TAB,a:ATSUB,v:VUE,f:(FICHE&&FICHE.id)||0,c:(CUR&&CUR.id)||0,k:{p:PAN,c:CCLI,u:CUSE,r:CREP,y:CPAY,o:CAVOFF}}))}catch(e){}}
+  var js=JSON.stringify({t:TAB,a:ATSUB,v:VUE,f:(FICHE&&FICHE.id)||0,c:(CUR&&CUR.id)||0,k:{p:PAN,c:CCLI,u:CUSE,r:CREP,y:CPAY,o:CAVOFF}});
+  try{sessionStorage.setItem("atelierView",js)}catch(e){}
+  try{localStorage.setItem("atelierViewL",js)}catch(e){}
+  try{history.replaceState(null,"","#"+TAB+(TAB==="enc"?"/"+ATSUB:""))}catch(e){}}
 function viewRestore(){
   if(!TOK&&!PW)return;
   var s=null;try{s=JSON.parse(sessionStorage.getItem("atelierView")||"null")}catch(e){}
+  if(!s){try{s=JSON.parse(localStorage.getItem("atelierViewL")||"null")}catch(e){}}
+  var hs=(location.hash||"").replace("#","").split("/");
+  if(hs[0]){if(!s)s={};s.t=hs[0];if(hs[1])s.a=hs[1]}
   if(!s)return;
   var ok=TABS.some(function(t){return t[0]===s.t})||s.t==="stats"||s.t==="retours"||s.t==="chat"||(s.t==="param"&&ROLE==="admin");
   if(ok)TAB=s.t;
@@ -101,7 +107,7 @@ function render0(){
   renderWho();
   if(!TOK&&!PW){vLogin();return}
   nav.innerHTML=TABS.filter(function(t){return (t[0]!=="param"||ROLE==="admin")&&(t[0]!=="compta"||ROLE==="admin")}).map(function(t){return"<button data-act='tab' data-tab='"+t[0]+"'"+(TAB===t[0]?" class='on'":"")+">"+t[1]+"</button>"}).join("")+"<button data-act='pcrPop' title='Pièces à remettre aux clients' style='margin:0 0 0 auto;align-self:center;flex:0 0 auto;background:var(--vert);color:#fff;border:0;border-radius:8px;padding:11px 20px;font-size:15px;font-weight:700;text-transform:none;letter-spacing:0'>&#128230; Client"+(typeof PCR!=="undefined"&&PCR&&PCR.pieces.length?" ("+PCR.pieces.length+")":"")+"</button>";
-  ({accueil:vAccueil,enc:vEnc,cmd:vCmd,stock:vStock,etq:vEtq,param:vParam,stats:vStats,compta:vCompta,retours:vRetours,chat:vChat,process:vProcess,cli:function(){CLV.ventes=CLV.ventes;vClient();clCharge()}})[TAB]();viewSave();if(typeof chatBadge==="function")chatBadge()}
+  try{({accueil:vAccueil,enc:vEnc,cmd:vCmd,stock:vStock,etq:vEtq,param:vParam,stats:vStats,compta:vCompta,retours:vRetours,chat:vChat,process:vProcess,cli:function(){CLV.ventes=CLV.ventes;vClient();clCharge()}})[TAB]()}finally{viewSave()}if(typeof chatBadge==="function")chatBadge()}
 
 // Bips de scan : aigu et court = OK, grave et long = code inconnu
 var AUDIOCTX=null;

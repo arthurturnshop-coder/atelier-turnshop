@@ -9,6 +9,19 @@ import { trouverMaitre } from "./maitres";
 import { GARDE, infosGarde } from "../garde";
 import { AppError, clean, exigeResponsable, magDe, signature } from "../util";
 
+// Numéro bidon : 060000000, 0666666666, 0612345678... (client sans portable).
+export function telBidon(tel: string | null | undefined): boolean {
+  let d = String(tel ?? "").replace(/\D/g, "");
+  if (d.startsWith("0033")) d = "0" + d.slice(4);
+  else if (d.startsWith("33") && d.length === 11) d = "0" + d.slice(2);
+  if (!d) return true;
+  if (d.length !== 10 || !d.startsWith("0")) return true;
+  const fin = d.slice(2);
+  if (new Set(fin).size <= 2) return true;
+  if ("0123456789".includes(fin.slice(0, 6)) || "9876543210".includes(fin.slice(0, 6))) return true;
+  return false;
+}
+
 export async function devisDe(repId: number) {
   const lignes = (await sql`SELECT d.id, d.type, d.libelle, d.quantite, d.prix_unitaire_cents, d.shopify_variant_id, d.sku, d.barcode, d.marque, d.remise_client, d.series, (SELECT statut FROM commande_lignes cl WHERE cl.devis_ligne_id = d.id ORDER BY cl.id DESC LIMIT 1) AS cmd FROM devis_lignes d WHERE d.reparation_id = ${repId} ORDER BY d.type DESC, d.id`) as any[];
   const total = lignes.reduce((s, l) => s + l.quantite * l.prix_unitaire_cents, 0);
@@ -99,6 +112,9 @@ app.post("/api/reparations", async (c) => {
   const panne = clean(b.panne, 1000);
   if (!panne) throw new AppError(400, "La panne décrite par le client est obligatoire.");
   const clientId = Number(b.customerId), trottId = Number(b.trottinetteId);
+  const [cl] = await sql`SELECT telephone FROM clients WHERE id = ${clientId}`;
+  if (!cl) throw new AppError(400, "Client inconnu.");
+  if (telBidon(cl.telephone)) throw new AppError(400, "Numéro de téléphone du client invalide (« " + (cl.telephone || "vide") + " »). Corrige la fiche client avant de créer la prise en charge.");
   const [t] = await sql`SELECT id FROM trottinettes WHERE id = ${trottId} AND client_id = ${clientId}`;
   if (!t) throw new AppError(400, "Trottinette inconnue pour ce client.");
   const date = /^\d{4}-\d{2}-\d{2}$/.test(b.dateDepot ?? "") ? b.dateDepot : new Date().toISOString().slice(0, 10);
