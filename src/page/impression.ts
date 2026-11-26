@@ -331,7 +331,8 @@ function etqImprimer(items,fkey){
   var key=fkey||etqFormat(),F=ETQFORMATS[key],L=items||etqToutes();
   if(!L.length){alert("Ajoute au moins un produit.");return}
   var h="";
-  if(F.page){h="<div class='etqgrid'>";for(var s=0;s<ETQSKIP;s++)h+="<div class='etqempty'></div>";L.forEach(function(it){h+=etqLabel(it,F)});h+="</div>"}
+  if(F.page){var cells=[];for(var s=0;s<ETQSKIP;s++)cells.push("<div class='etqempty'></div>");L.forEach(function(it){cells.push(etqLabel(it,F))});
+    var per=F.cols*F.rows;for(var pg=0;pg<cells.length;pg+=per){h+="<div class='etqgrid' style='"+(pg+per<cells.length?"break-after:page;page-break-after:always;":"")+"'>"+cells.slice(pg,pg+per).join("")+"</div>"}}
   else L.forEach(function(it){h+=etqLabel(it,F)});
   if(!F.page&&key==="62x29"){
     var hs=L.map(function(it){return etqLabel(it,F)}).join("<!--etq-->");
