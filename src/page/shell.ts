@@ -235,6 +235,7 @@ a.btn{display:inline-block;background:#111;color:#fff;text-decoration:none;paddi
 .prlist{overflow:auto;-webkit-overflow-scrolling:touch;flex:1;display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;align-content:start;margin:4px 0 12px;padding-right:4px}
 .prfam{grid-column:1/-1;font-weight:800;text-transform:uppercase;letter-spacing:.6px;font-size:15px;border-bottom:3px solid;padding:10px 0 4px;margin-top:8px}
 .prrow{display:flex!important;flex-direction:column;justify-content:space-between;align-items:flex-start;text-align:left;min-height:150px;padding:14px;cursor:pointer;font-size:17px;font-weight:700;line-height:1.25;color:#26332b;touch-action:manipulation}
+.prrow,.presta button{position:relative}.prcode{position:absolute;right:8px;bottom:6px;font-size:12px;font-weight:800;opacity:.65;background:rgba(0,0,0,.08);border-radius:4px;padding:1px 6px}.prrow.on .prcode{background:rgba(255,255,255,.25);opacity:1}
 .prrow .muted{font-size:15px;font-weight:700;color:#3d4a42}
 .prrow.on .muted{color:#fff}
 .prbox .actions button{min-height:56px;font-size:18px;padding:0 26px}
