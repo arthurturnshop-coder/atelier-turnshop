@@ -100,12 +100,21 @@ export async function attribuerRaccourcis() {
 }
 await attribuerRaccourcis();
 
+// Le tarif avant + arrière contient déjà la remise : on supprime la remise automatique « plusieurs prestations » (une seule fois ; réactivable dans Paramètres).
+{
+  const [f] = (await sql`SELECT 1 FROM reglages WHERE cle = 'multi_remise_supprimee'`) as any[];
+  if (!f) {
+    await sql`INSERT INTO reglages (cle, valeur) VALUES ('multi_remise_cents', '0') ON CONFLICT (cle) DO UPDATE SET valeur = '0'`;
+    await sql`INSERT INTO reglages (cle, valeur) VALUES ('multi_remise_supprimee', '1') ON CONFLICT (cle) DO NOTHING`;
+  }
+}
+
 // Remise "plusieurs prestations" : X € dès N prestations, jamais cumulée avec une offre.
 export async function lireMulti() {
   const rows = (await sql`SELECT cle, valeur FROM reglages WHERE cle IN ('multi_seuil', 'multi_remise_cents')`) as any[];
   const m: Record<string, string> = {};
   for (const r of rows) m[r.cle] = r.valeur;
-  return { seuil: Math.max(2, Number(m.multi_seuil ?? 2) || 2), remiseCents: Math.max(0, Number(m.multi_remise_cents ?? 1000) || 0) };
+  return { seuil: Math.max(2, Number(m.multi_seuil ?? 2) || 2), remiseCents: Math.max(0, Number(m.multi_remise_cents ?? 0) || 0) };
 }
 
 export async function remiseMulti(lignes: { type: string; quantite: number; libelle?: string }[], brutCents: number) {
