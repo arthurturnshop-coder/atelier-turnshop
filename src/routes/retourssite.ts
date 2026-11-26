@@ -91,3 +91,24 @@ app.post("/api/retours-site/modele", async (c) => {
   await sql`INSERT INTO reglages (cle, valeur) VALUES ('retours_site_mail', ${t}) ON CONFLICT (cle) DO UPDATE SET valeur = EXCLUDED.valeur`;
   return c.json({ message: "Modèle de mail enregistré." });
 });
+
+// Réception automatique des demandes du formulaire de retour du site (Make ou autre) : POST /pub/retour-formulaire avec l'en-tête x-secret = RETOURS_WEBHOOK_SECRET.
+// Champs acceptés : nom, email, telephone, commande, produit, motif, texte (message brut si les champs ne sont pas séparés), ref (identifiant unique pour éviter les doublons).
+app.post("/pub/retour-formulaire", async (c) => {
+  const secret = Bun.env.RETOURS_WEBHOOK_SECRET ?? "";
+  if (!secret || (c.req.header("x-secret") ?? "") !== secret) return c.json({ error: "non autorisé" }, 401);
+  const b = await c.req.json().catch(() => ({}));
+  const texte = clean(b.texte, 3000);
+  const email = clean(b.email, 120) || (texte.match(/[\w.+-]+@[\w-]+\.[\w.-]+/)?.[0] ?? "");
+  const commande = clean(b.commande, 40) || (texte.match(/#\s?\d{3,7}/)?.[0] ?? "");
+  const nom = clean(b.nom, 120), motif = clean(b.motif, 1000) || texte.slice(0, 1000);
+  if (!email && !nom && !texte) throw new AppError(400, "Formulaire vide.");
+  const ref = clean(b.ref, 120);
+  if (ref) {
+    const [d] = (await sql`SELECT id FROM retours_site WHERE note LIKE ${"%[ref:" + ref + "]%"} LIMIT 1`) as any[];
+    if (d) return c.json({ id: d.id, message: "Déjà reçu." });
+  }
+  const [cl] = email ? ((await sql`SELECT id FROM clients WHERE lower(email) = lower(${email}) LIMIT 1`) as any[]) : [];
+  const [r] = await sql`INSERT INTO retours_site (type, nom, email, telephone, commande, produit, motif, client_id, par, note) VALUES ('retour', ${nom}, ${email}, ${clean(b.telephone, 40)}, ${commande}, ${clean(b.produit, 200) || "À préciser (formulaire du site)"}, ${motif}, ${cl?.id ?? null}, 'Formulaire du site', ${ref ? "[ref:" + ref + "]" : ""}) RETURNING id`;
+  return c.json({ id: r.id, message: "Retour créé." });
+});
