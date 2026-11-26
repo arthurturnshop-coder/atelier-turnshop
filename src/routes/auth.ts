@@ -95,11 +95,14 @@ app.post("/auth/deconnexion", async (c) => {
 
 // Poste partagé : la personne qui agit vraiment tape son code à 3 chiffres ; l'action est alors faite à son nom et avec SES droits.
 const echecsCode = new Map<string, { n: number; jusque: number }>();
-async function acteurParCode(code: string, magasin: string | null, cle: string) {
+async function acteurParCode(code: string, magasin: string | null, cle: string, proprio: string | null = null) {
   const e = echecsCode.get(cle);
   if (e && e.jusque > Date.now()) throw new AppError(429, "Trop d'essais de code. Réessaie dans quelques minutes.");
   if (/^\d{3}$/.test(code)) {
     const rc = (await sql`SELECT prenom, role, magasins FROM utilisateurs WHERE actif = true AND code_caisse = ${hashCode(code)}`) as any[];
+    // Plusieurs personnes avec le même code : on prend d'abord le propriétaire de la session, sinon le rôle le plus élevé (jamais au hasard).
+    const rang = (r: any) => (r.prenom === proprio ? 0 : r.role === "admin" ? 1 : r.role === "responsable" ? 2 : 3);
+    rc.sort((x, y) => rang(x) - rang(y));
     for (const r of rc) if (!magasin || magasinsDe(r).includes(magasin)) { echecsCode.delete(cle); return { prenom: r.prenom, role: r.role, magasin }; }
   }
   const x = echecsCode.get(cle) ?? { n: 0, jusque: 0 };
@@ -123,7 +126,7 @@ app.use("/api/*", async (c, next) => {
   if (!base) return c.json({ error: "non autorisé" }, 401);
   const code = c.req.header("x-atelier-code") ?? "";
   if (code) {
-    const a = await acteurParCode(code, base.magasin, (tok || "pw").slice(0, 24));
+    const a = await acteurParCode(code, base.magasin, (tok || "pw").slice(0, 24), base.session ?? null);
     base = { ...a, session: base.session ?? "Secours" };
   }
   // Vue « Rouen + Amiens mélangés » : réservée aux admins (rôle de la personne qui agit).

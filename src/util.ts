@@ -25,7 +25,7 @@ export function exigeResponsable(c: any) {
 }
 export function exigeAdmin(c: any) {
   const u = c.get("user");
-  if (!u || !(u.secours || u.role === "admin")) throw new AppError(403, "Réservé aux administrateurs.");
+  if (!u || !(u.secours || u.role === "admin")) throw new AppError(403, `Réservé aux administrateurs (le serveur te voit comme : ${u?.prenom ?? "?"}, rôle ${u?.role ?? "?"}).`);
 }
 
 // Magasin de la session (null = profil Secours : voit tout). Les lignes sans magasin (anciennes) restent visibles des deux côtés.
