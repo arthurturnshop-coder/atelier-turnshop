@@ -50,7 +50,7 @@ function serieHtml(l,i){
     for(var k=0;k<q;k++)h+="<input data-act='cSerie' data-i='"+i+"' data-k='"+k+"' value='"+esc((l.series||[])[k]||"")+"' placeholder='N° de série"+(q>1?" "+(k+1):"")+"' style='display:block;margin-top:4px;width:100%;max-width:260px'>";
     return h+"</div>"}
   return""}
-function serieOk(l){if(!l.trott)return true;var q=Math.max(1,l.quantite|0);for(var k=0;k<q;k++){if(String((l.series||[])[k]||"").trim().length<3)return false}return true}
+function serieOk(l){if(!l.trott)return true;var q=Math.max(1,l.quantite|0);for(var k=0;k<q;k++){var x=String((l.series||[])[k]||"").trim();if(x&&x.length<3)return false}return true}
 function savHisto(r){
   var ev=[];
   (r.sav||[]).forEach(function(d){

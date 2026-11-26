@@ -149,7 +149,7 @@ var ACTS={
     if(!CREP){try{var need=await api("/caisse/series-requises",{lignes:PAN});need.indices.forEach(function(i){PAN[i].trott=true;PAN[i].series=PAN[i].series||[]})}catch(e){}}
     if(!CREP&&PAN.some(function(l){return l.trott})){
       if(!PAN.every(serieOk)){CMSG="Trottinette : saisis le numéro de série (un par trottinette) avant d encaisser.";render();return}
-      if(!CCLI){CMSG="Trottinette : choisis le client (sa garantie est liée à son compte).";render();return}}
+      if(!CCLI&&PAN.some(function(l){return(l.series||[]).some(Boolean)})){CMSG="Trottinette : choisis le client (sa garantie est liée à son compte).";render();return}}
     var mdpC=await demandeCode("Qui encaisse ?");if(mdpC===null)return;
     try{var d=await api("/caisse/encaisser",{livraison:livBody(),lignes:PAN,paiements:pay,clientId:CCLI?CCLI.id:null,utiliserFidelite:CUSE,avantageIds:ids,repairId:CREP,mdpCaissier:mdpC});CMDP="";CRAFF=CREP?CAFF:[];CAFF=[];CREP=null;CACO=0;PAN=[];CPAY={carte:"",especes:"",virement:"",bon_achat:""};CUSE=false;CAVOFF=[];CREC=d.vente;CMSG="";CHOPEN=0;CCLI=null;CFID=null;await chargeHisto();if(CPOP){CREC=null;CPOP=false;bigOk("Paiement validé",d.renduCents?"💶 Monnaie à rendre au client : "+eur(d.renduCents):"");if(FICHE)recharger(FICHE.id)}else if(d.renduCents)alert("💶 Monnaie à rendre au client : "+eur(d.renduCents))}catch(e){CMSG=e.message;render()}},
   shopTest:async function(){SHOPRES="<div class='muted'>Test en cours…</div>";render();try{var d=await api("/shopify/diagnostic");SHOPRES=d.etapes.map(function(e){return"<div>"+(e.ok?"✅ ":"❌ ")+"<b>"+esc(e.nom)+"</b><div class='muted'>"+esc(e.detail)+"</div></div>"}).join("")}catch(e){SHOPRES=esc(e.message)}render()},
