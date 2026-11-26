@@ -22,7 +22,7 @@ function chatCharge(scroll){
   return api("/chat/messages?conv="+encodeURIComponent(conv)).then(function(d){if(CH.conv!==conv)return;var ancien=CH.msgs?CH.msgs.length:-1;CH.msgs=d.messages;chatThread(scroll||ancien!==d.messages.length);chatNonLus()}).catch(function(e){CH.err=e.message})}
 function vChat(){
   if(!CH.eq){api("/chat/equipe").then(function(d){CH.eq=d;if(TAB==="chat")render()}).catch(function(e){CH.err=e.message;if(TAB==="chat")render()});app.innerHTML="<div class='caisse'><h3>&#128172; Chat</h3><div class='muted'>"+(CH.err?esc(CH.err):"Chargement…")+"</div></div>";return}
-  var h="<div class='caisse'><h3>&#128172; Chat</h3><div class='card'><div class='actions' id='chat-chips'></div>"
+  var h="<div class='caisse'><h3>&#128172; Chat <span class='muted' style='font-size:14px;font-weight:400'>— tu écris en tant que <b>"+esc(CH.eq.moi)+"</b></span></h3><div class='card'><div class='actions' id='chat-chips'></div>"
     +"<div class='step' style='margin-top:8px'>"+(CH.conv==="equipe"?"Toute l'équipe":"Message privé avec "+esc(CH.conv))+"</div>"
     +"<div id='chat-thread' style='height:52vh;min-height:260px;overflow-y:auto;border:1px solid #e3e3e3;border-radius:10px;padding:8px;background:#fff'></div>"
     +"<div class='dl' style='margin-top:8px;align-items:flex-end'><textarea id='chat-txt' rows='2' style='flex:1' placeholder='Écris ton message… (Entrée pour envoyer, Maj+Entrée pour aller à la ligne)'></textarea><button data-act='chatEnvoi'>Envoyer</button></div>"
@@ -31,7 +31,7 @@ function vChat(){
 ACTS.chatConv=function(b){CH.conv=b.dataset.c;CH.msgs=null;CH.err="";render()};
 ACTS.chatEnvoi=function(){
   var t=document.getElementById("chat-txt"),txt=t?t.value.trim():"";if(!txt||CH.busy)return;CH.busy=true;
-  api("/chat/envoyer",{conv:CH.conv,texte:txt}).then(function(){CH.busy=false;if(t)t.value="";CH.err="";return chatCharge(true)}).catch(function(e){CH.busy=false;CH.err=e.message;alert(e.message)})};
+  api("/chat/envoyer",{conv:CH.conv,texte:txt}).then(function(){CH.busy=false;if(t)t.value="";CH.err="";return chatCharge(true)}).then(function(){if(CH.msgs&&!CH.msgs.some(function(m){return m.texte===txt&&m.de===CH.eq.moi})){CH.err="Message envoyé mais introuvable : vérifie que tu es bien connecté sous ton nom."}}).catch(function(e){CH.busy=false;CH.err=e.message;alert(e.message)})};
 document.addEventListener("keydown",function(e){var t=e.target;if(t&&t.id==="chat-txt"&&e.key==="Enter"&&!e.shiftKey){e.preventDefault();ACTS.chatEnvoi()}});
 setInterval(function(){if(!TOK&&!PW)return;if(TAB==="chat"&&CH.eq)chatCharge(false);else chatNonLus()},6000);
 setTimeout(chatNonLus,1500);

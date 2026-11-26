@@ -63,11 +63,11 @@ function devisHtml(f){
     +"<input id='ll' class='lb' placeholder='Ex : changement de pneu / pneu 10x3 CST'>"
     +"<input id='lq' class='q' type='number' min='1' value='1'><input id='lp' class='p' placeholder='Prix €'>"
     +"<button data-act='addLigne' data-id='"+f.id+"'>Ajouter</button></div>";
-  return"<div class='devis'>"+ajout+"<hr style='margin:14px 0'><div class='step'>Devis en cours</div>"+table("Forfaits main-d'œuvre",mo)+table("Pièces détachées",pi)
+  return"<div class='devis devis2'><div class='dv-g'>"+ajout+"</div><div class='dv-d card'><div class='step'>Devis en cours</div>"+table("Forfaits main-d'œuvre",mo)+table("Pièces détachées",pi)
     +(d.remiseMultiCents?"<div class='muted'>Remise plusieurs prestations : -"+eur(d.remiseMultiCents)+" (non cumulable avec une offre)</div>":"")
     +"<div class='tot'>Total du devis : "+eur(d.netCents==null?d.totalCents:d.netCents)+"</div>"
     +payRecap(f)+"<div class='actions'>"+((f.acompte&&f.acompte.facture)?"":"<button class='sec' data-act='facturer' data-m='acompte' data-id='"+f.id+"'>💶 Acompte / paiement d'avance</button>")+(d.lignes.length?"<button data-act='facturer' data-m='paiement' data-id='"+f.id+"'>🧾 Facturer ce devis</button> <button class='sec' data-act='dvEnvoyer' data-id='"+f.id+"'>📧 Envoyer le devis au client</button>":"")+"</div>"
-    +dvEnvHtml(f)+"</div>"}
+    +dvEnvHtml(f)+"</div></div>"}
 var PRFAM=[["Freins","#c0392b","#fbeceb"],["Pneus et roues","#2471a3","#eaf2fa"],["Électrique","#d68910","#fdf3e1"],["Mécanique","#7d3c98","#f4ecf7"],["Entretien et divers","#1e8449","#e9f5ee"]];
 function prFam(n){n=(n||"").toLowerCase();var i=4;
   if(/frein|plaquette|disque|purge|levier/.test(n))i=0;

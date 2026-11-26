@@ -246,6 +246,17 @@ a.btn{display:inline-block;background:#111;color:#fff;text-decoration:none;paddi
 .ttabs{display:flex;gap:0}.ttabs button{min-height:36px}
 nav{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}nav::-webkit-scrollbar{display:none}nav button{padding:14px 18px;white-space:nowrap}
 @media(max-width:1100px){nav button{padding:12px 11px;font-size:13px;letter-spacing:.03em}}
+/* ---- Blocs bien distincts ---- */
+body{background:#d9ded9}
+.card{border:2px solid #9fb0a5;border-left:8px solid var(--vert);box-shadow:0 3px 8px rgba(0,0,0,.14);margin:18px 0;padding:14px 16px}
+.card .card{background:#f1f5f2;border:1px solid #b9c5bd;border-left:5px solid #8fb7a0;box-shadow:none;margin:12px 0}
+.card .card .card{background:#fff}
+.card>.step:first-child,.card>h3:first-child{background:#e3efe7;margin:-14px -16px 12px;padding:9px 16px;border-bottom:2px solid #b9d3c2;font-size:17px}
+
+.devis2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:16px;align-items:start}
+.devis2 .dv-d{margin:0;position:sticky;top:130px;max-height:calc(100vh - 150px);overflow:auto}
+@media(max-width:980px){.devis2{grid-template-columns:1fr}.devis2 .dv-d{position:static;max-height:none}}
+
 </style></head><body><header><span>FS <small style='font-weight:400;font-size:14px;opacity:.9'>by TURN Shop</small></span><div id="rech" class="rech" style="display:none"><input id="rq" type="search" placeholder="Chercher : n° PC, client, modèle, produit..." autocomplete="off"><div id="rpanel" class="rpanel" style="display:none"></div></div><span id="who"></span></header><nav id="nav"></nav><main id="app">Chargement…</main>
 <script>
 `;

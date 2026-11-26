@@ -21,7 +21,7 @@ var VTOUS=false;try{VTOUS=sessionStorage.getItem("atelierTous")==="1"}catch(e){}
 var ACT=null,ACTLOCK=5*60*1000,LOCKED=false,OWNP=sessionStorage.getItem("atelierPrenom")||"",OWNR=sessionStorage.getItem("atelierRole")||"";
 function actActif(){return !!(ACT&&ACT.until>Date.now())}
 function actPersist(){try{if(ACT)sessionStorage.setItem("atelierAct",JSON.stringify(ACT));else sessionStorage.removeItem("atelierAct")}catch(e){}}
-function setActeur(a){ACT={code:a.code||"",prenom:a.prenom,role:a.role,until:Date.now()+ACTLOCK};PRENOM=a.prenom;ROLE=a.role;actPersist();if(typeof renderWho==="function")renderWho()}
+function setActeur(a){ACT={code:a.code||"",prenom:a.prenom,role:a.role,until:Date.now()+ACTLOCK};try{if(typeof CH!=="undefined"&&(!CH.eq||CH.eq.moi!==a.prenom)){CH.eq=null;CH.msgs=null;CH.par={};CH.total=0}}catch(e){}PRENOM=a.prenom;ROLE=a.role;actPersist();if(typeof renderWho==="function")renderWho()}
 function actTouche(){if(ACT&&!LOCKED)ACT.until=Date.now()+ACTLOCK}
 function verrouille(msg){
   if(LOCKED||(!TOK&&!PW))return;LOCKED=true;ACT=null;actPersist();

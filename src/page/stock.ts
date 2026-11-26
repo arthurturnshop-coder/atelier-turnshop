@@ -7,7 +7,7 @@ function vStock(){
   var h="<div class='pmsg'>"+esc(STMSG)+"</div><div class='actions'><button class='"+(STSUB==="liste"?"":"sec")+"' data-act='stSub' data-s='liste'>Stock</button><button class='"+(STSUB==="inv"?"":"sec")+"' data-act='stSub' data-s='inv'>Inventaire d'un emplacement</button><button class='"+(STSUB==="cas"?"":"sec")+"' data-act='stSub' data-s='cas'>Mes casiers</button></div>";
   if(STSUB==="cas"){app.innerHTML=h+vCasiers();return}
   if(STSUB==="inv"){app.innerHTML=h+vInv();stFocus(STINV.lieu?"iscan":"ilieu");return}
-  if(!STK){app.innerHTML=h+"<div class='card'>Chargement…</div>";api("/stock?magasin="+encodeURIComponent(MAG||"")).then(function(d){STK=d;render()}).catch(function(e){STMSG=e.message;STK={produits:[],lieux:[],nb:0,valeurAchatHtCents:0};render()});return}
+  if(!STK){app.innerHTML=h+"<div class='card'>Chargement…</div>";api("/stock?magasin="+encodeURIComponent(MAG||"")).then(function(d){STK=d;render();if(STY){var yy=STY;STY=0;window.scrollTo(0,yy);setTimeout(function(){window.scrollTo(0,yy)},60)}}).catch(function(e){STMSG=e.message;STK={produits:[],lieux:[],nb:0,valeurAchatHtCents:0};render()});return}
   h+="<div class='card'><div class='step'>Ajout rapide</div><div class='muted'>Scanne les produits : chaque scan s'ajoute à la liste ci-dessous (même produit = quantité +1). Modifie ce que tu veux dans la liste, puis clique sur « Ajouter au stock ». Sans code : tape le nom et Entrée (un EAN interne est créé, à étiqueter).</div>"
     +"<div class='card' style='margin:8px 0;padding:10px;background:#f1f7f2'><b>📍 Emplacement en cours : <span style='font-size:22px'>"+esc(STLIEU||"—")+"</span></b><div class='muted'>Les produits scannés sont rangés ici. Change d'emplacement avec les boutons.</div><div class='actions'><button class='sec' data-act='lieuCase'>Case suivante (A11 → A12)</button><button class='sec' data-act='lieuEtage'>⬆ Étage suivant (A11 → A21)</button><button class='sec' data-act='lieuPanneau'>➡ Panneau suivant (A21 → B11)</button></div></div>"
     +"<div class='dl' style='margin-top:6px'><input id='sk' class='lb' placeholder='EAN-13 (scan) - vide = généré'><input id='sn' class='lb' placeholder='Nom du produit'><input id='sp' class='p' placeholder='Prix vente TTC'><input id='sa' class='p' placeholder='Achat HT'><input id='sq' class='q' type='number' min='1' value='1' title='Quantité'><input id='sm' class='q' type='number' min='0' placeholder='Min' title='Stock minimum : en dessous, une commande est suggérée'><input id='sl' class='q' placeholder='Empl.' value='"+esc(STLIEU)+"' title='Emplacement (A11…)'></div>"
@@ -24,7 +24,8 @@ function vStock(){
   app.innerHTML=h+"</div>";
   if(STEDIT){stFocus("e_nom")}else if(!STQ)stFocus("sk")}
 function stProd(id){return(STK&&STK.produits||[]).filter(function(p){return p.id===id})[0]}
-function stRun(p,msg){return p.then(function(d){STMSG=(d&&d.message)||msg||"";STK=null;render()}).catch(function(e){STMSG=e.message;render()})}
+var STY=0;
+function stRun(p,msg){var y0=window.scrollY||0;return p.then(function(d){STMSG=(d&&d.message)||msg||"";STY=y0;STK=null;render()}).catch(function(e){STMSG=e.message;render()})}
 ACTS.stSub=function(b){STSUB=b.dataset.s;CASI=null;STMSG="";STAP=null;render()};
 var STB=[];try{STB=JSON.parse(localStorage.getItem("atelierStockLot")||"[]")||[]}catch(e){STB=[]}
 function stbSave(){try{localStorage.setItem("atelierStockLot",JSON.stringify(STB))}catch(e){}}
