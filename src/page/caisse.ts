@@ -208,7 +208,7 @@ async function ajouterProduit(p,ctx){
   if(ctx==="dvs"){await dvAjoutProduit(p);return}
   if(ctx==="sep"){if(!FICHE)return;try{var rs=await api("/devis/ligne",{repairId:FICHE.id,type:"piece",libelle:p.libelle,quantite:1,prix:String(p.prix).replace(".",","),variantId:p.variantId,sku:p.sku,barcode:p.barcode,marque:p.marque});
     var nl=rs.devis.lignes.filter(function(l){return l.type==="piece"}).sort(function(a,b){return b.id-a.id})[0];
-    if(nl){await api("/devis-lignes/remise-client",{id:nl.id,valeur:true});var mm=await cmdAuto([nl.id]);DEVHINT="Commande séparée : "+mm}
+    if(nl){await api("/devis-lignes/remise-client",{id:nl.id,valeur:true});DEVHINT="Ajouté au devis (pour le client). Clique sur « À commander » sur la ligne si besoin."}
     await recharger(FICHE.id)}catch(e){alert(e.message)}return}
   if(ctx==="devis"){if(!FICHE)return;DEVHINT="";var rd=await api("/devis/ligne",{repairId:FICHE.id,type:"piece",libelle:p.libelle,quantite:1,prix:String(p.prix).replace(".",","),variantId:p.variantId,sku:p.sku,barcode:p.barcode,marque:p.marque});if(rd.maitre)DEVHINT="Produit maître mis sur le devis : "+rd.maitre.nom+" (produit choisi : "+rd.maitre.origine+")";await recharger(FICHE.id);return}
   if(ctx.indexOf("cmd")===0){var d=await api("/achats/ligne",{fournisseurId:+ctx.slice(3),libelle:p.libelle,sku:p.sku,barcode:p.barcode,variantId:p.variantId,quantite:1});await cmdAjoutRapide(ctx,d.message);return}
