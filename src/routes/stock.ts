@@ -25,7 +25,10 @@ const cents = (x: any): number | null => {
   const n = Math.round(Number(s) * 100);
   return Number.isFinite(n) && n >= 0 ? n : null;
 };
-const emp = (x: any) => clean(x, 20).toUpperCase().replace(/\s+/g, "");
+// Plusieurs emplacements possibles pour une même référence : « A11, B21 » devient « A11/B21 ».
+const emp = (x: any) => [...new Set(clean(x, 80).toUpperCase().split(/[,;\/]+/).map((t) => t.replace(/\s+/g, "")).filter(Boolean))].join("/");
+const segs = (l: any) => String(l ?? "").toUpperCase().split("/").filter(Boolean);
+const dansLieu = (l: any, q: string) => segs(l).some((x) => x.startsWith(q));
 const codeNet = (x: any) => clean(x, 60).replace(/\s+/g, "");
 
 // Stock par boutique : celle demandée, sinon celle du profil connecté, sinon Amiens.
@@ -121,9 +124,9 @@ app.get("/api/stock", async (c) => {
   const alias = new Map<number, string[]>();
   for (const x of tous) alias.set(x.produit_id, [...(alias.get(x.produit_id) ?? []), x.code]);
   const qLieu = q.replace(/\s+/g, "").toUpperCase();
-  const estLieu = /^[A-Z]{1,2}\d{0,3}$/.test(qLieu) && rows.some((p) => String(p.emplacement ?? "").toUpperCase().startsWith(qLieu));
-  const f = estLieu ? rows.filter((p) => String(p.emplacement ?? "").toUpperCase().startsWith(qLieu)).slice(0, 300) : rows.filter((p) => !q || `${p.nom} ${p.code} ${p.emplacement} ${(alias.get(p.id) ?? []).join(" ")}`.toLowerCase().includes(q)).slice(0, 300);
-  const lieux = [...new Set(rows.map((p) => p.emplacement).filter(Boolean))].sort();
+  const estLieu = /^[A-Z]{1,2}\d{0,3}$/.test(qLieu) && rows.some((p) => dansLieu(p.emplacement, qLieu));
+  const f = estLieu ? rows.filter((p) => dansLieu(p.emplacement, qLieu)).slice(0, 300) : rows.filter((p) => !q || `${p.nom} ${p.code} ${p.emplacement} ${(alias.get(p.id) ?? []).join(" ")}`.toLowerCase().includes(q)).slice(0, 300);
+  const lieux = [...new Set(rows.flatMap((p) => segs(p.emplacement)))].sort();
   const valeur = rows.reduce((t, p) => t + (p.achat_ht_cents ?? 0) * p.qte, 0);
   const ac = f.length ? ((await sql`SELECT produit_id, code, fournisseur, denomination FROM stock_codes WHERE produit_id = ANY(${f.map((p) => p.id)}) ORDER BY id`) as any[]) : [];
   return c.json({ magasin: m, produits: f.map((p) => vue(p, ac.filter((x) => x.produit_id === p.id).map((x) => ({ code: x.code, fournisseur: x.fournisseur, denomination: x.denomination })))), lieux, nb: rows.length, valeurAchatHtCents: valeur });
@@ -195,7 +198,7 @@ app.post("/api/stock/inventaire", async (c) => {
   if (!zone) throw new AppError(400, "Indique l'emplacement ou le panneau inventorié (ex : A11, ou A pour tout le panneau A).");
   // « A » (lettres seules) = tout le panneau A (A11, A12, A22…) ; « A11 » = ce rayon seulement.
   const panneau = /^[A-Z]+$/.test(zone);
-  const dans = (lieu: string) => (panneau ? lieu.startsWith(zone) : lieu === zone);
+  const dans = (lieu: string) => segs(lieu).some((x) => (panneau ? x.startsWith(zone) : x === zone));
   const compte = new Map<string, number>(), lieuDe = new Map<string, string>();
   let sansLieu = 0;
   const scansBruts = Array.isArray(b.scans) ? b.scans.slice(0, 5000) : [];
@@ -219,7 +222,7 @@ app.post("/api/stock/inventaire", async (c) => {
     const sh = await shopifyParCode(k);
     inconnus.push({ code: k, qte: compte.get(k), vers: lieuDe.get(k), nom: sh?.nom ?? "", prixCents: sh?.prixCents ?? 0, achatHtCents: sh?.achatHtCents ?? null, shopify: !!sh });
   }
-  const deplaces = connus.filter((p) => !p.archive_le && p.emplacement !== lieuDe.get(p.code));
+  const deplaces = connus.filter((p) => !p.archive_le && !segs(p.emplacement).includes(lieuDe.get(p.code) ?? ""));
   const revenus = connus.filter((p) => p.archive_le);
   const ecarts = connus.filter((p) => !p.archive_le && p.qte !== compte.get(p.code));
   const apercu = {
@@ -232,8 +235,8 @@ app.post("/api/stock/inventaire", async (c) => {
   if (!b.appliquer) return c.json({ apercu });
   for (const p of connus) {
     const n = compte.get(p.code)!, lieu = lieuDe.get(p.code)!;
-    if (p.qte !== n || p.emplacement !== lieu || p.archive_le) {
-      await sql`UPDATE stock_produits SET qte = ${n}, emplacement = ${lieu}, archive_le = NULL, maj_le = now() WHERE id = ${p.id}`;
+    if (p.qte !== n || !segs(p.emplacement).includes(lieu) || p.archive_le) {
+      await sql`UPDATE stock_produits SET qte = ${n}, emplacement = ${segs(p.emplacement).includes(lieu) ? p.emplacement : lieu}, archive_le = NULL, maj_le = now() WHERE id = ${p.id}`;
       if (n !== p.qte) await sql`INSERT INTO stock_mouvements (produit_id, delta, motif) VALUES (${p.id}, ${n - p.qte}, ${"Inventaire " + zone})`;
     }
   }

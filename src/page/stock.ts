@@ -89,7 +89,7 @@ ACTS.stEtqTous=function(){var n=0;(STK&&STK.produits||[]).forEach(function(p){ET
 var STEDIT=0;
 function stEditRow(p){
   return"<tr class='editrow'><td><input id='e_nom' class='lb' style='width:100%' value='"+esc(p.nom)+"' placeholder='Nom'><div class='muted'>"+esc(p.code)+"</div></td>"
-    +"<td><input id='e_l' class='q' style='width:70px' value='"+esc(p.emplacement||"")+"' placeholder='Empl.'></td>"
+    +"<td><input id='e_l' class='q' style='width:120px' placeholder='A11 / B21' title='Plusieurs emplacements possibles : sépare-les par une virgule ou un /' value='"+esc(p.emplacement||"")+"' placeholder='Empl.'></td>"
     +"<td class='n'><input id='e_a' class='p' style='width:80px' value='"+(p.achatHtCents==null?"":(p.achatHtCents/100).toFixed(2))+"' placeholder='Achat HT'></td>"
     +"<td class='n'><input id='e_p' class='p' style='width:80px' value='"+(p.prixCents/100).toFixed(2)+"' placeholder='Vente'></td>"
     +"<td class='n'><b>"+p.qte+"</b></td>"
