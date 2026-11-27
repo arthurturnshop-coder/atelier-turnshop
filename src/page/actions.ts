@@ -6,6 +6,16 @@ function bigOk(t,sub){var o=document.createElement("div");o.style.cssText="posit
   document.body.appendChild(o);var ms=sub?3500:1600;function f(){if(o.parentNode)o.remove()}o.addEventListener("click",f);setTimeout(f,ms)}
 function cReset(){CLIV={adresse:"",cp:"",ville:""};CREP=null;CAFF=[];CRAFF=[];CACO=0;PAN=[];CPAY={carte:"",especes:"",virement:"",bon_achat:""};CCLI=null;CFID=null;CUSE=false;CAVOFF=[];CMSG=""}
 var ACTS={
+  offrePop:function(){OFP=true;OFD=null;offrePopRender();api("/marketing/offres").then(function(d){OFD=d;offrePopRender()}).catch(function(){OFD={avantages:[],offres:[]};offrePopRender()})},
+  offreFerme:function(){OFP=false;offrePopRender()},
+  mkType:function(b){window.MKTT=b.dataset.t;var a=document.getElementById("mk-t1"),c=document.getElementById("mk-t2");a.className=b.dataset.t==="idee"?"on":"sec";c.className=b.dataset.t==="big"?"on":"sec"},
+  mkIdee:function(){api("/marketing/idee",{type:window.MKTT||"idee",texte:v("mk-x")}).then(function(d){MKTMSG=d.message;window.MKTT="idee";MKT=null;render()}).catch(function(e){alert(e.message)})},
+  mkStatut:function(b){api("/marketing/idee/statut",{id:+b.dataset.id,statut:b.dataset.s}).then(function(){MKT=null;render()}).catch(function(e){alert(e.message)})},
+  mkIdeeDel:function(b){api("/marketing/idee/supprimer",{id:+b.dataset.id}).then(function(){MKT=null;render()}).catch(function(e){alert(e.message)})},
+  mkPlSave:function(b){api("/marketing/planning",{id:+b.dataset.id||0,type:v("mp-ty"),titre:v("mp-ti"),date:v("mp-d"),dateFin:v("mp-f"),canal:v("mp-c"),note:v("mp-n")}).then(function(d){MKTMSG=d.message;MKTE=null;MKT=null;render()}).catch(function(e){alert(e.message)})},
+  mkPlEdit:function(b){MKTE=(MKT.planning||[]).filter(function(p){return p.id===+b.dataset.id})[0]||null;render()},
+  mkPlNew:function(){MKTE=null;render()},
+  mkPlDel:function(b){api("/marketing/planning/supprimer",{id:+b.dataset.id}).then(function(){MKT=null;render()}).catch(function(e){alert(e.message)})},
   remAnnule:function(b,e){if(e&&e.preventDefault)e.preventDefault();api("/devis/ligne/remise",{id:+b.dataset.id,valeur:""}).then(function(){recharger(FICHE.id)}).catch(function(er){alert(er.message)})},
   retirePiece:function(b){api("/devis/ligne/retire",{id:+b.dataset.id,v:b.dataset.v==="1"}).then(function(){recharger(FICHE.id)}).catch(function(e){alert(e.message)})},
   remDevis:function(b){api("/devis/remise",{repairId:+b.dataset.id,valeur:v("rd-v")}).then(function(){recharger(FICHE.id)}).catch(function(e){alert(e.message)})},

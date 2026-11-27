@@ -3,7 +3,7 @@ var LG={step:"mag"};
 var CUR=null,RES=[],SEARCHED=false,TAB="accueil",MSG="";
 var CONS=null,CHIF=null,EDITCONS=false,NEWCLI=false,ADDT=false,RECEP=null,EDITCLI=false,FID=null,FIDLOAD=null;
 var ST=["reçu","diagnostic","devis envoyé","en attente de pièce","à faire","en réparation","prêt","récupéré"];
-var TABS=[["accueil","Dashboard"],["enc","Atelier"],["cmd","Commandes"],["rsite","Retours"],["stock","Stock"],["etq","Étiquettes"],["cli","Client"],["process","Process"],["compta","Compta"]];
+var TABS=[["accueil","Dashboard"],["enc","Atelier"],["cmd","Commandes"],["rsite","Retours"],["stock","Stock"],["etq","Étiquettes"],["cli","Client"],["process","Process"],["mkt","Marketing"],["compta","Compta"]];
 var CLAB={upsell:"Upsell du jour",offre:"Offre du moment",fidelite:"Avantages de la carte fidélité",autre:"Autre consigne"};
 var RACC="",ATSUB="liste",VUE="tout",LST=null,FICHE=null,PJOUR="",PMAG="",PLAN=null,PMSG="",PSEQ=0,DRAG=null,PSEL=null,PPEND=null;
 var app=document.getElementById("app"),nav=document.getElementById("nav");
@@ -118,7 +118,7 @@ function render0(){
   renderWho();
   if(!TOK&&!PW){vLogin();return}
   nav.innerHTML=TABS.filter(function(t){return (t[0]!=="param"||ROLE==="admin")&&(t[0]!=="compta"||ROLE==="admin")}).map(function(t){return"<button data-act='tab' data-tab='"+t[0]+"'"+(TAB===t[0]?" class='on'":"")+">"+t[1]+"</button>"}).join("")+"<button data-act='pcrPop' title='Pièces à remettre aux clients' style='margin:0 0 0 auto;align-self:center;flex:0 0 auto;background:var(--vert);color:#fff;border:0;border-radius:8px;padding:11px 20px;font-size:15px;font-weight:700;text-transform:none;letter-spacing:0'>&#128230; Client"+(typeof PCR!=="undefined"&&PCR&&PCR.pieces.length?" ("+PCR.pieces.length+")":"")+"</button>";
-  try{({accueil:vAccueil,enc:vEnc,cmd:vCmd,stock:vStock,etq:vEtq,param:vParam,stats:vStats,compta:vCompta,retours:vRetours,rsite:vRsite,chat:vChat,process:vProcess,cli:function(){CLV.ventes=CLV.ventes;vClient();clCharge()}})[TAB]()}finally{viewSave();if(typeof etqSync==='function')etqSync()}if(typeof chatBadge==="function")chatBadge()}
+  try{({accueil:vAccueil,enc:vEnc,cmd:vCmd,stock:vStock,etq:vEtq,param:vParam,stats:vStats,compta:vCompta,retours:vRetours,rsite:vRsite,chat:vChat,process:vProcess,mkt:vMarketing,cli:function(){CLV.ventes=CLV.ventes;vClient();clCharge()}})[TAB]()}finally{viewSave();if(typeof etqSync==='function')etqSync()}if(typeof chatBadge==="function")chatBadge()}
 
 // Bips de scan : aigu et court = OK, grave et long = code inconnu
 var AUDIOCTX=null;

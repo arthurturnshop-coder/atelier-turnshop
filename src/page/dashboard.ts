@@ -9,7 +9,7 @@ function blocConsignes(){
       +"</div><div class='cons-b'><button data-act='saveCons'>Enregistrer</button><button class='sec' data-act='cancelCons'>Annuler</button></div></div>"}
   var ks=Object.keys(CLAB).filter(function(k){return CONS[k]});
   return T+(ROLE==="admin"?"<button class='sec cons-e' data-act='editCons'>Modifier</button>":"")+"</div>"+(ks.length?"<div class='cons-g'>"+ks.map(function(k){
-      return"<div class='ct ct-"+k+"'><div class='ct-l'>"+CICO[k]+" "+esc(CLAB[k])+"</div><div class='ct-t'>"+esc(CONS[k])+"</div></div>"}).join("")+"</div>"
+      return"<div class='ct ct-"+k+"'><div class='ct-l'>"+CICO[k]+" "+esc(CLAB[k])+(k==="offre"?"<button class='ofi' data-act='offrePop' title='Détails de l offre : avantage et règles'>i</button>":"")+"</div><div class='ct-t'>"+esc(CONS[k])+"</div></div>"}).join("")+"</div>"
     :"<div class='muted'>Aucune consigne pour l'instant.</div>")+"</div>"}
 var TACH=null,TACHBUSY=false,TREC=null,TRECBUSY=false,TTAB="ponct",TRECP=null,TRECPB=false,PRF={txt:"",f:"m1"};
 var TSEQ=0;

@@ -27,10 +27,11 @@ import { CHAT } from "./page/chat";
 import { BANQUE } from "./page/banque";
 import { DEFI } from "./page/defi";
 import { PROCESS } from "./page/process";
+import { MARKETING } from "./page/marketing";
 
 // L'ordre compte : c'est l'ordre d'exécution du script dans le navigateur.
 export const HTML = [
-  SHELL, BASE, LOGIN, PROFIL, DASHBOARD, ATELIER, CAISSE, PARAMETRES, ACTIONS, RECHERCHE, COMMANDES, STOCK, COMPTA, MAITRES, PLANNING, IMPRESSION, STATS, RETOURS, RETOURSSITE, GARANTIE, CREATION, CLIENT, DEVIS, DEPOT, CHAT, BANQUE, DEFI, PROCESS,
+  SHELL, BASE, LOGIN, PROFIL, DASHBOARD, ATELIER, CAISSE, PARAMETRES, ACTIONS, RECHERCHE, COMMANDES, STOCK, COMPTA, MAITRES, PLANNING, IMPRESSION, STATS, RETOURS, RETOURSSITE, GARANTIE, CREATION, CLIENT, DEVIS, DEPOT, CHAT, BANQUE, DEFI, PROCESS, MARKETING,
   "viewRestore();render();viewRestoreOpen();",
   "</script></body></html>",
 ].join("\n");

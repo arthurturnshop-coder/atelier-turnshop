@@ -28,6 +28,7 @@ import "./routes/sav";
 import "./routes/chat";
 import "./routes/defi";
 import "./routes/process";
+import "./routes/marketing";
 import "./routes/stats";
 import "./routes/commandes";
 import "./routes/acomptes";
