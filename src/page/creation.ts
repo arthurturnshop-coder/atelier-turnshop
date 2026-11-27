@@ -61,14 +61,19 @@ ACTS.creOk=async function(){
     var cid;
     if(CRE.cli)cid=CRE.cli.id;
     else{if(!v("cn-nm")){throw new Error("Choisis un client ou renseigne au moins le nom du nouveau client.")}
-      var dc=await api("/clients",{prenom:v("cn-pn"),nom:v("cn-nm"),telephone:v("cn-tel"),email:v("cn-em")});cid=dc.id}
+      var dg=String(v("cn-tel")||"").replace(/\\D/g,"");if(dg.indexOf("0033")===0)dg="0"+dg.slice(4);else if(dg.indexOf("33")===0&&dg.length===11)dg="0"+dg.slice(2);
+      var fn=dg.slice(2),bad=dg.length!==10||dg.charAt(0)!=="0"||Object.keys(fn.split("").reduce(function(o,c){o[c]=1;return o},{})).length<=2||"0123456789".indexOf(fn.slice(0,6))>=0||"9876543210".indexOf(fn.slice(0,6))>=0;
+      if(m!=="devis"&&bad)throw new Error("Numéro de téléphone invalide : il faut un vrai portable à 10 chiffres (le client n a pas été créé, corrige le numéro).");
+      var dc=await api("/clients",{prenom:v("cn-pn"),nom:v("cn-nm"),telephone:v("cn-tel"),email:v("cn-em")});cid=dc.id;
+      CRE.cli={id:dc.id,name:(v("cn-pn")+" "+v("cn-nm")).trim(),phone:v("cn-tel"),email:v("cn-em")}}
     var tid,sv=document.getElementById("cr-sv");
     if(sv&&sv.checked){var dsv=await api("/trottinettes",{customerId:cid,marque:"Sans véhicule",modele:"Achat de pièces / accessoires",serie:"NC-"+Date.now()});tid=dsv.id}
     else if(sel&&sel.value!=="new")tid=Number(sel.value);
+    else if(CRE.tid&&CRE.tcid===cid)tid=CRE.tid;
     else{if(!v("ct-m")||!v("ct-mo"))throw new Error("Indique la marque et le modèle de la trottinette.");
-      var dt=await api("/trottinettes",{customerId:cid,marque:v("ct-m"),modele:v("ct-mo"),serie:v("ct-s")||("NC-"+Date.now())});tid=dt.id}
+      var dt=await api("/trottinettes",{customerId:cid,marque:v("ct-m"),modele:v("ct-mo"),serie:v("ct-s")||("NC-"+Date.now())});tid=dt.id;CRE.tid=tid;CRE.tcid=cid}
     var d=await api("/reparations",{customerId:cid,trottinetteId:tid,panne:(m==="devis"?"Devis : ":"")+pn,etat:v("cr-e"),remarques:v("cr-r"),boite:v("cr-b"),affaires:affairesLire("cr"),codeAcces:v("cr-k"),dateDepot:v("cr-d"),enMagasin:!(abs&&abs.checked),sousGarantie:!!(gar&&gar.checked)});
-    CRE.busy=false;CREF={};ATSUB="liste";
+    CRE.busy=false;CRE.tid=0;CREF={};ATSUB="liste";
     await ouvrirFiche(d.id);
     if(m==="prise"&&pec&&pec.checked&&!(abs&&abs.checked))await imprimerPEC(d.id,nbp)
   }catch(e){CRE.busy=false;CRE.msg=e.message;render()}};
