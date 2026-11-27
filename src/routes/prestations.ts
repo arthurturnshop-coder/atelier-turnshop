@@ -55,6 +55,16 @@ if (n === 0) await sql`INSERT INTO prestations (nom, prix_cents, avec_piece, pie
     }
     await sql`INSERT INTO reglages (cle, valeur) VALUES ('seed_av_ar_pneus_freins', '1') ON CONFLICT (cle) DO NOTHING`;
   }
+  // Raccourci « + valve tubeless 3,90 € » sur chaque prestation pneu tubeless (création unique).
+  const [vt] = (await sql`SELECT 1 FROM reglages WHERE cle = 'seed_option_valve_tubeless'`) as any[];
+  if (!vt) {
+    const tubs = (await sql`SELECT id FROM prestations WHERE lower(nom) LIKE 'pneu tubeless%'`) as any[];
+    for (const t of tubs) {
+      const [o] = (await sql`SELECT 1 FROM prestation_options WHERE prestation_id = ${t.id} AND lower(nom) LIKE '%valve%'`) as any[];
+      if (!o) await sql`INSERT INTO prestation_options (prestation_id, nom, prix_cents, type) VALUES (${t.id}, 'Valve tubeless', 390, 'piece')`;
+    }
+    await sql`INSERT INTO reglages (cle, valeur) VALUES ('seed_option_valve_tubeless', '1') ON CONFLICT (cle) DO NOTHING`;
+  }
   const [dgn] = (await sql`SELECT 1 FROM prestations WHERE lower(nom) = 'diagnostic'`) as any[];
   if (!dgn) await sql`INSERT INTO prestations (nom, prix_cents, avec_piece, piece_aide) VALUES ('Diagnostic', 1500, false, '')`;
   const [dejaFait] = (await sql`SELECT 1 FROM reglages WHERE cle = 'seed_prestations_tarifs_site'`) as any[];

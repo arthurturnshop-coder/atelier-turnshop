@@ -222,6 +222,10 @@ var ACTS={
   poAdd:async function(b){var id=b.dataset.id;try{await api("/prestations/option",{prestationId:+id,nom:v("po-n-"+id),prix:v("po-p-"+id),type:v("po-t-"+id)});PRESTA=null;render()}catch(e){alert(e.message)}},
   poSuppr:async function(b){try{await api("/prestations/option/supprimer",{id:+b.dataset.id});PRESTA=null;render()}catch(e){alert(e.message)}},
   addOpt:async function(b){var x=(PRESTA?PRESTA.prestations:[]).filter(function(p){return p.id===+b.dataset.pid})[0],o=x&&(x.options||[]).filter(function(y){return y.id===+b.dataset.id})[0];if(!o||!FICHE)return;
+    if(/^Faire aussi/.test(o.nom)){
+      var nm2=x.nom.replace(/\\((avant|arrière|avant ou arrière)\\)/,"(avant + arrière)"),p2=(PRESTA?PRESTA.prestations:[]).filter(function(p){return p.nom===nm2})[0];
+      if(p2){var li=((FICHE.devis&&FICHE.devis.lignes)||[]).filter(function(l){return l.libelle===x.nom})[0];
+        try{if(li)await api("/devis/ligne/supprimer",{id:li.id});await api("/devis/ligne",{repairId:FICHE.id,type:"main_oeuvre",libelle:p2.nom,quantite:1,prix:String(p2.prixCents/100).replace(".",",")});DEVOPT=0;await recharger(FICHE.id)}catch(e){alert(e.message)}return}}
     try{await api("/devis/ligne",{repairId:FICHE.id,type:o.type,libelle:o.nom,quantite:1,prix:String(o.prixCents/100).replace(".",",")});await recharger(FICHE.id)}catch(e){alert(e.message)}},
   psSuppr:async function(b){if(!confirm("Supprimer cette prestation ?"))return;try{await api("/prestations/supprimer",{id:+b.dataset.id});PRESTA=null;render()}catch(e){alert(e.message)}},
   multiSave:async function(){try{var d=await api("/reglages/multi",{seuil:v("mu-n"),remise:v("mu-e")});PSMSG=d.message;PRESTA=null;render()}catch(e){PSMSG=e.message;render()}},
