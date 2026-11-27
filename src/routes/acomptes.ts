@@ -29,7 +29,16 @@ export async function acomptesDe(repId: number) {
 }
 
 // Encaisser un acompte (ou un paiement avant réparation) : pas de commande Shopify, pas d'avis, pas de points.
+// Même règle que l'encaissement : pas d'argent qui entre ou sort si la caisse du magasin n'est pas ouverte aujourd'hui.
+async function exigeCaisseOuverte(c: any) {
+  const mg = (c.get("user") as any)?.magasin === "Rouen" ? "Rouen" : "Amiens";
+  const [ouv] = (await sql`SELECT jour >= (now() AT TIME ZONE 'Europe/Paris')::date AS ok FROM caisse_sessions WHERE magasin = ${mg} AND fermee_le IS NULL ORDER BY id DESC LIMIT 1`) as any[];
+  if (!ouv) throw new AppError(409, "Caisse fermée : ouvre la caisse avant d'encaisser un acompte.");
+  if (!ouv.ok) throw new AppError(409, "La caisse de la veille n'est pas fermée : ferme-la d'abord.");
+}
+
 app.post("/api/reparations/acompte", async (c) => {
+  await exigeCaisseOuverte(c);
   const b = await c.req.json().catch(() => ({}));
   const repId = Number(b.repairId);
   const [r] = (await sql`SELECT id, client_id FROM reparations WHERE id = ${repId} AND supprime_le IS NULL`) as any[];
@@ -64,6 +73,7 @@ app.post("/api/reparations/acompte", async (c) => {
 // Rembourser ce qu'il reste de l'acompte : carte, espèces, virement ou bon d'achat (utilisable tout de suite en caisse).
 app.post("/api/reparations/rembourser", async (c) => {
   exigeResponsable(c);
+  await exigeCaisseOuverte(c);
   const b = await c.req.json().catch(() => ({}));
   const repId = Number(b.repairId);
   const moyen = String(b.moyen ?? "");
