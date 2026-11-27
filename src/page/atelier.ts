@@ -65,7 +65,7 @@ function devisHtml(f){
     +"<button data-act='addLigne' data-id='"+f.id+"'>Ajouter</button></div>";
   return"<div class='devis devis2'><div class='dv-g'>"+ajout+"</div><div class='dv-d card'><div class='step'>Devis en cours</div>"+table("Forfaits main-d'œuvre",mo)+table("Pièces détachées",pi)
     +(d.remiseMultiCents?"<div class='muted'>Remise totale : -"+eur(d.remiseMultiCents)+"</div>":"")
-    +(d.lignes.length?"<div style='margin:6px 0;display:flex;gap:6px;align-items:center;flex-wrap:wrap'><b>Remise sur le devis :</b> <input id='rd-v' value='"+esc(d.remiseTxt||"")+"' placeholder='20% ou 15 €' style='width:110px;padding:4px;font-size:13px'> <button class='sec' data-act='remDevis' data-id='"+f.id+"' style='min-height:0;padding:3px 10px;font-size:12px'>Appliquer</button>"+(d.remiseManuelleCents?" <span class='tag ok'>-"+eur(d.remiseManuelleCents)+"</span>":"")+"</div>":"")+"<div class='tot'>Total du devis : "+eur(d.netCents==null?d.totalCents:d.netCents)+"</div>"
+    +"<div class='tot'>Total du devis : "+eur(d.netCents==null?d.totalCents:d.netCents)+"</div>"
     +payRecap(f)+"<div class='actions'>"+((f.acompte&&f.acompte.facture)?"":"<button class='sec' data-act='facturer' data-m='acompte' data-id='"+f.id+"'>💶 Acompte / paiement d'avance</button>")+(d.lignes.length?"<button data-act='facturer' data-m='paiement' data-id='"+f.id+"'>🧾 Facturer ce devis</button> <button class='sec' data-act='dvEnvoyer' data-id='"+f.id+"'>📧 Envoyer le devis au client</button>":"")+"</div>"
     +dvEnvHtml(f)+"</div></div>"}
 var PRFAM=[["Freins","#c0392b","#fbeceb"],["Pneus et roues","#2471a3","#eaf2fa"],["Électrique","#d68910","#fdf3e1"],["Mécanique","#7d3c98","#f4ecf7"],["Entretien et divers","#1e8449","#e9f5ee"]];
