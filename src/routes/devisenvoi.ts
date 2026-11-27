@@ -79,6 +79,10 @@ app.post("/pub/devis/:token/repondre", async (c) => {
   await sql`UPDATE devis_envois SET statut = ${decision}, commentaire = ${com}, repondu_le = now() WHERE id = ${e.id}`;
   const id = e.reparation_id;
   await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${id}, 'note', ${`Devis ${decision === "accepte" ? "ACCEPTÉ" : "REFUSÉ"} par le client (lien email)${com ? " : " + com : ""}`})`;
+  if (decision === "accepte") {
+    const r = (await sql`UPDATE reparations SET statut = 'à faire', maj_le = now() WHERE id = ${id} AND statut = 'devis envoyé' RETURNING id`) as any[];
+    if (r.length) await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${id}, 'statut', 'Statut : devis envoyé → à faire (devis accepté par le client)')`;
+  }
   await sql`INSERT INTO taches (texte, echeance, priorite, cree_par, reparation_id) VALUES (${`Devis ${decision === "accepte" ? "accepté" : "refusé"} ${pc(id)}${com ? " : " + com : ""}`}, (now() AT TIME ZONE 'Europe/Paris')::date, true, 'Espace client', ${id})`;
   return c.json({ ok: true, decision });
 });
