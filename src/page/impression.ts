@@ -357,7 +357,7 @@ function vEtq(){etqEmpl();
   h+="<div class='card'><div class='step'>À imprimer ("+nb+" étiquette"+(nb>1?"s":"")+")</div>";
   if(!ETQ.length)h+="<div class='muted'>Aucun produit pour l'instant.</div>";
   ETQ.forEach(function(it,i){
-    h+="<div class='hrow' style='display:flex;gap:8px;align-items:center;justify-content:space-between;margin:6px 0'><div><b>"+esc(it.big||it.titre)+"</b><div class='muted'>"+(it.big?"Emplacement / casier":esc(it.prix)+" € · "+(it.barcode?"code-barres "+esc(it.barcode):it.sku?"sku "+esc(it.sku):"pas de code-barres"))+"</div></div>"
+    h+="<div class='hrow' style='display:flex;gap:8px;align-items:center;justify-content:space-between;margin:6px 0'><div><b>"+esc(it.big||it.titre)+"</b><div class='muted'>"+(it.big?"Emplacement / casier":"<input class='etqp' data-i='"+i+"' value='"+esc(String(it.prix).replace(".",","))+"' inputmode='decimal' style='width:74px;text-align:right;padding:3px'> € · "+(it.barcode?"code-barres "+esc(it.barcode):it.sku?"sku "+esc(it.sku):"pas de code-barres"))+"</div></div>"
       +"<div style='display:flex;gap:6px;align-items:center'><input type='number' min='1' max='200' value='"+it.qte+"' style='width:70px' data-act='etqQte' data-i='"+i+"'><button class='danger' data-act='etqSuppr' data-i='"+i+"'>×</button></div></div>"});
   if(ETQ.length)h+="<div class='actions'><button data-act='etqPrint'>Imprimer</button><button class='sec' data-act='etqVider'>Tout vider</button></div>"
     +"<div class='step' style='margin-top:10px'>Aperçu</div><div style='overflow:auto;background:#eee;padding:8px'>"+etqLabel(ETQ[0],F)+"</div>";
@@ -390,6 +390,7 @@ ACTS.etqGenListe=function(){var q=Math.max(1,parseInt(v("eg-q"),10)||1);etqAjout
 ACTS.etqMode=function(b){ETQF=b.dataset.f;try{localStorage.setItem("etqf",ETQF)}catch(e){}render()};
 ACTS.etqFormat=function(b){ETQF=b.value;try{localStorage.setItem("etqf",ETQF)}catch(e){}render()};
 ACTS.etqSkip=function(b){ETQSKIP=Math.max(0,Number(b.value)||0)};
+document.addEventListener("change",function(e){var t=e.target;if(!t||!t.classList||!t.classList.contains("etqp"))return;var it=ETQ[+t.dataset.i];if(!it)return;var n=Number(String(t.value).replace(",",".").replace(/[^0-9.]/g,""));if(!(n>=0)){alert("Prix invalide.");render();return}it.prix=n.toFixed(2);api("/stock/prix-etiquette",{code:it.barcode||"",prix:it.prix}).then(function(d){toastOk(d.maj?"Prix mis à jour aussi dans le stock.":"Prix modifié sur l'étiquette.");render()}).catch(function(er){alert(er.message);render()})});
 ACTS.etqQte=function(b){var it=ETQ[+b.dataset.i];if(it){it.qte=Math.max(1,Math.min(200,Number(b.value)||1))}};
 ACTS.etqSuppr=function(b){ETQ.splice(+b.dataset.i,1);render()};
 ACTS.etqLieu=async function(){

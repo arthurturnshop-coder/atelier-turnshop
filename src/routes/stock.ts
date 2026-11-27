@@ -137,6 +137,17 @@ app.post("/api/stock/rapide", async (c) => {
   return c.json({ message: `${p.nom} : ${p.qte} en stock${p.emplacement ? " (" + p.emplacement + ")" : ""} · code ${p.code}`, produit: vue(p) });
 });
 
+// Prix modifié depuis le panier d'étiquettes : met aussi à jour la fiche stock si le code existe.
+app.post("/api/stock/prix-etiquette", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const code = clean(b.code, 80);
+  const p = cents(b.prix);
+  if (p === null || p === undefined) throw new AppError(400, "Prix invalide.");
+  let maj = false;
+  if (code) { const r = (await sql`UPDATE stock_produits SET prix_cents = ${p}, maj_le = now() WHERE code = ${code} RETURNING id`) as any[]; maj = r.length > 0; }
+  return c.json({ maj });
+});
+
 app.post("/api/stock/maj", async (c) => {
   const b = await c.req.json().catch(() => ({}));
   const id = Number(b.id);
