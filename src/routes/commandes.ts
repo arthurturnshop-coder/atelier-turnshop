@@ -79,10 +79,25 @@ export async function creerCommandeShopify(venteId: number): Promise<{ ok: boole
     const acs = (await sql`SELECT va.montant_cents, COALESCE((SELECT moyen FROM vente_paiements WHERE vente_id = va.acompte_id ORDER BY montant_cents DESC LIMIT 1), 'carte') AS moyen FROM vente_acomptes va WHERE va.vente_id = ${v.id}`) as any[];
     for (const a of acs) paiements.push({ moyen: a.moyen, montant_cents: a.montant_cents });
     const order = construireCommande(v, client, rep, lignes, paiements);
-    const data = await shopifyMutate(
-      `mutation($order: OrderCreateOrderInput!, $options: OrderCreateOptionsInput) { orderCreate(order: $order, options: $options) { order { id name customer { id } } userErrors { field message } } }`,
-      { order, options: { inventoryBehaviour: "DECREMENT_IGNORING_POLICY", sendReceipt: !!rep && !!String(client?.email ?? "").trim(), sendFulfillmentReceipt: false } },
-    );
+    // Boutique de la vente (Amiens / Rouen) : tag + lieu d'expédition (le stock Shopify baisse dans la bonne boutique).
+    const mag = String(v.magasin ?? "").trim();
+    let locId: string | null = null;
+    if (mag) {
+      order.tags.push(mag);
+      try {
+        const L = await shopifyMutate(`query { locations(first: 20) { nodes { id name } } }`, {});
+        const mots = /rouen/i.test(mag) ? ["rouen", "harcourt"] : [mag.toLowerCase()];
+        locId = (L.locations?.nodes ?? []).find((n: any) => mots.some((m) => String(n.name).toLowerCase().includes(m)))?.id ?? null;
+      } catch { /* lieu introuvable : commande sans lieu */ }
+    }
+    const MUT = `mutation($order: OrderCreateOrderInput!, $options: OrderCreateOptionsInput) { orderCreate(order: $order, options: $options) { order { id name customer { id } } userErrors { field message } } }`;
+    const opts = { inventoryBehaviour: "DECREMENT_IGNORING_POLICY", sendReceipt: !!rep && !!String(client?.email ?? "").trim(), sendFulfillmentReceipt: false };
+    let data: any;
+    if (locId && !order.shippingAddress) {
+      // Essai avec le lieu d'expédition ; si Shopify refuse, on recrée sans (l'encaissement ne doit jamais bloquer).
+      data = await shopifyMutate(MUT, { order: { ...order, fulfillmentStatus: undefined, fulfillment: { locationId: locId, notifyCustomer: false } }, options: opts });
+      if (data?.orderCreate?.userErrors?.length) data = await shopifyMutate(MUT, { order, options: opts });
+    } else data = await shopifyMutate(MUT, { order, options: opts });
     const res = data?.orderCreate;
     if (res?.userErrors?.length) throw new Error(res.userErrors.map((e: any) => e.message).join(" · "));
     if (!res?.order?.id) throw new Error("Shopify n'a pas renvoyé de commande.");
