@@ -257,6 +257,20 @@ body{background:#d9ded9}
 .devis2 .dv-d{margin:0;position:sticky;top:130px;max-height:calc(100vh - 150px);overflow:auto}
 @media(max-width:980px){.devis2{grid-template-columns:1fr}.devis2 .dv-d{position:static;max-height:none}}
 
+.dv-d{font-size:13px}
+.dv-d table{width:100%;table-layout:auto}
+.dv-d th{font-size:11px;text-transform:uppercase;color:#555;padding:2px 4px}
+.dv-d td{padding:5px 4px;vertical-align:top;border-top:1px solid #d3dbd5;line-height:1.25}
+.dv-d td:first-child{width:46%;font-weight:600}
+.dv-d .dvact{margin-top:4px;display:flex;flex-wrap:wrap;gap:4px;font-weight:400}
+.dv-d .dvact button{min-height:0;padding:2px 7px;font-size:12px;letter-spacing:0;font-weight:600}
+.dv-d td button.sec[data-act='lgQte']{min-height:0;padding:1px 7px;font-size:14px}
+.dv-d input.lgq{width:38px!important;padding:3px;font-size:13px;min-height:0}
+.dv-d input.lgp{width:62px!important;padding:3px;font-size:13px;min-height:0}
+.dv-d input.lgr{width:92px!important;font-size:11px!important;padding:2px 3px!important;min-height:0;margin-top:3px}
+.dv-d .tag{font-size:11px;padding:0 5px}
+.dv-d .step{font-size:13px;margin:8px 0 2px}
+.dv-d .tot{font-size:17px}
 </style></head><body><header><span>FS <small style='font-weight:400;font-size:14px;opacity:.9'>by TURN Shop</small></span><div id="rech" class="rech" style="display:none"><input id="rq" type="search" placeholder="Chercher : n° PC, client, modèle, produit..." autocomplete="off"><div id="rpanel" class="rpanel" style="display:none"></div></div><span id="who"></span></header><nav id="nav"></nav><main id="app">Chargement…</main>
 <script>
 `;
