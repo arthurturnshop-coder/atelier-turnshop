@@ -6,6 +6,8 @@ function bigOk(t,sub){var o=document.createElement("div");o.style.cssText="posit
   document.body.appendChild(o);var ms=sub?3500:1600;function f(){if(o.parentNode)o.remove()}o.addEventListener("click",f);setTimeout(f,ms)}
 function cReset(){CLIV={adresse:"",cp:"",ville:""};CREP=null;CAFF=[];CRAFF=[];CACO=0;PAN=[];CPAY={carte:"",especes:"",virement:"",bon_achat:""};CCLI=null;CFID=null;CUSE=false;CAVOFF=[];CMSG=""}
 var ACTS={
+  retirePiece:function(b){api("/devis/ligne/retire",{id:+b.dataset.id,v:b.dataset.v==="1"}).then(function(){recharger(FICHE.id)}).catch(function(e){alert(e.message)})},
+  remDevis:function(b){api("/devis/remise",{repairId:+b.dataset.id,valeur:v("rd-v")}).then(function(){recharger(FICHE.id)}).catch(function(e){alert(e.message)})},
   chooseMag:function(b){loadProfils(b.dataset.mag)},
   choosePrenom:choosePrenom,
   loginBack:function(){LG={step:"mag"};MSG="";render()},

@@ -24,10 +24,16 @@ export function telBidon(tel: string | null | undefined): boolean {
 }
 
 export async function devisDe(repId: number) {
-  const lignes = (await sql`SELECT d.id, d.type, d.libelle, d.quantite, d.prix_unitaire_cents, d.shopify_variant_id, d.sku, d.barcode, d.marque, d.remise_client, d.prix_manuel, d.prix_origine_cents, d.series, (SELECT statut FROM commande_lignes cl WHERE cl.devis_ligne_id = d.id ORDER BY cl.id DESC LIMIT 1) AS cmd FROM devis_lignes d WHERE d.reparation_id = ${repId} ORDER BY d.type DESC, d.id`) as any[];
+  const lignes = (await sql`SELECT d.id, d.type, d.libelle, d.quantite, d.prix_unitaire_cents, d.shopify_variant_id, d.sku, d.barcode, d.marque, d.remise_client, d.prix_manuel, d.prix_origine_cents, d.retire, d.series, (SELECT statut FROM commande_lignes cl WHERE cl.devis_ligne_id = d.id ORDER BY cl.id DESC LIMIT 1) AS cmd FROM devis_lignes d WHERE d.reparation_id = ${repId} ORDER BY d.type DESC, d.id`) as any[];
   const total = lignes.reduce((s, l) => s + l.quantite * l.prix_unitaire_cents, 0);
-  const remiseMultiCents = await remiseMulti(lignes.map((l) => ({ type: l.type, quantite: l.quantite, libelle: l.libelle })), total);
-  return { remiseMultiCents, netCents: total - remiseMultiCents, lignes: lignes.map((l) => ({ id: l.id, type: l.type, libelle: l.libelle, quantite: l.quantite, prixCents: l.prix_unitaire_cents, variantId: l.shopify_variant_id ?? "", sku: l.sku ?? "", barcode: l.barcode ?? "", series: l.series ?? "", commande: l.cmd ?? "", remiseClient: !!l.remise_client, prixManuel: !!l.prix_manuel, origineCents: l.prix_origine_cents ?? null })), totalCents: total };
+  const remiseAuto = await remiseMulti(lignes.map((l) => ({ type: l.type, quantite: l.quantite, libelle: l.libelle })), total);
+  const [rp] = (await sql`SELECT remise_devis_txt FROM reparations WHERE id = ${repId}`) as any[];
+  const rt = String(rp?.remise_devis_txt ?? "");
+  const rn = Number(rt.replace(/[%€]/g, ""));
+  let remiseManuelleCents = 0;
+  if (rt && rn > 0) remiseManuelleCents = Math.min(total - remiseAuto, rt.includes("%") ? Math.round(((total - remiseAuto) * Math.min(rn, 100)) / 100) : Math.round(rn * 100));
+  const remiseMultiCents = remiseAuto + remiseManuelleCents;
+  return { remiseMultiCents, remiseManuelleCents, remiseTxt: rt, netCents: total - remiseMultiCents, lignes: lignes.map((l) => ({ id: l.id, type: l.type, libelle: l.libelle, quantite: l.quantite, prixCents: l.prix_unitaire_cents, variantId: l.shopify_variant_id ?? "", sku: l.sku ?? "", barcode: l.barcode ?? "", series: l.series ?? "", commande: l.cmd ?? "", remiseClient: !!l.remise_client, prixManuel: !!l.prix_manuel, origineCents: l.prix_origine_cents ?? null, retire: !!l.retire })), totalCents: total };
 }
 
 await sql`ALTER TABLE reparations ADD COLUMN IF NOT EXISTS boite TEXT`;
@@ -273,6 +279,27 @@ app.post("/api/devis/ligne/remise", async (c) => {
     if (nouveau < 0 || (txt.includes("%") && n > 100)) throw new AppError(400, "Remise trop élevée.");
   }
   await sql`UPDATE devis_lignes SET prix_unitaire_cents = ${nouveau}, prix_origine_cents = ${nouveau === base ? null : base} WHERE id = ${id}`;
+  await sql`UPDATE reparations SET maj_le = now() WHERE id = ${l.reparation_id}`;
+  return c.json({ devis: await devisDe(l.reparation_id) });
+});
+
+app.post("/api/devis/remise", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const id = Number(b.repairId);
+  const txt = String(b.valeur ?? "").replace(/\s/g, "").replace(",", ".").replace(/^-/, "");
+  if (txt && !(Number(txt.replace(/[%€]/g, "")) > 0)) throw new AppError(400, "Remise invalide : écris 20% ou 15 (en €).");
+  const [r] = (await sql`SELECT id FROM reparations WHERE id = ${id} AND supprime_le IS NULL`) as any[];
+  if (!r) throw new AppError(404, "Réparation introuvable.");
+  await sql`UPDATE reparations SET remise_devis_txt = ${txt || null}, maj_le = now() WHERE id = ${id}`;
+  return c.json({ devis: await devisDe(id) });
+});
+
+app.post("/api/devis/ligne/retire", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const id = Number(b.id);
+  const [l] = await sql`SELECT reparation_id FROM devis_lignes WHERE id = ${id}`;
+  if (!l) throw new AppError(404, "Ligne introuvable.");
+  await sql`UPDATE devis_lignes SET retire = ${b.v === true || b.v === 1 || b.v === "1"} WHERE id = ${id}`;
   await sql`UPDATE reparations SET maj_le = now() WHERE id = ${l.reparation_id}`;
   return c.json({ devis: await devisDe(l.reparation_id) });
 });
