@@ -70,6 +70,7 @@ export function ligneListe(r: any, journal: any[]) {
     rdvStatut: r.rdv_statut ?? "",
     magasin: r.magasin ?? "",
     boite: r.boite ?? "",
+    repday: r.repday === true,
     affaires: r.affaires ? String(r.affaires).split(",").filter(Boolean) : [],
     affairesAutre: r.affaires_autre ?? "",
     garde: infosGarde(r.pret_le, r.statut, r.abandonnee_le),
@@ -85,6 +86,7 @@ app.get("/api/reparations", async (c) => {
   const compteurs = {
     rdv: rows.filter((r) => r.en_magasin === false).length,
     afaire: rows.filter((r) => r.en_magasin !== false && ["reçu", "diagnostic", "devis envoyé", "à faire", "en réparation"].includes(r.statut)).length,
+    attente: rows.filter((r) => r.en_magasin !== false && r.statut === "devis envoyé").length,
     commande: rows.filter((r) => r.statut === "en attente de pièce").length,
     pretes: rows.filter((r) => r.statut === "prêt").length,
     garantie: rows.filter((r) => r.sous_garantie === true).length,
@@ -93,6 +95,7 @@ app.get("/api/reparations", async (c) => {
   const filtre = (r: any) => {
     if (vue === "rdv") return r.en_magasin === false;
     if (vue === "afaire") return r.en_magasin !== false && ["reçu", "diagnostic", "devis envoyé", "à faire", "en réparation"].includes(r.statut);
+    if (vue === "attente") return r.en_magasin !== false && r.statut === "devis envoyé";
     if (vue === "commande") return r.statut === "en attente de pièce";
     if (vue === "pretes") return r.statut === "prêt";
     if (vue === "garantie") return r.sous_garantie === true;
@@ -102,6 +105,29 @@ app.get("/api/reparations", async (c) => {
   const ids = sel.map((r) => r.id);
   const journal = ids.length ? ((await sql`SELECT reparation_id, date, type, texte FROM journal WHERE reparation_id = ANY(${ids}) ORDER BY id`) as any[]) : [];
   return c.json({ compteurs, reparations: sel.map((r) => ligneListe(r, journal)) });
+});
+
+// Repday (réparation dans la journée) : on/off. Express : ajoute une ligne « Express » +10 € au devis.
+app.post("/api/reparations/repday", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const id = Number(b.id);
+  const [r] = await sql`SELECT id FROM reparations WHERE id = ${id} AND supprime_le IS NULL`;
+  if (!r) throw new AppError(404, "Réparation introuvable.");
+  await sql`UPDATE reparations SET repday = ${b.v === true}, maj_le = now() WHERE id = ${id}`;
+  await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${id}, 'note', ${(b.v === true ? "Repday activé" : "Repday retiré") + signature(c)})`;
+  return c.json({ ok: true });
+});
+app.post("/api/reparations/express", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const id = Number(b.id);
+  const [r] = await sql`SELECT id FROM reparations WHERE id = ${id} AND supprime_le IS NULL`;
+  if (!r) throw new AppError(404, "Réparation introuvable.");
+  const [ex] = await sql`SELECT id FROM devis_lignes WHERE reparation_id = ${id} AND libelle = 'Express' LIMIT 1`;
+  if (ex) throw new AppError(400, "Express déjà ajouté au devis.");
+  await sql`INSERT INTO devis_lignes (reparation_id, type, libelle, quantite, prix_unitaire_cents) VALUES (${id}, 'main_oeuvre', 'Express', 1, 1000)`;
+  await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${id}, 'note', ${"Express +10 € ajouté" + signature(c)})`;
+  await sql`UPDATE reparations SET maj_le = now() WHERE id = ${id}`;
+  return c.json({ ok: true });
 });
 
 // Fiche détaillée d'une réparation (ouverte au clic sur le ticket).

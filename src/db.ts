@@ -11,6 +11,7 @@ await sql`ALTER TABLE reparations ADD COLUMN IF NOT EXISTS technicien TEXT, ADD 
 await sql`ALTER TABLE reparations ADD COLUMN IF NOT EXISTS en_magasin BOOLEAN NOT NULL DEFAULT true`;
 // Nouveautés v2 : commentaire interne, garantie, suppression douce.
 await sql`ALTER TABLE reparations ADD COLUMN IF NOT EXISTS commentaire_interne TEXT NOT NULL DEFAULT ''`;
+await sql`ALTER TABLE reparations ADD COLUMN IF NOT EXISTS repday BOOLEAN NOT NULL DEFAULT false`;
 await sql`ALTER TABLE reparations ADD COLUMN IF NOT EXISTS sous_garantie BOOLEAN NOT NULL DEFAULT false`;
 await sql`ALTER TABLE reparations ADD COLUMN IF NOT EXISTS supprime_le TIMESTAMPTZ`;
 // Lignes de devis : type 'main_oeuvre' ou 'piece'.

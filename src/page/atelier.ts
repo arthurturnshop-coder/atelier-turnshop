@@ -15,7 +15,7 @@ function vEnc(){
   if(FICHE){vFiche();return}
   app.innerHTML=subHtml()+"<div id='vues' class='vues'></div><div id='liste'>Chargement…</div>";
   loadEnc()}
-var VUES=[["tout","Tout"],["rdv","Rendez-vous"],["afaire","À faire"],["commande","En commande"],["pretes","Prêtes"],["garantie","Sous garantie"],["pieces","🛠 Pièces garantie"]];
+var VUES=[["tout","Tout"],["rdv","Rendez-vous"],["afaire","À faire"],["attente","En attente de validation"],["commande","En commande"],["pretes","Prêtes"],["garantie","Sous garantie"],["pieces","🛠 Pièces garantie"]];
 function vuesHtml(cpt){
   return VUES.map(function(x){return"<button class='"+(VUE===x[0]?"on":"")+"' data-act='vue' data-vue='"+x[0]+"'>"+x[1]+"<b>"+(x[0]==="pieces"?(SAV?SAV.length:0):(cpt?cpt[x[0]=="rdv"?"rdv":x[0]]:0))+"</b></button>"}).join("")}
 async function loadEnc(){
@@ -33,7 +33,7 @@ async function loadEnc(){
       +"<div class='muted'>"+(r.boite?"<span class='tag'>📦 "+esc(r.boite)+"</span> ":"")+(r.pieceAValider?"<span class='tag warn'>📦 Pièce arrivée : à valider</span> ":"")+(r.pieceArrivee?"<span class='tag warn'>Pièce arrivée : prévenir</span> ":"")+(r.source==="web"?"<span class='tag ok'>Demande en ligne</span> ":"")+(r.rdvStatut==="attente"?"<span class='tag warn'>RDV à valider</span> ":"")+(r.enMagasin===false?"<span class='tag warn'>Pas en magasin</span> ":"")+(r.sousGarantie?"<span class='tag ok'>Sous garantie</span> ":"")+(r.abandonnee?"<span class='tag warn'>Abandonnée</span> ":(r.garde&&r.garde.fraisCents>0?"<span class='tag warn'>Gardiennage "+eur(r.garde.fraisCents)+"</span> ":(r.garde&&r.garde.jours>=4?"<span class='tag warn'>Prête depuis "+r.garde.jours+" j</span> ":"")))+"Dépôt "+esc(day(r.dateDepot))+"</div></button>"};
   if(VUE==="tout"){
     var AFE=["reçu","diagnostic","à faire","en réparation"];
-    var cols=[["Rendez-vous",function(r){return r.enMagasin===false}],["Commande",function(r){return r.statut==="en attente de pièce"}],["En attente de validation",function(r){return r.enMagasin!==false&&r.statut==="devis envoyé"}],["À faire",function(r){return r.enMagasin!==false&&AFE.indexOf(r.statut)>=0}],["Sous garantie",function(r){return r.sousGarantie===true}],["Prête",function(r){return r.statut==="prêt"}]];
+    var cols=[["Rendez-vous",function(r){return r.enMagasin===false}],["Commande",function(r){return r.statut==="en attente de pièce"}],["Repday",function(r){return r.repday===true&&r.statut!=="récupéré"}],["À faire",function(r){return r.enMagasin!==false&&AFE.indexOf(r.statut)>=0}],["Sous garantie",function(r){return r.sousGarantie===true}],["Prête",function(r){return r.statut==="prêt"}]];
     el.innerHTML="<div class='kan'>"+cols.map(function(c){var x=l.filter(c[1]);return"<div class='kcol'><div class='khead'>"+c[0]+" <b>"+x.length+"</b></div>"+(x.length?x.map(card).join(""):"<div class='muted'>Aucune</div>")+"</div>"}).join("")+"</div>";return}
   el.innerHTML="<div class='grid'>"+l.map(card).join("")+"</div>"}
 
@@ -114,7 +114,7 @@ function vFiche(){
     +"<div class='card' style='margin:0'><div class='step'>Description de la panne</div><textarea id='fp' rows='3'>"+esc(f.panne)+"</textarea>"
     +"<div class='step'>Commentaire interne (visible seulement par TURN)</div><textarea id='fc' rows='3' placeholder='Ce que le client a demandé, ce qu il faudrait lui proposer...'>"+esc(f.commentaireInterne||"")+"</textarea>"
     +"<button data-act='saveFiche' data-id='"+f.id+"'>Enregistrer la description et le commentaire</button></div></div>"
-    +affairesCard(f)+garantieHtml(f)+(f.sousGarantie?facturesAchatHtml(f):"")+gardeHtml(f)
+    +repdayCard(f)+affairesCard(f)+garantieHtml(f)+(f.sousGarantie?facturesAchatHtml(f):"")+gardeHtml(f)
     +"<div class='card'><div class='step'>Devis</div>"+devisHtml(f)+"</div>"
     +"<div class='card'><div class='step'>Historique</div>"+(f.journal||[]).slice().reverse().map(function(j){return"<div class='hist'>"+esc(dayHour(j.date))+" · "+esc(j.texte)+"</div>"}).join("")
     +"<input id='fn' placeholder='Ajouter une note à l historique'><button class='sec' data-act='addNote' data-id='"+f.id+"'>Ajouter la note</button></div>";
@@ -131,6 +131,7 @@ function boitesCharge(){if(BXOC===null){BXOC=undefined;api("/boites").then(funct
 var AFFL=["Casque","Clés","Chargeur","Autre"];
 function affairesBox(pre){return"<div class='muted' style='margin-top:6px'>🎒 Affaires laissées par le client</div><div class='actions' style='flex-wrap:wrap'>"+AFFL.map(function(a,i){return"<label class='muted' style='display:flex;gap:6px;align-items:center'><input type='checkbox' id='"+pre+"-af"+i+"' style='width:auto;margin:0'> "+a+"</label>"}).join("")+"</div><div class='muted'>Casque coché = 3 tickets (un à agrafer au casque).</div>"}
 function affairesLire(pre){return AFFL.filter(function(a,i){var e=document.getElementById(pre+"-af"+i);return e&&e.checked})}
+function repdayCard(f){return"<div class='card'><div class='actions' style='flex-wrap:wrap'><button class='"+(f.repday?"":"sec")+"' data-act='repday' data-id='"+f.id+"' data-v='"+(f.repday?0:1)+"'>"+(f.repday?"⚡ REPDAY ✓ (clique pour retirer)":"⚡ Repday")+"</button><button class='sec' data-act='express' data-id='"+f.id+"'>🚀 Express +10 €</button></div></div>"}
 function affairesCard(f){var A=f.affaires||[];return"<div class='card'><div class='step'>🎒 Affaires laissées par le client</div><div class='actions' style='flex-wrap:wrap'>"+AFFL.map(function(a){var on=A.indexOf(a)>=0;return"<button class='"+(on?"":"sec")+"' data-act='affSet' data-id='"+f.id+"' data-a='"+a+"'>"+(on?"✓ ":"")+a+"</button>"}).join("")+"</div>"+(A.indexOf("Autre")>=0?"<div class='dl' style='margin-top:6px'><input id='aff-autre' value='"+esc(f.affairesAutre||"")+"' placeholder='Quoi ? (ex : antivol, sac, béquille…)' data-fid='"+f.id+"'></div>":"")+(A.length?"":"<div class='muted'>Rien de laissé.</div>")+"</div>"}
 function boiteSelect(id){
   boitesCharge();var L=BXOC&&BXOC.length?BXOC:["C1","C2","C3","C4","C5","C6","C7","C8"].map(function(n){return{nom:n,repairId:null}});

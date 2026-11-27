@@ -17,6 +17,8 @@ var ACTS={
   mkPlNew:function(){MKTE=null;render()},
   mkPlDel:function(b){api("/marketing/planning/supprimer",{id:+b.dataset.id}).then(function(){MKT=null;render()}).catch(function(e){alert(e.message)})},
   remAnnule:function(b,e){if(e&&e.preventDefault)e.preventDefault();api("/devis/ligne/remise",{id:+b.dataset.id,valeur:""}).then(function(){recharger(FICHE.id)}).catch(function(er){alert(er.message)})},
+  repday:function(b){api("/reparations/repday",{id:+b.dataset.id,v:b.dataset.v==="1"}).then(function(){recharger(FICHE.id)}).catch(function(e){alert(e.message)})},
+  express:function(b){api("/reparations/express",{id:+b.dataset.id}).then(function(){recharger(FICHE.id)}).catch(function(e){alert(e.message)})},
   retirePiece:function(b){api("/devis/ligne/retire",{id:+b.dataset.id,v:b.dataset.v==="1"}).then(function(){recharger(FICHE.id)}).catch(function(e){alert(e.message)})},
   remDevis:function(b){api("/devis/remise",{repairId:+b.dataset.id,valeur:v("rd-v")}).then(function(){recharger(FICHE.id)}).catch(function(e){alert(e.message)})},
   chooseMag:function(b){loadProfils(b.dataset.mag)},
