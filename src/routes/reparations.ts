@@ -38,6 +38,7 @@ export async function devisDe(repId: number) {
 
 await sql`ALTER TABLE reparations ADD COLUMN IF NOT EXISTS boite TEXT`;
 await sql`ALTER TABLE reparations ADD COLUMN IF NOT EXISTS affaires TEXT`;
+await sql`ALTER TABLE reparations ADD COLUMN IF NOT EXISTS affaires_autre TEXT`;
 const AFFAIRES = ["Casque", "Clés", "Chargeur", "Autre"];
 const affairesClean = (v: any) => (Array.isArray(v) ? AFFAIRES.filter((a) => v.includes(a)) : []);
 const BOITES = ["C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8"];
@@ -70,6 +71,7 @@ export function ligneListe(r: any, journal: any[]) {
     magasin: r.magasin ?? "",
     boite: r.boite ?? "",
     affaires: r.affaires ? String(r.affaires).split(",").filter(Boolean) : [],
+    affairesAutre: r.affaires_autre ?? "",
     garde: infosGarde(r.pret_le, r.statut, r.abandonnee_le),
     abandonnee: !!r.abandonnee_le,
     journal: journal.filter((j) => j.reparation_id === r.id).map((j) => ({ date: j.date, type: j.type, texte: j.texte })),
@@ -186,6 +188,11 @@ app.post("/api/reparations/maj", async (c) => {
     await sql`UPDATE reparations SET sous_garantie = ${b.sousGarantie}, maj_le = now() WHERE id = ${id}`;
     await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${id}, 'statut', ${(b.sousGarantie ? "Marquée sous garantie" : "Garantie retirée") + signature(c)})`;
     touche = true;
+  }
+  if (typeof b.affairesAutre === "string") {
+    const t = clean(b.affairesAutre, 120);
+    await sql`UPDATE reparations SET affaires_autre = ${t || null}, maj_le = now() WHERE id = ${id}`;
+    if (t) await sql`INSERT INTO journal (reparation_id, type, texte) VALUES (${id}, 'note', ${"Autre affaire laissée : " + t + signature(c)})`;
   }
   if (Array.isArray(b.affaires)) {
     const nv = affairesClean(b.affaires).join(",");
