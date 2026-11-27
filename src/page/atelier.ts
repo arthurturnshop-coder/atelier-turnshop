@@ -110,10 +110,11 @@ function vFiche(){
     +(f.enMagasin===false?"<div class='tag warn' style='margin:6px 0'>Trottinette pas en magasin</div><button data-act='arrivee' data-id='"+f.id+"' data-fiche='1'>Trottinette arrivée</button>":"")
     +"<div class='step' style='margin-top:10px'>Statut</div><div class='stbtns'>"+ST.map(function(s){if(s==="devis envoyé"&&s!==f.statut)return"<button class='dis' disabled title='Se met tout seul quand tu envoies le devis au client'>"+esc(s)+" (auto)</button>";return"<button class='"+(s===f.statut?"on":"")+"' data-act='setStatut' data-id='"+f.id+"' data-s='"+esc(s)+"'>"+esc(s)+"</button>"}).join("")+"</div>"
     +"<button class='"+(f.sousGarantie?"":"sec")+"' data-act='setGarantie' data-id='"+f.id+"' data-v='"+(f.sousGarantie?0:1)+"' style='margin-top:8px;padding:12px 18px;font-size:16px;font-weight:800;"+(f.sousGarantie?"":"border:2px solid var(--vert);")+"'>"+(f.sousGarantie?"🛡 SOUS GARANTIE ✓ (clique pour retirer)":"🛡 Cette réparation est sous garantie ?")+"</button>"+(f.sousGarantie?"":"<div class='muted'>Clique pour ouvrir le suivi garantie : N° RMA, factures, demande au fournisseur.</div>")+"</div>"
-    +codeCard(f)+boiteCard(f)+affairesCard(f)+garantieHtml(f)+(f.sousGarantie?facturesAchatHtml(f):"")+gardeHtml(f)
-    +"<div class='card'><div class='step'>Description de la panne</div><textarea id='fp' rows='3'>"+esc(f.panne)+"</textarea>"
+    +"<div class='fiche2'><div>"+codeCard(f)+boiteCard(f)+"</div>"
+    +"<div class='card' style='margin:0'><div class='step'>Description de la panne</div><textarea id='fp' rows='3'>"+esc(f.panne)+"</textarea>"
     +"<div class='step'>Commentaire interne (visible seulement par TURN)</div><textarea id='fc' rows='3' placeholder='Ce que le client a demandé, ce qu il faudrait lui proposer...'>"+esc(f.commentaireInterne||"")+"</textarea>"
-    +"<button data-act='saveFiche' data-id='"+f.id+"'>Enregistrer la description et le commentaire</button></div>"
+    +"<button data-act='saveFiche' data-id='"+f.id+"'>Enregistrer la description et le commentaire</button></div></div>"
+    +affairesCard(f)+garantieHtml(f)+(f.sousGarantie?facturesAchatHtml(f):"")+gardeHtml(f)
     +"<div class='card'><div class='step'>Devis</div>"+devisHtml(f)+"</div>"
     +"<div class='card'><div class='step'>Historique</div>"+(f.journal||[]).slice().reverse().map(function(j){return"<div class='hist'>"+esc(dayHour(j.date))+" · "+esc(j.texte)+"</div>"}).join("")
     +"<input id='fn' placeholder='Ajouter une note à l historique'><button class='sec' data-act='addNote' data-id='"+f.id+"'>Ajouter la note</button></div>";

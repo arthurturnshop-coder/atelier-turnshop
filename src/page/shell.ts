@@ -271,6 +271,10 @@ body{background:#d9ded9}
 .dv-d .tag{font-size:11px;padding:0 5px}
 .dv-d .step{font-size:13px;margin:8px 0 2px}
 .dv-d .tot{font-size:17px}
+.fiche2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
+.fiche2 .card:first-child{margin-top:10px}
+@media(max-width:900px){.fiche2{grid-template-columns:1fr}}
+.fiche2 textarea{width:100%;box-sizing:border-box}
 </style></head><body><header><span>FS <small style='font-weight:400;font-size:14px;opacity:.9'>by TURN Shop</small></span><div id="rech" class="rech" style="display:none"><input id="rq" type="search" placeholder="Chercher : n° PC, client, modèle, produit..." autocomplete="off"><div id="rpanel" class="rpanel" style="display:none"></div></div><span id="who"></span></header><nav id="nav"></nav><main id="app">Chargement…</main>
 <script>
 `;
