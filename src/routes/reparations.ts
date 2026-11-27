@@ -24,10 +24,10 @@ export function telBidon(tel: string | null | undefined): boolean {
 }
 
 export async function devisDe(repId: number) {
-  const lignes = (await sql`SELECT d.id, d.type, d.libelle, d.quantite, d.prix_unitaire_cents, d.shopify_variant_id, d.sku, d.barcode, d.marque, d.remise_client, d.prix_manuel, d.series, (SELECT statut FROM commande_lignes cl WHERE cl.devis_ligne_id = d.id ORDER BY cl.id DESC LIMIT 1) AS cmd FROM devis_lignes d WHERE d.reparation_id = ${repId} ORDER BY d.type DESC, d.id`) as any[];
+  const lignes = (await sql`SELECT d.id, d.type, d.libelle, d.quantite, d.prix_unitaire_cents, d.shopify_variant_id, d.sku, d.barcode, d.marque, d.remise_client, d.prix_manuel, d.prix_origine_cents, d.series, (SELECT statut FROM commande_lignes cl WHERE cl.devis_ligne_id = d.id ORDER BY cl.id DESC LIMIT 1) AS cmd FROM devis_lignes d WHERE d.reparation_id = ${repId} ORDER BY d.type DESC, d.id`) as any[];
   const total = lignes.reduce((s, l) => s + l.quantite * l.prix_unitaire_cents, 0);
   const remiseMultiCents = await remiseMulti(lignes.map((l) => ({ type: l.type, quantite: l.quantite, libelle: l.libelle })), total);
-  return { remiseMultiCents, netCents: total - remiseMultiCents, lignes: lignes.map((l) => ({ id: l.id, type: l.type, libelle: l.libelle, quantite: l.quantite, prixCents: l.prix_unitaire_cents, variantId: l.shopify_variant_id ?? "", sku: l.sku ?? "", barcode: l.barcode ?? "", series: l.series ?? "", commande: l.cmd ?? "", remiseClient: !!l.remise_client, prixManuel: !!l.prix_manuel })), totalCents: total };
+  return { remiseMultiCents, netCents: total - remiseMultiCents, lignes: lignes.map((l) => ({ id: l.id, type: l.type, libelle: l.libelle, quantite: l.quantite, prixCents: l.prix_unitaire_cents, variantId: l.shopify_variant_id ?? "", sku: l.sku ?? "", barcode: l.barcode ?? "", series: l.series ?? "", commande: l.cmd ?? "", remiseClient: !!l.remise_client, prixManuel: !!l.prix_manuel, origineCents: l.prix_origine_cents ?? null })), totalCents: total };
 }
 
 await sql`ALTER TABLE reparations ADD COLUMN IF NOT EXISTS boite TEXT`;
@@ -251,9 +251,28 @@ app.post("/api/devis/ligne/prix", async (c) => {
   const p = Math.round(Number(String(b.prix ?? "").replace(/[^0-9,.-]/g, "").replace(",", ".")) * 100);
   if (!(p >= 0 && p <= 10000000)) throw new AppError(400, "Prix invalide.");
   if (p !== l.prix_unitaire_cents) {
-    await sql`UPDATE devis_lignes SET prix_unitaire_cents = ${p}, prix_manuel = true WHERE id = ${id}`;
+    await sql`UPDATE devis_lignes SET prix_unitaire_cents = ${p}, prix_manuel = true, prix_origine_cents = NULL WHERE id = ${id}`;
     if (l.type === "piece") void tagPrixManuel(l.shopify_variant_id);
   }
+  await sql`UPDATE reparations SET maj_le = now() WHERE id = ${l.reparation_id}`;
+  return c.json({ devis: await devisDe(l.reparation_id) });
+});
+
+app.post("/api/devis/ligne/remise", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const id = Number(b.id);
+  const [l] = await sql`SELECT reparation_id, prix_unitaire_cents, prix_origine_cents FROM devis_lignes WHERE id = ${id}`;
+  if (!l) throw new AppError(404, "Ligne introuvable.");
+  const base = l.prix_origine_cents ?? l.prix_unitaire_cents;
+  const txt = String(b.valeur ?? "").replace(/\s/g, "").replace(",", ".").replace(/^-/, "");
+  let nouveau = base;
+  if (txt !== "" && Number(txt.replace(/[%€]/g, "")) > 0) {
+    const n = Number(txt.replace(/[%€]/g, ""));
+    if (!Number.isFinite(n)) throw new AppError(400, "Remise invalide.");
+    nouveau = txt.includes("%") ? Math.round(base * (1 - n / 100)) : base - Math.round(n * 100);
+    if (nouveau < 0 || (txt.includes("%") && n > 100)) throw new AppError(400, "Remise trop élevée.");
+  }
+  await sql`UPDATE devis_lignes SET prix_unitaire_cents = ${nouveau}, prix_origine_cents = ${nouveau === base ? null : base} WHERE id = ${id}`;
   await sql`UPDATE reparations SET maj_le = now() WHERE id = ${l.reparation_id}`;
   return c.json({ devis: await devisDe(l.reparation_id) });
 });
