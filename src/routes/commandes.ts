@@ -92,12 +92,17 @@ export async function creerCommandeShopify(venteId: number): Promise<{ ok: boole
     }
     const MUT = `mutation($order: OrderCreateOrderInput!, $options: OrderCreateOptionsInput) { orderCreate(order: $order, options: $options) { order { id name customer { id } } userErrors { field message } } }`;
     const opts = { inventoryBehaviour: "DECREMENT_IGNORING_POLICY", sendReceipt: !!rep && !!String(client?.email ?? "").trim(), sendFulfillmentReceipt: false };
+    // Le numéro de commande Shopify = le numéro de facture de l'atelier (F-AAAA-NNNNN). Si Shopify refuse, on retombe sur son propre numéro.
+    const nomCmd = v.numero_facture ? { name: String(v.numero_facture) } : {};
+    const essais: any[] = [];
+    if (locId && !order.shippingAddress) essais.push({ ...order, ...nomCmd, fulfillmentStatus: undefined, fulfillment: { locationId: locId, notifyCustomer: false } });
+    essais.push({ ...order, ...nomCmd });
+    if (v.numero_facture) essais.push(order);
     let data: any;
-    if (locId && !order.shippingAddress) {
-      // Essai avec le lieu d'expédition ; si Shopify refuse, on recrée sans (l'encaissement ne doit jamais bloquer).
-      data = await shopifyMutate(MUT, { order: { ...order, fulfillmentStatus: undefined, fulfillment: { locationId: locId, notifyCustomer: false } }, options: opts });
-      if (data?.orderCreate?.userErrors?.length) data = await shopifyMutate(MUT, { order, options: opts });
-    } else data = await shopifyMutate(MUT, { order, options: opts });
+    for (const o of essais) {
+      data = await shopifyMutate(MUT, { order: o, options: opts });
+      if (!data?.orderCreate?.userErrors?.length) break;
+    }
     const res = data?.orderCreate;
     if (res?.userErrors?.length) throw new Error(res.userErrors.map((e: any) => e.message).join(" · "));
     if (!res?.order?.id) throw new Error("Shopify n'a pas renvoyé de commande.");
