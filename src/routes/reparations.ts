@@ -28,7 +28,7 @@ export async function devisDe(repId: number) {
   const total = lignes.reduce((s, l) => s + l.quantite * l.prix_unitaire_cents, 0);
   const remiseAuto = await remiseMulti(lignes.map((l) => ({ type: l.type, quantite: l.quantite, libelle: l.libelle })), total);
   const [rp] = (await sql`SELECT remise_devis_txt FROM reparations WHERE id = ${repId}`) as any[];
-  const rt = String(rp?.remise_devis_txt ?? "");
+  const rt = ""; void rp; // remise globale abandonnée : seules les remises par ligne existent
   const rn = Number(rt.replace(/[%€]/g, ""));
   let remiseManuelleCents = 0;
   if (rt && rn > 0) remiseManuelleCents = Math.min(total - remiseAuto, rt.includes("%") ? Math.round(((total - remiseAuto) * Math.min(rn, 100)) / 100) : Math.round(rn * 100));
