@@ -29,12 +29,24 @@ export async function fiche(id: number) {
 }
 
 
+// Pré-filtre en base (chaque mot doit se retrouver quelque part) : plus de limite arbitraire qui masquait les clients en fin d'alphabet.
+async function poolClients(mots: string[]): Promise<any[]> {
+  let where = sql`TRUE`;
+  for (const m of mots) {
+    const like = `%${m.replace(/[\\%_]/g, "\\$&")}%`;
+    const d = m.replace(/\D/g, "");
+    const likeTel = d.length >= 3 && d === m ? `%${d}%` : "@@aucun@@";
+    where = sql`${where} AND (lower(prenom) LIKE ${like} OR lower(nom) LIKE ${like} OR lower(email) LIKE ${like} OR regexp_replace(coalesce(telephone,''), '\\D', '', 'g') LIKE ${likeTel})`;
+  }
+  return (await sql`SELECT id, prenom, nom, email, telephone, lower(coalesce(prenom,'')) AS p, lower(coalesce(nom,'')) AS n, lower(coalesce(email,'')) AS e, regexp_replace(coalesce(telephone,''), '\\D', '', 'g') AS t FROM clients WHERE ${where} ORDER BY nom LIMIT 300`) as any[];
+}
+
 app.get("/api/search", async (c) => {
   const q = clean(c.req.query("q"), 100);
   if (!q) return c.json([]);
   // Chaque mot doit se retrouver dans le prénom, le nom, l'email ou le téléphone (chiffres seuls pour le téléphone).
   const mots = q.toLowerCase().split(/\s+/).filter(Boolean).slice(0, 5);
-  const pool = (await sql`SELECT id, lower(prenom) AS p, lower(nom) AS n, lower(email) AS e, regexp_replace(telephone, '\\D', '', 'g') AS t FROM clients ORDER BY nom LIMIT 5000`) as any[];
+  const pool = await poolClients(mots);
   const sc = (r: any) => {
     let s = 0;
     for (const m of mots) {
@@ -73,7 +85,7 @@ app.get("/api/recherche", async (c) => {
   const motsQ = q.toLowerCase().split(/\s+/).filter(Boolean).slice(0, 5);
   let rowsAll: any[] = rows as any[];
   if (motsQ.length > 1) {
-    const pool = (await sql`SELECT id, prenom, nom, email, telephone FROM clients ORDER BY nom LIMIT 5000`) as any[];
+    const pool = await poolClients(motsQ);
     const ok = pool.filter((r) => motsQ.every((m) => `${r.prenom} ${r.nom} ${r.email}`.toLowerCase().includes(m) || (m.replace(/\D/g, "").length >= 3 && String(r.telephone ?? "").replace(/\D/g, "").includes(m.replace(/\D/g, ""))))).slice(0, 8);
     const vus = new Set(rowsAll.map((r) => r.id));
     rowsAll = [...rowsAll, ...ok.filter((r) => !vus.has(r.id))].slice(0, 8);
